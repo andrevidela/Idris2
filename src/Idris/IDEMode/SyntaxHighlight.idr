@@ -101,7 +101,7 @@ outputNameSyntax (fc, (name, _, term)) =
                  -- TyCon   : (tag : Int) -> (arity : Nat) -> NameType
                  (Ref fc Bound name) => Just Bound
                  (Ref fc Func name) => Just Function
-                 (Ref fc (DataCon tag arity) name) => Just Data
+                 (Ref fc (DataCon _ tag arity) name) => Just Data
                  (Ref fc (TyCon tag arity) name) => Just Typ
                  (Meta fc x y xs) => Just Bound
                  (Bind fc x b scope) => Just Bound

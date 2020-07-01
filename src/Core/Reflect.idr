@@ -26,7 +26,7 @@ getCon : {vars : _} ->
          FC -> Defs -> Name -> Core (Term vars)
 getCon fc defs n
     = case !(lookupDefExact n (gamma defs)) of
-           Just (DCon t a _) => resolved (gamma defs) (Ref fc (DataCon t a) n)
+           Just (DCon rig t a _) => resolved (gamma defs) (Ref fc (DataCon rig t a) n)
            Just (TCon t a _ _ _ _ _ _) => resolved (gamma defs) (Ref fc (TyCon t a) n)
            Just _ => resolved (gamma defs) (Ref fc Func n)
            _ => throw (UndefinedName fc n)
@@ -273,7 +273,7 @@ Reify NameType where
              (NS _ (UN "DataCon"), [t,i])
                   => do t' <- reify defs !(evalClosure defs t)
                         i' <- reify defs !(evalClosure defs i)
-                        pure (DataCon t' i')
+                        pure (DataCon top t' i')
              (NS _ (UN "TyCon"), [t,i])
                   => do t' <- reify defs !(evalClosure defs t)
                         i' <- reify defs !(evalClosure defs i)
@@ -285,7 +285,7 @@ export
 Reflect NameType where
   reflect fc defs lhs env Bound = getCon fc defs (reflectiontt "Bound")
   reflect fc defs lhs env Func = getCon fc defs (reflectiontt "Func")
-  reflect fc defs lhs env (DataCon t i)
+  reflect fc defs lhs env (DataCon _ t i)
       = do t' <- reflect fc defs lhs env t
            i' <- reflect fc defs lhs env i
            appCon fc defs (reflectiontt "DataCon") [t', i']
