@@ -213,7 +213,7 @@ export
 mkTerm : (vars : List Name) -> Pat -> Term vars
 mkTerm vars (PAs fc x y) = mkTerm vars y
 mkTerm vars (PCon fc x tag arity xs)
-    = apply fc (Ref fc (DataCon top tag arity) x)
+    = do apply fc (Ref fc (DataCon linear tag arity) x)
                (map (mkTerm vars) xs)
 mkTerm vars (PTyCon fc x arity xs)
     = apply fc (Ref fc (TyCon 0 arity) x)

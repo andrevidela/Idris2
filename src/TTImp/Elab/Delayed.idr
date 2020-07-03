@@ -136,7 +136,7 @@ mutual
       = if xn /= yn
            then pure True
            else anyM (mismatch defs) (zip xargs yargs)
-  mismatchNF defs (NDCon _ _ xt _ xargs) (NDCon _ _ yt _ yargs)
+  mismatchNF defs (NDCon _ _ _ xt _ xargs) (NDCon _ _ _ yt _ yargs)
       = if xt /= yt
            then pure True
            else anyM (mismatch defs) (zip xargs yargs)
@@ -158,13 +158,13 @@ contra defs (NTCon _ xn xt xa xargs) (NTCon _ yn yt ya yargs)
     = if xn /= yn
          then pure True
          else anyM (mismatch defs) (zip xargs yargs)
-contra defs (NDCon _ _ xt _ xargs) (NDCon _ _ yt _ yargs)
+contra defs (NDCon _ _ _ xt _ xargs) (NDCon _ _ _ yt _ yargs)
     = if xt /= yt
          then pure True
          else anyM (mismatch defs) (zip xargs yargs)
 contra defs (NPrimVal _ x) (NPrimVal _ y) = pure (x /= y)
-contra defs (NDCon _ _ _ _ _) (NPrimVal _ _) = pure True
-contra defs (NPrimVal _ _) (NDCon _ _ _ _ _) = pure True
+contra defs (NDCon _ _ _ _ _ _) (NPrimVal _ _) = pure True
+contra defs (NPrimVal _ _) (NDCon _ _ _ _ _ _) = pure True
 contra defs x y = pure False
 
 -- Errors that might be recoverable later if we try again. Generally -

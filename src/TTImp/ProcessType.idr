@@ -114,7 +114,7 @@ processFnOpt fc ndef (SpecArgs ns)
           = do defs <- get Ctxt
                ns' <- getDepsArgs False !(traverse (evalClosure defs) args) ns
                pure (insert n inparam ns')
-      getDeps inparam (NDCon _ n t a args) ns
+      getDeps inparam (NDCon _ _ n t a args) ns
           = do defs <- get Ctxt
                getDepsArgs False !(traverse (evalClosure defs) args) ns
       getDeps inparam (NTCon _ n t a args) ns
@@ -224,7 +224,7 @@ findInferrable defs ty = fi 0 0 [] [] ty
           = case lookup n pos of
                  Nothing => pure acc
                  Just p => if p `elem` acc then pure acc else pure (p :: acc)
-      findInf acc pos (NDCon _ _ _ _ args)
+      findInf acc pos (NDCon _ _ _ _ _ args)
           = do args' <- traverse (evalClosure defs) args
                findInfs acc pos args'
       findInf acc pos (NTCon _ _ _ _ args)

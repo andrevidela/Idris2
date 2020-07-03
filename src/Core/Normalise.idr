@@ -167,8 +167,8 @@ parameters (defs : Defs, topopts : EvalOpts)
                       (NApp fc (NRef nt fn) args)
         applyToStack (NApp fc (NLocal mrig idx p) args) stk
           = evalLocal env fc mrig _ p (args ++ stk) []
-        applyToStack (NDCon fc n t a args) stk
-            = pure $ NDCon fc n t a (args ++ stk)
+        applyToStack (NDCon fc rig n t a args) stk
+            = pure $ NDCon fc rig n t a (args ++ stk)
         applyToStack (NTCon fc n t a args) stk
             = pure $ NTCon fc n t a (args ++ stk)
         applyToStack nf _ = pure nf
@@ -218,7 +218,7 @@ parameters (defs : Defs, topopts : EvalOpts)
               FC -> NameType -> Name -> Stack free -> (def : Lazy (NF free)) ->
               Core (NF free)
     evalRef env meta fc (DataCon rig tag arity) fn stk def
-        = pure $ NDCon fc fn tag arity stk
+        = pure $ NDCon fc rig fn tag arity stk
     evalRef env meta fc (TyCon tag arity) fn stk def
         = pure $ NTCon fc fn tag arity stk
     evalRef env meta fc Bound fn stk def
@@ -268,7 +268,7 @@ parameters (defs : Defs, topopts : EvalOpts)
              Stack free -> NF free -> CaseAlt more ->
              Core (CaseResult (NF free))
     -- Ordinary constructor matching
-    tryAlt {more} env loc opts fc stk (NDCon _ nm tag' arity args') (ConCase x tag args sc)
+    tryAlt {more} env loc opts fc stk (NDCon _ rig nm tag' arity args') (ConCase x tag args sc)
          = if tag == tag'
               then evalConAlt env loc opts fc stk args args' sc
               else pure NoMatch
@@ -306,7 +306,7 @@ parameters (defs : Defs, topopts : EvalOpts)
               else pure GotStuck
       where
         concrete : NF free -> Bool
-        concrete (NDCon _ _ _ _ _) = True
+        concrete (NDCon _ _ _ _ _ _) = True
         concrete (NTCon _ _ _ _ _) = True
         concrete (NPrimVal _ _) = True
         concrete (NBind _ _ _ _) = True
@@ -586,9 +586,9 @@ mutual
       = do f' <- quoteHead q defs fc bound env f
            args' <- quoteArgs q defs bound env args
            pure $ apply fc f' args'
-  quoteGenNF q defs bound env (NDCon fc n t ar args)
+  quoteGenNF q defs bound env (NDCon fc rig n t ar args)
       = do args' <- quoteArgs q defs bound env args
-           pure $ apply fc (Ref fc (DataCon top t ar) n) args'
+           pure $ apply fc (Ref fc (DataCon rig t ar) n) args'
   quoteGenNF q defs bound env (NTCon fc n t ar args)
       = do args' <- quoteArgs q defs bound env args
            pure $ apply fc (Ref fc (TyCon t ar) n) args'
@@ -988,7 +988,7 @@ mutual
              then allConv q defs env args args'
              else chkConvCaseBlock fc q defs env val args val' args'
 
-    convGen q defs env (NDCon _ nm tag _ args) (NDCon _ nm' tag' _ args')
+    convGen q defs env (NDCon _ rig nm tag _ args) (NDCon _ rig' nm' tag' _ args')
         = if tag == tag'
              then allConv q defs env args args'
              else pure False
@@ -1159,11 +1159,11 @@ replace' {vars} tmpi defs env lhs parg tm
              pure $ apply fc
                         !(replace' tmpi defs env lhs parg (NApp fc hd []))
                         args'
-    repSub (NDCon fc n t a args)
+    repSub (NDCon fc r n t a args)
         = do args' <- traverse repArg args
              empty <- clearDefs defs
              pure $ apply fc
-                        !(quote empty env (NDCon fc n t a []))
+                        !(quote empty env (NDCon fc r n t a []))
                         args'
     repSub (NTCon fc n t a args)
         = do args' <- traverse repArg args

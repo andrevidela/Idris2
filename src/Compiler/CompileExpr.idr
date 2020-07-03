@@ -230,8 +230,11 @@ mutual
   toCExpTm n (Ref fc (DataCon rig tag Z) (NS ["Prelude"] (UN "GT")))
       = pure $ CPrimVal fc (I tag)
   toCExpTm n (Ref fc (DataCon rig tag arity) fn)
-      = -- get full name for readability, and the Nat hack
-        pure $ CCon fc !(getFullName fn) (Just tag) []
+      = do -- get full name for readability, and the Nat hack
+           fullName <- getFullName fn
+           coreLift $ putStrLn $ "foundDataCon " ++ show fullName ++ " at " ++ show fc ++
+                                 " rig count is : " ++ show rig
+           pure $ CCon fc fullName (Just tag) []
   toCExpTm n (Ref fc (TyCon tag arity) fn)
       = pure $ CCon fc fn Nothing []
   toCExpTm n (Ref fc _ fn)
@@ -467,7 +470,7 @@ data NArgs : Type where
 
 getPArgs : Defs -> Closure [] -> Core (String, Closure [])
 getPArgs defs cl
-    = do NDCon fc _ _ _ args <- evalClosure defs cl
+    = do NDCon fc _ _ _ _ args <- evalClosure defs cl
              | nf => throw (GenericMsg (getLoc nf) "Badly formed struct type")
          case reverse args of
               (tydesc :: n :: _) =>
@@ -478,7 +481,7 @@ getPArgs defs cl
 
 getFieldArgs : Defs -> Closure [] -> Core (List (String, Closure []))
 getFieldArgs defs cl
-    = do NDCon fc _ _ _ args <- evalClosure defs cl
+    = do NDCon fc _ _ _ _ args <- evalClosure defs cl
              | nf => throw (GenericMsg (getLoc nf) "Badly formed struct type")
          case args of
               -- cons

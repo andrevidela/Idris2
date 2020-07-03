@@ -49,7 +49,7 @@ checkIfGuarded fc n
          when t $ setFlag fc n AllGuarded
   where
     guardedNF : {vars : _} -> Defs -> Env Term vars -> NF vars -> Core Bool
-    guardedNF defs env (NDCon _ _ _ _ args) = pure True
+    guardedNF defs env (NDCon _ _ _ _ _ args) = pure True
     guardedNF defs env (NApp _ (NRef _ n) args)
         = do Just gdef <- lookupCtxtExact n (gamma defs)
                   | Nothing => pure False
@@ -569,7 +569,7 @@ nameIn defs tyns (NTCon _ n _ _ args)
          then pure True
          else do args' <- traverse (evalClosure defs) args
                  anyM (nameIn defs tyns) args'
-nameIn defs tyns (NDCon _ n _ _ args)
+nameIn defs tyns (NDCon _ _ n _ _ args)
     = anyM (nameIn defs tyns)
            !(traverse (evalClosure defs) args)
 nameIn defs tyns _ = pure False

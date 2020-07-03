@@ -13,6 +13,8 @@ import TTImp.Elab.Check
 import TTImp.Elab.Delayed
 import TTImp.TTImp
 
+import Data.Maybe
+
 %default covering
 
 -- Drop the name from the nested function declarations. We do this when
@@ -179,6 +181,30 @@ weakenExp env (Just gtm)
     = do tm <- getTerm gtm
          pure (Just (gnf env (weaken tm)))
 
+matchLinearMisuse : (thenBr : a) -> (elseBr : a) -> Error -> a
+matchLinearMisuse thenBr elseBr (LinearMisuse _ _ rig _) = branchOne thenBr elseBr rig
+matchLinearMisuse thenBr elseBr _ = elseBr
+
+printNameType : NameType -> String
+printNameType (DataCon r _ _) = "Data constructor with rig " ++ show r
+printNameType _ = ""
+
+printTerm : {vars : List Name} -> Term vars -> String
+printTerm (Local _ _ _ _) = "Local var"
+printTerm (Ref _ tpe n) = "ref to something : " ++ show n ++ " " ++ printNameType tpe
+printTerm (Bind _ n _ _) = "binder : " ++ show n
+printTerm (Meta _ n _ _) = "meta : " ++ show n
+printTerm (App _ (Ref _ nametype name) _) = "applying ref : " ++ printNameType nametype ++ ", " ++ show name
+printTerm (As _ _ _ _) = "As"
+printTerm _ = ""
+
+||| If rigcount is different from rig of DataCon, replace it, otherwise nothing
+lineariseDataCon : RigCount -> Term vars -> Core (Maybe (Term vars))
+lineariseDataCon rig (App fc (Ref fc' (DataCon r tag ary) name) arg) = do
+  coreLift $ putStrLn $ "replacing for " ++ show name
+  pure $ toMaybe (rig /= r) (App fc (Ref fc' (DataCon rig tag ary) name) arg)
+lineariseDataCon _ _ = pure Nothing
+
 export
 checkLet : {vars : _} ->
            {auto c : Ref Ctxt Defs} ->
@@ -205,21 +231,13 @@ checkLet rigc_in elabinfo nest env fc rigl n nTy nVal scope expty {vars}
                              (record { preciseInf = True } elabinfo)
                              nest env nVal (Just (gnf env tyv))
                   pure (fst c, snd c, rigl |*| rigc))
-              (\err => case linearErr err of
-                            Just r
-                              => do branchOne
-                                     (do c <- runDelays 0 $ check linear elabinfo
-                                                  nest env nVal (Just (gnf env tyv))
-                                         pure (fst c, snd c, linear))
-                                     (do c <- check (rigl |*| rigc)
-                                                  elabinfo -- without preciseInf
-                                                  nest env nVal (Just (gnf env tyv))
-                                         pure (fst c, snd c, rigMult rigl rigc))
-                                     r
-                            _ => do c <- check (rigl |*| rigc)
-                                               elabinfo -- without preciseInf
-                                               nest env nVal (Just (gnf env tyv))
-                                    pure (fst c, snd c, rigl |*| rigc))
+              (matchLinearMisuse (do c <- runDelays 0 $ check linear elabinfo
+                                              nest env nVal (Just (gnf env tyv))
+                                     pure (fst c, snd c, linear))
+                                 (do c <- check (rigl |*| rigc)
+                                              elabinfo -- without preciseInf
+                                              nest env nVal (Just (gnf env tyv))
+                                     pure (fst c, snd c, rigl |*| rigc)))
          let env' : Env Term (n :: _) = Lam rigb Explicit tyv :: env
          let nest' = weaken (dropName n nest)
          expScope <- weakenExp env' expty
@@ -227,17 +245,17 @@ checkLet rigc_in elabinfo nest env fc rigl n nTy nVal scope expty {vars}
             inScope fc env' (\e' =>
               check {e=e'} rigc elabinfo nest' env' scope expScope)
          scopet <- getTerm gscopet
+         newVal <- lineariseDataCon rigb valv
+         let newVal' = fromMaybe valv newVal
+         case newVal  of
+              Just (App fc (Ref fc' (DataCon r tag ary) name) arg) =>
+                corePrint $ "rig changed to " ++ show r ++ " at position " ++ show fc' ++ " name : " ++ show !(getFullName name)
+              _ => pure ()
 
+
+         corePrint $ "rigb is " ++ show rigb
          -- No need to 'checkExp' here - we've already checked scopet
          -- against the expected type when checking the scope, so just
          -- build the term directly
-         pure (Bind fc n (Let rigb valv tyv) scopev,
-               gnf env (Bind fc n (Let rigb valv tyv) scopet))
-  where
-    linearErr : Error -> Maybe RigCount
-    linearErr (LinearMisuse _ _ r _) = Just r
-    linearErr (InType _ _ e) = linearErr e
-    linearErr (InCon _ _ e) = linearErr e
-    linearErr (InLHS _ _ e) = linearErr e
-    linearErr (InRHS _ _ e) = linearErr e
-    linearErr _ = Nothing
+         pure (Bind fc n (Let rigb newVal' tyv) scopev,
+               gnf env (Bind fc n (Let rigb newVal' tyv) scopet))

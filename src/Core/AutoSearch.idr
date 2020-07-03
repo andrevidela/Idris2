@@ -215,7 +215,7 @@ usableLocal {vars} loc defaults env (NTCon _ n _ _ args)
                         then usableLocalArg (1 + i) dets cs
                         else pure False
              else usableLocalArg (1 + i) dets cs
-usableLocal loc defaults env (NDCon _ n _ _ args)
+usableLocal loc defaults env (NDCon _ _ n _ _ args)
     = do defs <- get Ctxt
          us <- traverse (usableLocal loc defaults env)
                         !(traverse (evalClosure defs) args)
@@ -451,7 +451,7 @@ concreteDets {vars} fc defaults env top pos dets (arg :: args)
              traverse (\ parg => do argnf <- evalClosure defs parg
                                     concrete defs argnf False) args'
              pure ()
-    concrete defs (NDCon nfc n t a args) atTop
+    concrete defs (NDCon nfc rig n t a args) atTop
         = do traverse (\ parg => do argnf <- evalClosure defs parg
                                     concrete defs argnf False) args
              pure ()

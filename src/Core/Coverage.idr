@@ -105,7 +105,7 @@ conflict defs env nfty n
       conflictNF i nf (NApp _ (NRef Bound n) [])
           = do empty <- clearDefs defs
                pure (Just [(n, !(quote empty env nf))])
-      conflictNF i (NDCon _ n t a args) (NDCon _ n' t' a' args')
+      conflictNF i (NDCon _ _ n t a args) (NDCon _ _ n' t' a' args')
           = if t == t'
                then conflictArgs i args args'
                else pure Nothing
@@ -306,6 +306,7 @@ replaceDefaults fc defs nfty cs
 -- and return those patterns.
 -- The returned patterns are those arising from the *missing* cases
 buildArgs : {vars : _} ->
+            {auto c : Ref Ctxt Defs} ->
             FC -> Defs ->
             KnownVars vars Int -> -- Things which have definitely match
             KnownVars vars (List Int) -> -- Things an argument *can't* be

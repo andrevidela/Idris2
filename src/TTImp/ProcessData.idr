@@ -156,14 +156,14 @@ getDetags fc tys
                else disjointArgs args args'
 
       disjoint : NF [] -> NF [] -> Core Bool
-      disjoint (NDCon _ _ t _ args) (NDCon _ _ t' _ args')
+      disjoint (NDCon _ _ _ t _ args) (NDCon _ _ _ t' _ args')
           = if t /= t'
                then pure True
                else do defs <- get Ctxt
                        argsnf <- traverse (evalClosure defs) args
                        args'nf <- traverse (evalClosure defs) args'
                        disjointArgs argsnf args'nf
-      disjoint (NTCon _ n _ _ args) (NDCon _ n' _ _ args')
+      disjoint (NTCon _ n _ _ args) (NDCon _ _ n' _ _ args')
           = if n /= n'
                then pure True
                else do defs <- get Ctxt

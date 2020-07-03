@@ -91,11 +91,11 @@ mutual
 
 export
 addMutatingCases : {auto c : Ref Ctxt Defs} -> Name -> Core ()
-addMutatingCases n = do
-  defs <- get Ctxt
-  Just def <- lookupCtxtExact n (gamma defs)  | _ => pure ()
-  let Just (MkFun fargs body) = compexpr def | _ => pure ()
-  setCompiled n (MkFun fargs !(mkMutating (UN "") Nothing body))
+addMutatingCases n = pure () -- do
+--   defs <- get Ctxt
+--   Just def <- lookupCtxtExact n (gamma defs)  | _ => pure ()
+--   let Just (MkFun fargs body) = compexpr def | _ => pure ()
+--   setCompiled n (MkFun fargs !(mkMutating (UN "") Nothing body))
 
 ||| Duplicate every clause and replace every constructor on the rhs by a mutating version
 ||| The transformation on takes place for patterns which are not wildcards

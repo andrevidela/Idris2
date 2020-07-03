@@ -761,7 +761,7 @@ mutual
       = do defs <- get Ctxt
            mty <- lookupTyExact n (gamma defs)
            unifyInvertible swap (lower mode) loc env mname mref margs margs' mty (NTCon nfc n t a) args'
-  unifyHoleApp swap mode loc env mname mref margs margs' (NDCon nfc n t a args')
+  unifyHoleApp swap mode loc env mname mref margs margs' (NDCon nfc rig n t a args')
       = do defs <- get Ctxt
            mty <- lookupTyExact n (gamma defs)
            unifyInvertible swap (lower mode) loc env mname mref margs margs' mty (NTCon nfc n t a) args'
@@ -927,7 +927,7 @@ mutual
   -- A local against something canonical (binder or constructor) is bad
   unifyApp swap mode loc env xfc (NLocal rx x xp) args y@(NBind _ _ _ _)
       = convertErrorS swap loc env (NApp xfc (NLocal rx x xp) args) y
-  unifyApp swap mode loc env xfc (NLocal rx x xp) args y@(NDCon _ _ _ _ _)
+  unifyApp swap mode loc env xfc (NLocal rx x xp) args y@(NDCon _ _ _ _ _ _)
       = convertErrorS swap loc env (NApp xfc (NLocal rx x xp) args) y
   unifyApp swap mode loc env xfc (NLocal rx x xp) args y@(NTCon _ _ _ _ _)
       = convertErrorS swap loc env (NApp xfc (NLocal rx x xp) args) y
@@ -1134,7 +1134,7 @@ mutual
                UnifyInfo -> FC -> Env Term vars ->
                NF vars -> NF vars ->
                Core UnifyResult
-  unifyNoEta mode loc env (NDCon xfc x tagx ax xs) (NDCon yfc y tagy ay ys)
+  unifyNoEta mode loc env (NDCon xfc xrig x tagx ax xs) (NDCon yfc yrig y tagy ay ys)
       = do gam <- get Ctxt
            if tagx == tagy
              then
@@ -1153,8 +1153,8 @@ mutual
                      -}
                      unifyArgs mode loc env xs ys
              else convertError loc env
-                       (NDCon xfc x tagx ax xs)
-                       (NDCon yfc y tagy ay ys)
+                       (NDCon xfc xrig x tagx ax xs)
+                       (NDCon yfc yrig y tagy ay ys)
   unifyNoEta mode loc env (NTCon xfc x tagx ax xs) (NTCon yfc y tagy ay ys)
       = if x == y
            then do ust <- get UST

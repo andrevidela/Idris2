@@ -29,6 +29,8 @@ mutual
        CApp : FC -> CExp vars -> List (CExp vars) -> CExp vars
        -- A saturated constructor application
        CCon : FC -> Name -> (tag : Maybe Int) -> List (CExp vars) -> CExp vars
+       -- A mutated construcor with it list of new arguments
+       CMut : FC -> Name -> List (CExp vars) -> CExp vars
        -- Internally defined primitive operations
        COp : {arity : _} ->
              FC -> PrimFn arity -> Vect arity (CExp vars) -> CExp vars
@@ -235,7 +237,7 @@ mutual
             NmLam fc (getLocName _ locs' First) (forgetExp locs' sc)
   forgetExp locs (CLet fc x _ val sc)
       = let locs' = addLocs [x] locs in
-            NmLet fc (getLocName _ locs' First) 
+            NmLet fc (getLocName _ locs' First)
                      (forgetExp locs val)
                      (forgetExp locs' sc)
   forgetExp locs (CApp fc f args)

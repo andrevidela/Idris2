@@ -13,7 +13,7 @@ import TTImp.TTImp
 
 export
 Reify BindMode where
-  reify defs val@(NDCon _ n _ _ args)
+  reify defs val@(NDCon _ _ n _ _ args)
       = case (!(full (gamma defs) n), args) of
              (NS _ (UN "PI"), [c])
                  => do c' <- reify defs !(evalClosure defs c)
@@ -35,7 +35,7 @@ Reflect BindMode where
 
 export
 Reify UseSide where
-  reify defs val@(NDCon _ n _ _ args)
+  reify defs val@(NDCon _ _ n _ _ args)
       = case (!(full (gamma defs) n), args) of
              (NS _ (UN "UseLeft"), _) => pure UseLeft
              (NS _ (UN "UseRight"), _) => pure UseRight
@@ -51,7 +51,7 @@ Reflect UseSide where
 
 export
 Reify DotReason where
-  reify defs val@(NDCon _ n _ _ args)
+  reify defs val@(NDCon _ _ n _ _ args)
       = case (!(full (gamma defs) n), args) of
              (NS _ (UN "NonLinearVar"), _) => pure NonLinearVar
              (NS _ (UN "VarApplied"), _) => pure VarApplied
@@ -80,7 +80,7 @@ Reflect DotReason where
 mutual
   export
   Reify RawImp where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "IVar"), [fc, n])
                     => do fc' <- reify defs !(evalClosure defs fc)
@@ -230,7 +230,7 @@ mutual
 
   export
   Reify IFieldUpdate where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "ISetField"), [x, y])
                     => do x' <- reify defs !(evalClosure defs x)
@@ -245,7 +245,7 @@ mutual
 
   export
   Reify AltType where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "FirstSuccess"), _)
                     => pure FirstSuccess
@@ -259,7 +259,7 @@ mutual
 
   export
   Reify FnOpt where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "Inline"), _) => pure Inline
                (NS _ (UN "TCInline"), _) => pure TCInline
@@ -286,7 +286,7 @@ mutual
 
   export
   Reify ImpTy where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "MkTy"), [x,y,z])
                     => do x' <- reify defs !(evalClosure defs x)
@@ -298,7 +298,7 @@ mutual
 
   export
   Reify DataOpt where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "SearchBy"), [x])
                     => do x' <- reify defs !(evalClosure defs x)
@@ -312,7 +312,7 @@ mutual
 
   export
   Reify ImpData where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "MkData"), [v,w,x,y,z])
                     => do v' <- reify defs !(evalClosure defs v)
@@ -331,7 +331,7 @@ mutual
 
   export
   Reify IField where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "MkIField"), [v,w,x,y,z])
                     => do v' <- reify defs !(evalClosure defs v)
@@ -345,7 +345,7 @@ mutual
 
   export
   Reify ImpRecord where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "MkRecord"), [v,w,x,y,z])
                     => do v' <- reify defs !(evalClosure defs v)
@@ -359,7 +359,7 @@ mutual
 
   export
   Reify ImpClause where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "PatClause"), [x,y,z])
                     => do x' <- reify defs !(evalClosure defs x)
@@ -381,7 +381,7 @@ mutual
 
   export
   Reify ImpDecl where
-    reify defs val@(NDCon _ n _ _ args)
+    reify defs val@(NDCon _ _ n _ _ args)
         = case (!(full (gamma defs) n), args) of
                (NS _ (UN "IClaim"), [v,w,x,y,z])
                     => do v' <- reify defs !(evalClosure defs v)

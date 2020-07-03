@@ -1788,6 +1788,15 @@ toPos (Just ns) = justPos 0 ns
     justPos i (Just x :: xs) = i :: justPos (1 + i) xs
     justPos i (Nothing :: xs) = justPos (1 + i) xs
 
+export
+getFullName : {auto c : Ref Ctxt Defs} -> Name -> Core Name
+getFullName (Resolved i)
+    = do defs <- get Ctxt
+         Just gdef <- lookupCtxtExact (Resolved i) (gamma defs)
+              | Nothing => pure (Resolved i)
+         pure (fullname gdef)
+getFullName n = pure n
+
 getConPs : {vars : _} ->
            Maybe (List (Maybe (Term vars))) -> Name -> Term vars -> List Nat
 getConPs acc tyn (Bind _ x (Pi _ _ ty) sc)
@@ -1827,6 +1836,7 @@ addData vars vis tidx (MkData (MkCon dfc tyn arity tycon) datacons)
     conVisibility Export = Private
     conVisibility x = x
 
+    -- maybe we change the tag here?
     addDataConstructors : (tag : Int) -> List Constructor ->
                           Context -> Core Context
     addDataConstructors tag [] gam = pure gam
@@ -1843,8 +1853,7 @@ addData vars vis tidx (MkData (MkCon dfc tyn arity tycon) datacons)
 -- current namespace of "Prelude.List.Data"
 -- Inner namespaces go first, for ease of name lookup
 export
-extendNS : {auto c : Ref Ctxt Defs} ->
-           List String -> Core ()
+extendNS : {auto c : Ref Ctxt Defs} -> List String -> Core ()
 extendNS ns
     = do defs <- get Ctxt
          put Ctxt (record { currentNS $= ((reverse ns) ++) } defs)
@@ -1954,15 +1963,6 @@ resetFirstEntry
     = do defs <- get Ctxt
          put Ctxt (record { gamma->firstEntry = nextEntry (gamma defs) } defs)
 
-export
-getFullName : {auto c : Ref Ctxt Defs} ->
-              Name -> Core Name
-getFullName (Resolved i)
-    = do defs <- get Ctxt
-         Just gdef <- lookupCtxtExact (Resolved i) (gamma defs)
-              | Nothing => pure (Resolved i)
-         pure (fullname gdef)
-getFullName n = pure n
 
 -- Getting and setting various options
 
