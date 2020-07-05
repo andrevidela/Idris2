@@ -232,8 +232,6 @@ mutual
   toCExpTm n (Ref fc (DataCon rig tag arity) fn)
       = do -- get full name for readability, and the Nat hack
            fullName <- getFullName fn
-           coreLift $ putStrLn $ "foundDataCon " ++ show fullName ++ " at " ++ show fc ++
-                                 " rig count is : " ++ show rig
            pure $ CCon fc fullName (Just tag) []
   toCExpTm n (Ref fc (TyCon tag arity) fn)
       = pure $ CCon fc fn Nothing []

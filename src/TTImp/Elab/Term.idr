@@ -309,15 +309,15 @@ TTImp.Elab.Check.check rigc elabinfo nest env tm_in exp
 --            Core (Term vars, Glued vars)
 TTImp.Elab.Check.checkImp rigc elabinfo nest env tm exp
     = do
-         let print = (case tm of
-                           (ILet _ _ name _ _ _) => Just name
-                           _ => Nothing)
-         maybe (pure ())
-               (\name => corePrint $ "checking " ++ show !(getFullName name))
-               print
+--          let print = (case tm of
+--                            (ILet _ _ name _ _ _) => Just name
+--                            _ => Nothing)
+--          maybe (pure ())
+--                (\name => corePrint $ "checking " ++ show !(getFullName name))
+--                print
          res <- checkTerm rigc elabinfo nest env tm exp
-         maybe (pure ())
-               (\name => corePrint $ "done checking " ++ show !(getFullName name))
-               print
+--          maybe (pure ())
+--                (\name => corePrint $ "done checking " ++ show !(getFullName name))
+--                print
          pure res
 

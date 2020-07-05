@@ -597,6 +597,7 @@ mutual
     toBuf b (CLet fc x inl val sc) = do tag 3; toBuf b fc; toBuf b x; toBuf b inl; toBuf b val; toBuf b sc
     toBuf b (CApp fc f as) = assert_total $ do tag 4; toBuf b fc; toBuf b f; toBuf b as
     toBuf b (CCon fc t n as) = assert_total $ do tag 5; toBuf b fc; toBuf b t; toBuf b n; toBuf b as
+    toBuf b (CMut fc n as) = assert_total $ do tag 15; toBuf b fc; toBuf b n; toBuf b as
     toBuf b (COp {arity} fc op as) = assert_total $ do tag 6; toBuf b fc; toBuf b arity; toBuf b op; toBuf b as
     toBuf b (CExtPrim fc f as) = assert_total $ do tag 7; toBuf b fc; toBuf b f; toBuf b as
     toBuf b (CForce fc x) = assert_total $ do tag 8; toBuf b fc; toBuf b x
@@ -655,6 +656,12 @@ mutual
                14 => do fc <- fromBuf b
                         msg <- fromBuf b
                         pure (CCrash fc msg)
+               14 => do fc <- fromBuf b
+                        msg <- fromBuf b
+                        pure (CCrash fc msg)
+               15 => do fc <- fromBuf b
+                        n <- fromBuf b; as <- fromBuf b
+                        pure (CMut fc n as)
                _ => corrupt "CExp"
 
   export

@@ -351,6 +351,8 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
         = pure $ "(" ++ !(schExp i x) ++ " " ++ showSep " " !(traverse (schExp i) args) ++ ")"
     schExp i (NmCon fc x tag args)
         = pure $ schConstructor schString x tag !(traverse (schExp i) args)
+    schExp i (NmMut fc x args)
+        = ?mutate -- pure $ schConstructor schString x tag !(traverse (schExp i) args)
     schExp i (NmOp fc op args)
         = pure $ schOp op !(schArgs i args)
     schExp i (NmExtPrim fc p args)

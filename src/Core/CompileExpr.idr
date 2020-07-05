@@ -81,6 +81,8 @@ mutual
        NmApp : FC -> NamedCExp -> List NamedCExp -> NamedCExp
        -- A saturated constructor application
        NmCon : FC -> Name -> (tag : Maybe Int) -> List NamedCExp -> NamedCExp
+       -- A mutated constructor
+       NmMut : FC -> Name -> List NamedCExp -> NamedCExp
        -- Internally defined primitive operations
        NmOp : FC -> PrimFn arity -> Vect arity NamedCExp -> NamedCExp
        -- Externally defined primitive operations
@@ -167,6 +169,8 @@ mutual
         = assert_total $ "(" ++ show x ++ " " ++ show xs ++ ")"
     show (NmCon _ x tag xs)
         = assert_total $ "(%con " ++ show x ++ " " ++ show tag ++ " " ++ show xs ++ ")"
+    show (NmMut _ x xs)
+        = assert_total $ "(%mut " ++ show x ++ " " ++ show xs ++ ")"
     show (NmOp _ op xs)
         = assert_total $ "(" ++ show op ++ " " ++ show xs ++ ")"
     show (NmExtPrim _ p xs)
@@ -244,6 +248,8 @@ mutual
       = NmApp fc (forgetExp locs f) (map (forgetExp locs) args)
   forgetExp locs (CCon fc n t args)
       = NmCon fc n t (map (forgetExp locs) args)
+  forgetExp locs (CMut fc n args)
+      = NmMut fc n (map (forgetExp locs) args)
   forgetExp locs (COp fc op args)
       = NmOp fc op (map (forgetExp locs) args)
   forgetExp locs (CExtPrim fc p args)
@@ -349,6 +355,8 @@ mutual
       = CApp fc (insertNames ns x) (assert_total (map (insertNames ns) xs))
   insertNames ns (CCon fc x tag xs)
       = CCon fc x tag (assert_total (map (insertNames ns) xs))
+  insertNames ns (CMut fc x xs)
+      = CMut fc x (assert_total (map (insertNames ns) xs))
   insertNames ns (COp fc x xs)
       = COp fc x (assert_total (map (insertNames ns) xs))
   insertNames ns (CExtPrim fc p xs)
@@ -431,6 +439,8 @@ mutual
             CLet fc x inl (shrinkCExp sub val) sc'
   shrinkCExp sub (CApp fc x xs)
       = CApp fc (shrinkCExp sub x) (assert_total (map (shrinkCExp sub) xs))
+  shrinkCExp sub (CMut fc x xs)
+      = CMut fc x (assert_total (map (shrinkCExp sub) xs))
   shrinkCExp sub (CCon fc x tag xs)
       = CCon fc x tag (assert_total (map (shrinkCExp sub) xs))
   shrinkCExp sub (COp fc x xs)
@@ -501,6 +511,8 @@ mutual
             CLet fc x inl (substEnv env val) sc'
   substEnv env (CApp fc x xs)
       = CApp fc (substEnv env x) (assert_total (map (substEnv env) xs))
+  substEnv env (CMut fc x xs)
+      = CMut fc x (assert_total (map (substEnv env) xs))
   substEnv env (CCon fc x tag xs)
       = CCon fc x tag (assert_total (map (substEnv env) xs))
   substEnv env (COp fc x xs)
@@ -571,6 +583,8 @@ mutual
             CLet fc x inl (mkLocals bs val) sc'
   mkLocals bs (CApp fc f xs)
       = CApp fc (mkLocals bs f) (assert_total (map (mkLocals bs) xs))
+  mkLocals bs (CMut fc x xs)
+      = CMut fc x (assert_total (map (mkLocals bs) xs))
   mkLocals bs (CCon fc x tag xs)
       = CCon fc x tag (assert_total (map (mkLocals bs) xs))
   mkLocals bs (COp fc x xs)
@@ -622,6 +636,7 @@ getFC (CLam fc _ _) = fc
 getFC (CLet fc _ _ _ _) = fc
 getFC (CApp fc _ _) = fc
 getFC (CCon fc _ _ _) = fc
+getFC (CMut fc _ _) = fc
 getFC (COp fc _ _) = fc
 getFC (CExtPrim fc _ _) = fc
 getFC (CForce fc _) = fc
@@ -641,6 +656,7 @@ namespace NamedCExp
   getFC (NmLet fc _ _ _) = fc
   getFC (NmApp fc _ _) = fc
   getFC (NmCon fc _ _ _) = fc
+  getFC (NmMut fc _ _) = fc
   getFC (NmOp fc _ _) = fc
   getFC (NmExtPrim fc _ _) = fc
   getFC (NmForce fc _) = fc

@@ -189,6 +189,8 @@ mutual
       = eval rec env (!(traverse (eval rec env []) args) ++ stk) f
   eval rec env stk (CCon fc n t args)
       = pure $ unload stk $ CCon fc n t !(traverse (eval rec env []) args)
+  eval rec env stk (CMut fc n args)
+      = pure $ unload stk $ CMut fc n !(traverse (eval rec env []) args)
   eval rec env stk (COp fc p args)
       = pure $ unload stk $ COp fc p !(traverseVect (eval rec env []) args)
   eval rec env stk (CExtPrim fc p args)

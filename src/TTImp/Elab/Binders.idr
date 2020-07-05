@@ -199,11 +199,10 @@ printTerm (As _ _ _ _) = "As"
 printTerm _ = ""
 
 ||| If rigcount is different from rig of DataCon, replace it, otherwise nothing
-lineariseDataCon : RigCount -> Term vars -> Core (Maybe (Term vars))
-lineariseDataCon rig (App fc (Ref fc' (DataCon r tag ary) name) arg) = do
-  coreLift $ putStrLn $ "replacing for " ++ show name
-  pure $ toMaybe (rig /= r) (App fc (Ref fc' (DataCon rig tag ary) name) arg)
-lineariseDataCon _ _ = pure Nothing
+lineariseDataCon : RigCount -> Term vars -> (Maybe (Term vars))
+lineariseDataCon rig (App fc (Ref fc' (DataCon r tag ary) name) arg) =
+  toMaybe (rig /= r) (App fc (Ref fc' (DataCon rig tag ary) name) arg)
+lineariseDataCon _ _ = Nothing
 
 export
 checkLet : {vars : _} ->
@@ -245,15 +244,9 @@ checkLet rigc_in elabinfo nest env fc rigl n nTy nVal scope expty {vars}
             inScope fc env' (\e' =>
               check {e=e'} rigc elabinfo nest' env' scope expScope)
          scopet <- getTerm gscopet
-         newVal <- lineariseDataCon rigb valv
+         let newVal = lineariseDataCon rigb valv
          let newVal' = fromMaybe valv newVal
-         case newVal  of
-              Just (App fc (Ref fc' (DataCon r tag ary) name) arg) =>
-                corePrint $ "rig changed to " ++ show r ++ " at position " ++ show fc' ++ " name : " ++ show !(getFullName name)
-              _ => pure ()
 
-
-         corePrint $ "rigb is " ++ show rigb
          -- No need to 'checkExp' here - we've already checked scopet
          -- against the expected type when checking the scope, so just
          -- build the term directly
