@@ -52,7 +52,7 @@ schConstructor schString n Nothing args
 ||| Mutates the given vector at the given index
 mutateValue : (ref : String) -> (index : Nat) -> String -> String
 mutateValue ref idx newVal =
-  "(begin (display \"mutating\") (newline) (vector-set! " ++ ref ++  " " ++ show idx ++ " " ++ newVal ++ "))"
+  "(vector-set! " ++ ref ++  " " ++ show idx ++ " " ++ newVal ++ ")"
 
 ||| Mutate all fiels of a given construtor
 ||| We skip the first value in the vector because we do not change
@@ -62,8 +62,9 @@ schMutate : (ref : String) -> (args : List String) -> String
 schMutate ref args =
   -- we start indexing at 1 since 0 is the tag and doesn't change
   let indices = [1 .. (length args + 1)]
-      zipped : List (Nat, String) = zip indices args in
-      showSep " " (map (uncurry $ mutateValue ref) zipped)
+      zipped : List (Nat, String) = zip indices args
+      mutation = (showSep " " (map (uncurry $ mutateValue ref) zipped)) in
+      "(begin " ++ mutation ++ " " ++ ref ++ ")"
 
 ||| Generate scheme for a plain function.
 op : String -> List String -> String

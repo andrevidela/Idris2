@@ -232,8 +232,7 @@ mutual
   toCExpTm n (Ref fc (DataCon rig tag arity) fn)
       = do -- get full name for readability, and the Nat hack
            fullName <- getFullName fn
-           let newtag = branchOne (tag * 2 + 1) (tag * 2) rig
-           pure $ CCon fc fullName (Just newtag) []
+           pure $ CCon fc fullName (Just tag) []
   toCExpTm n (Ref fc (TyCon tag arity) fn)
       = pure $ CCon fc fn Nothing []
   toCExpTm n (Ref fc _ fn)

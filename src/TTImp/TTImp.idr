@@ -199,6 +199,8 @@ mutual
        Invertible : FnOpt
        Totality : TotalReq -> FnOpt
        Macro : FnOpt
+       -- This function has mutating fields
+       Mutating : FnOpt
        SpecArgs : List Name -> FnOpt
 
   export
@@ -214,6 +216,7 @@ mutual
     show (Totality CoveringOnly) = "covering"
     show (Totality PartialOK) = "partial"
     show Macro = "%macro"
+    show Mutating = "%mutating"
     show (SpecArgs ns) = "%spec " ++ showSep " " (map show ns)
 
   export
@@ -227,6 +230,7 @@ mutual
     Invertible == Invertible = True
     (Totality tot_lhs) == (Totality tot_rhs) = tot_lhs == tot_rhs
     Macro == Macro = True
+    Mutating == Mutating = True
     (SpecArgs ns) == (SpecArgs ns') = ns == ns'
     _ == _ = False
 
@@ -931,7 +935,7 @@ mutual
   export
   TTC FnOpt where
     toBuf b Inline = tag 0
-    toBuf b TCInline = tag 11
+    toBuf b TCInline = tag 12
     toBuf b (Hint t) = do tag 1; toBuf b t
     toBuf b (GlobalHint t) = do tag 2; toBuf b t
     toBuf b ExternFn = tag 3
@@ -941,7 +945,8 @@ mutual
     toBuf b (Totality CoveringOnly) = tag 7
     toBuf b (Totality PartialOK) = tag 8
     toBuf b Macro = tag 9
-    toBuf b (SpecArgs ns) = do tag 10; toBuf b ns
+    toBuf b Mutating = tag 10
+    toBuf b (SpecArgs ns) = do tag 11; toBuf b ns
 
     fromBuf b
         = case !getTag of
@@ -955,8 +960,9 @@ mutual
                7 => pure (Totality CoveringOnly)
                8 => pure (Totality PartialOK)
                9 => pure Macro
-               10 => do ns <- fromBuf b; pure (SpecArgs ns)
-               11 => pure TCInline
+               10 => pure Mutating
+               11 => do ns <- fromBuf b; pure (SpecArgs ns)
+               12 => pure TCInline
                _ => corrupt "FnOpt"
 
   export

@@ -597,7 +597,6 @@ mutual
     toBuf b (CLet fc x inl val sc) = do tag 3; toBuf b fc; toBuf b x; toBuf b inl; toBuf b val; toBuf b sc
     toBuf b (CApp fc f as) = assert_total $ do tag 4; toBuf b fc; toBuf b f; toBuf b as
     toBuf b (CCon fc t n as) = assert_total $ do tag 5; toBuf b fc; toBuf b t; toBuf b n; toBuf b as
-    toBuf b (CMut fc n as) = assert_total $ do tag 15; toBuf b fc; toBuf b n; toBuf b as
     toBuf b (COp {arity} fc op as) = assert_total $ do tag 6; toBuf b fc; toBuf b arity; toBuf b op; toBuf b as
     toBuf b (CExtPrim fc f as) = assert_total $ do tag 7; toBuf b fc; toBuf b f; toBuf b as
     toBuf b (CForce fc x) = assert_total $ do tag 8; toBuf b fc; toBuf b x
@@ -607,6 +606,7 @@ mutual
     toBuf b (CPrimVal fc c) = do tag 12; toBuf b fc; toBuf b c
     toBuf b (CErased fc) = do tag 13; toBuf b fc
     toBuf b (CCrash fc msg) = do tag 14; toBuf b fc; toBuf b msg
+    toBuf b (CMut fc n as) = assert_total $ do tag 15; toBuf b fc; toBuf b n; toBuf b as
 
     fromBuf b
         = assert_total $ case !getTag of
@@ -653,9 +653,6 @@ mutual
                         pure (CPrimVal fc c)
                13 => do fc <- fromBuf b
                         pure (CErased fc)
-               14 => do fc <- fromBuf b
-                        msg <- fromBuf b
-                        pure (CCrash fc msg)
                14 => do fc <- fromBuf b
                         msg <- fromBuf b
                         pure (CCrash fc msg)
@@ -895,8 +892,9 @@ TTC DefFlag where
   toBuf b (SetTotal x) = do tag 6; toBuf b x
   toBuf b BlockedHint = tag 7
   toBuf b Macro = tag 8
-  toBuf b (PartialEval x) = tag 9 -- names not useful any more
-  toBuf b AllGuarded = tag 10
+  toBuf b Mutating = tag 9
+  toBuf b (PartialEval x) = tag 10 -- names not useful any more
+  toBuf b AllGuarded = tag 11
 
   fromBuf b
       = case !getTag of
@@ -907,8 +905,9 @@ TTC DefFlag where
              6 => do x <- fromBuf b; pure (SetTotal x)
              7 => pure BlockedHint
              8 => pure Macro
-             9 => pure (PartialEval [])
-             10 => pure AllGuarded
+             9 => pure Mutating
+             10 => pure (PartialEval [])
+             11 => pure AllGuarded
              _ => corrupt "DefFlag"
 
 export

@@ -54,6 +54,8 @@ processFnOpt fc ndef (Totality tot)
     = setFlag fc ndef (SetTotal tot)
 processFnOpt fc ndef Macro
     = setFlag fc ndef Macro
+processFnOpt fc ndef Mutating
+    = setFlag fc ndef Mutating
 processFnOpt fc ndef (SpecArgs ns)
     = do defs <- get Ctxt
          Just gdef <- lookupCtxtExact ndef (gamma defs)

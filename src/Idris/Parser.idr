@@ -1274,6 +1274,8 @@ fnDirectOpt fname
          pure $ IFnOpt TCInline
   <|> do pragma "extern"
          pure $ IFnOpt ExternFn
+  <|> do pragma "mutating"
+         pure $ IFnOpt Mutating
   <|> do pragma "macro"
          pure $ IFnOpt Macro
   <|> do pragma "spec"

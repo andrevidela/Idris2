@@ -34,12 +34,10 @@ mutual
   mkMutating nm tag (CApp fc fn args) = pure $ CApp fc !(mkMutating nm tag fn) !(traverse (mkMutating nm tag) args)
   -- if the constructor matches name and tag, replace it by mut, otherwise do nothing
   mkMutating nm tag con@(CCon fc nm' tag' args)  = do
-    coreLift $ putStrLn $ "found CCon " ++ show con
-    coreLift $ putStrLn $ "replace if match " ++ show nm ++ ":" ++ show tag
-    if nm == nm' && tag == tag'
-       then do coreLift $ putStrLn "names match, creating additional case"
-               pure $ CMut fc nm args
-       else do coreLift $ putStrLn "names do not match" ; pure con
+    corePrint $ "looking to replace " ++ show !(getFullName nm) ++ " and we got " ++ show !(getFullName nm')
+    pure $ if nm == nm' && tag == tag'
+       then CMut fc nm args
+       else con
   mkMutating nm tag (COp fc aty args) = pure $ COp fc aty !(traverseVect (mkMutating nm tag) args)
   mkMutating nm tag (CExtPrim fc n args) = pure $ CExtPrim fc n !(traverse (mkMutating nm tag) args)
   mkMutating nm tag (CForce fc body) = CForce fc <$> (mkMutating nm tag body)
@@ -50,15 +48,8 @@ mutual
   -- this makes a redundant tree traversal, maybe we should do everything in 1 go
   mkMutating nm tag (CConCase fc sc clauses wc) = do
         -- add the mutating clauses for the current
-        coreLift $ putStrLn $ "found ConCase with name " ++ show nm ++ ":" ++ show tag
         newClauses <- traverse mutateCaseAlt clauses
-        -- The new clauses need to have their tag updated. All non-mutating clauses
-        -- are Multiplied by 2 and all _mutating_ ones are * 2 + 1
-        -- this allows us to create new tags without requiring any type information
-        let clauses' = map (updateTag (*2)) clauses
-        let mutatingClauses = map (updateTag (\t => t * 2 + 1)) newClauses
-        let allClauses = interleave clauses' mutatingClauses
-        pure $ CConCase fc sc !(traverse mutateClause allClauses) wc
+        pure $ CConCase fc sc !(traverse mutateClause newClauses) wc
     where
       -- mutate the clause but this time replace all `nm` and `tag` since nm' and tag'
       -- have already been added in the lines above
@@ -71,18 +62,12 @@ mutual
     where
       mapClauses : CConstAlt vars -> Core (CConstAlt vars)
       mapClauses (MkConstAlt c rhs) = pure $ MkConstAlt c !(mkMutating nm tag rhs)
-  mkMutating nm tag other@(CCrash _ _) =
-    do coreLift $ putStrLn ("found crash " ++ show other ++ ", ignoring"); pure other
-  mkMutating nm tag other@(CErased _) =
-    do coreLift $ putStrLn ("found erased " ++ show other ++ ", ignoring"); pure other
-  mkMutating nm tag other@(CPrimVal _ _) =
-    do coreLift $ putStrLn ("found primVal " ++ show other ++ ", ignoring"); pure other
-  mkMutating nm tag other@(CLocal _ _) =
-    do coreLift $ putStrLn ("found local " ++ show other ++ ", ignoring"); pure other
-  mkMutating nm tag other@(CRef fc n) = do
-    pure other
-  mkMutating nm tag other@(CMut _ _ _) =
-    do coreLift $ putStrLn ("found mut " ++ show other ++ ", ignoring"); pure other
+  mkMutating nm tag other@(CCrash _ _) = pure other
+  mkMutating nm tag other@(CErased _) = pure other
+  mkMutating nm tag other@(CPrimVal _ _) = pure other
+  mkMutating nm tag other@(CLocal _ _) = pure other
+  mkMutating nm tag other@(CRef fc n) = pure other
+  mkMutating nm tag other@(CMut _ _ _) = pure other
 
   ||| Given a name/tag for a constructor, replace all occurences of constructing that value
   ||| on the rhs of a case alternatuve.
@@ -91,70 +76,24 @@ mutual
 
 export
 addMutatingCases : {auto c : Ref Ctxt Defs} -> Name -> Core ()
-addMutatingCases n = pure () -- do
---   defs <- get Ctxt
---   Just def <- lookupCtxtExact n (gamma defs)  | _ => pure ()
---   let Just (MkFun fargs body) = compexpr def | _ => pure ()
---   setCompiled n (MkFun fargs !(mkMutating (UN "") Nothing body))
+addMutatingCases n = do
+  defs <- get Ctxt
+  Just def <- lookupCtxtExact n (gamma defs)  | _ => pure ()
+  let Just (MkFun fargs body) = compexpr def | _ => pure ()
+  setCompiled n (MkFun fargs !(mkMutating (UN "") Nothing body))
 
-||| Duplicate every clause and replace every constructor on the rhs by a mutating version
-||| The transformation on takes place for patterns which are not wildcards
-||| It only replaces constructors that match the ones we match on
-||| The tag for mutating version is simply offest by the amount of matches we have
-||| the following tree:
-||| case v of
-|||      Match1 a => … -- tag 0
-|||      Match2 b => … -- tag 1
-|||      Match3 c => … -- tag 2
-|||
-||| will be replaced by:
-||| case v of
-|||      Match1 a => … -- tag 0
-|||      Match2 b => … -- tag 1
-|||      Match3 c => … -- tag 2
-|||      Match1' a => … -- tag 3 mutating rhs
-|||      Match2' b => … -- tag 4 mutating rhs
-|||      Match3' c => … -- tag 5 mutating rhs
-||| wildcards are not duplicated since they do not match on a known constructor
-||| case v of
-|||      Match1 a => …
-|||      _ => …
-||| will be replaced by:
-||| case v of
-|||      Match1 a => … -- tag 0
-|||      Match1' a => … -- tag 1
-|||      _ => … -- not duplicated since we do not know which constructor to replace
 export
-expandCases : {vars : List Name} -> {auto c : Ref Ctxt Defs} ->
-              CExp vars -> Core (CExp vars)
--- expandCases (CLam fc nm body) = (expandCases body)
--- expandCases (CLet fc nm i rhs body) =
---   do expandCases rhs
---      expandCases body
--- expandCases (CApp fc fn args) = do (expandCases fn) ; (traverse_ expandCases args)
--- expandCases (CCon fc nm tag args) = (traverse_ expandCases args)
--- expandCases (COp fc aty args) = map (const ()) (traverseVect expandCases args)
--- expandCases (CExtPrim fc nm args) = (traverse_ expandCases args)
--- expandCases (CForce fc expr) = (expandCases expr)
--- expandCases (CDelay fc expr) = (expandCases expr)
--- expandCases (CConCase fc sc clauses wc) =
---   traverse_ (\(MkConAlt _ _ _ rhs) => expandCases rhs) clauses
--- expandCases (CConstCase fc sc clauses wc) =
---   traverse_ (\(MkConstAlt c exp) => expandCases exp) clauses
--- expandCases other@(CCrash _ _) =
---   do coreLift $ putStrLn ("found crash " ++ show other ++ ", ignoring"); pure ()
--- expandCases other@(CErased _) =
---   do coreLift $ putStrLn ("found erased " ++ show other ++ ", ignoring"); pure ()
--- expandCases other@(CPrimVal _ _) =
---   do coreLift $ putStrLn ("found primVal " ++ show other ++ ", ignoring"); pure ()
--- expandCases other@(CLocal _ _) =
---   do coreLift $ putStrLn ("found local " ++ show other ++ ", ignoring"); pure ()
--- expandCases other@(CRef fc n) = do
---   defs <- get Ctxt
---   Just gdef <- lookupCtxtExact n (gamma defs) | _ => pure ()
---   let Just (MkFun fargs body) = compexpr gdef | _ => pure ()
---   expanded <- mkMutating {vars=fargs} (UN "") Nothing body
---   let newCDef = MkFun fargs expanded
---   setCompiled n newCDef
--- expandCases other@(CMut _ _ _) =
---   do coreLift $ putStrLn ("found mut " ++ show other ++ ", ignoring"); pure ()
+updateMutating : {auto c : Ref Ctxt Defs} -> Name -> Core ()
+updateMutating n = do
+  defs <- get Ctxt
+  Just def <- lookupCtxtExact n (gamma defs)  | _ => pure ()
+  corePrint $ show !(getFullName n)
+  corePrint $ show $ flags def
+  corePrint $ show $ Mutating `elem` flags def
+  if Mutating `elem` flags def
+     then do corePrint "mutating flag found"
+             let Just (MkFun fargs body) = compexpr def
+               | _ => do corePrint "false alert" ; pure ()
+             setCompiled n (MkFun fargs !(mkMutating (UN "") Nothing body))
+     else pure ()
+
