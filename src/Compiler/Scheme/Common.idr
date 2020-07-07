@@ -49,6 +49,22 @@ schConstructor _ _ (Just t) args
 schConstructor schString n Nothing args
     = "(vector " ++ schString (show n) ++ " " ++ showSep " " args ++ ")"
 
+||| Mutates the given vector at the given index
+mutateValue : (ref : String) -> (index : Nat) -> String -> String
+mutateValue ref idx newVal =
+  "(begin (display \"mutating\") (newline) (vector-set! " ++ ref ++  " " ++ show idx ++ " " ++ newVal ++ "))"
+
+||| Mutate all fiels of a given construtor
+||| We skip the first value in the vector because we do not change
+||| @vecRef : The vector to update
+||| @args : The list of new arguments
+schMutate : (ref : String) -> (args : List String) -> String
+schMutate ref args =
+  -- we start indexing at 1 since 0 is the tag and doesn't change
+  let indices = [1 .. (length args + 1)]
+      zipped : List (Nat, String) = zip indices args in
+      showSep " " (map (uncurry $ mutateValue ref) zipped)
+
 ||| Generate scheme for a plain function.
 op : String -> List String -> String
 op o args = "(" ++ o ++ " " ++ showSep " " args ++ ")"
@@ -275,6 +291,7 @@ mutual
   used n (NmLet _ _ v sc) = used n v || used n sc
   used n (NmApp _ f args) = used n f || anyTrue (map (used n) args)
   used n (NmCon _ _ _ args) = anyTrue (map (used n) args)
+  used n (NmMut _ _ args) = anyTrue (map (used n) args)
   used n (NmOp _ _ args) = anyTrue (toList (map (used n) args))
   used n (NmExtPrim _ _ args) = anyTrue (map (used n) args)
   used n (NmForce _ t) = used n t
@@ -300,10 +317,10 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
   showTag n Nothing = schString (show n)
 
   mutual
-    schConAlt : Int -> String -> NamedConAlt -> Core String
+    schConAlt : {mut : List (Name, String)} -> Int -> String -> NamedConAlt -> Core String
     schConAlt i target (MkNConAlt n tag args sc)
         = pure $ "((" ++ showTag n tag ++ ") "
-                      ++ bindArgs 1 args !(schExp i sc) ++ ")"
+                      ++ bindArgs 1 args !(schExp i {mut=(n, target)::mut} sc) ++ ")"
       where
         bindArgs : Int -> (ns : List Name) -> String -> String
         bindArgs i [] body = body
@@ -313,9 +330,9 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
                     ++ bindArgs (i + 1) ns body ++ ")"
                  else bindArgs (i + 1) ns body
 
-    schConUncheckedAlt : Int -> String -> NamedConAlt -> Core String
+    schConUncheckedAlt : {mut : List (Name, String)} -> Int -> String -> NamedConAlt -> Core String
     schConUncheckedAlt i target (MkNConAlt n tag args sc)
-        = pure $ bindArgs 1 args !(schExp i sc)
+        = pure $ bindArgs 1 args !(schExp {mut=(n, target)::mut} i sc)
       where
         bindArgs : Int -> (ns : List Name) -> String -> String
         bindArgs i [] body = body
@@ -325,53 +342,56 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
                     ++ bindArgs (i + 1) ns body ++ ")"
                  else bindArgs (i + 1) ns body
 
-    schConstAlt : Int -> String -> NamedConstAlt -> Core String
+    schConstAlt : {mut : List (Name, String)} -> Int -> String -> NamedConstAlt -> Core String
     schConstAlt i target (MkNConstAlt c exp)
-        = pure $ "((equal? " ++ target ++ " " ++ schConstant schString c ++ ") " ++ !(schExp i exp) ++ ")"
+        = pure $ "((equal? " ++ target ++ " " ++ schConstant schString c ++ ") " ++ !(schExp {mut} i exp) ++ ")"
 
     -- oops, no traverse for Vect in Core
-    schArgs : Int -> Vect n NamedCExp -> Core (Vect n String)
+    schArgs : {mut : List (Name, String)} -> Int -> Vect n NamedCExp -> Core (Vect n String)
     schArgs i [] = pure []
-    schArgs i (arg :: args) = pure $ !(schExp i arg) :: !(schArgs i args)
+    schArgs i (arg :: args) = pure $ !(schExp {mut} i arg) :: !(schArgs {mut} i args)
 
     export
-    schExp : Int -> NamedCExp -> Core String
+    schExp : {mut : List (Name, String)} -> Int -> NamedCExp -> Core String
     schExp i (NmLocal fc n) = pure $ schName n
     schExp i (NmRef fc n) = pure $ schName n
     schExp i (NmLam fc x sc)
-       = do sc' <- schExp i  sc
+       = do sc' <- schExp {mut} i sc
             pure $ "(lambda (" ++ schName x ++ ") " ++ sc' ++ ")"
     schExp i (NmLet fc x val sc)
-       = do val' <- schExp i val
-            sc' <- schExp i sc
+       = do val' <- schExp {mut} i val
+            sc' <- schExp {mut} i sc
             pure $ "(let ((" ++ schName x ++ " " ++ val' ++ ")) " ++ sc' ++ ")"
     schExp i (NmApp fc x [])
-        = pure $ "(" ++ !(schExp i x) ++ ")"
+        = pure $ "(" ++ !(schExp {mut} i x) ++ ")"
     schExp i (NmApp fc x args)
-        = pure $ "(" ++ !(schExp i x) ++ " " ++ showSep " " !(traverse (schExp i) args) ++ ")"
+        = pure $ "(" ++ !(schExp {mut} i x) ++ " " ++ showSep " " !(traverse (schExp {mut} i) args) ++ ")"
     schExp i (NmCon fc x tag args)
-        = pure $ schConstructor schString x tag !(traverse (schExp i) args)
-    schExp i (NmMut fc x args)
-        = ?mutate -- pure $ schConstructor schString x tag !(traverse (schExp i) args)
+        = pure $ schConstructor schString x tag !(traverse (schExp {mut} i) args)
+    schExp i (NmMut fc n args)
+        = do coreLift $ putStrLn ("found mutation for " ++ show n ++ " in context " ++ show mut)
+             let (Just ref) = lookup n mut
+               | _ => throw (InternalError ("Mutating reference not found : " ++ show n ++ " context " ++ show mut))
+             pure $ schMutate ref !(traverse (schExp {mut} i) args)
     schExp i (NmOp fc op args)
-        = pure $ schOp op !(schArgs i args)
+        = pure $ schOp op !(schArgs {mut} i args)
     schExp i (NmExtPrim fc p args)
         = schExtPrim i (toPrim p) args
-    schExp i (NmForce fc t) = pure $ "(" ++ !(schExp i t) ++ ")"
-    schExp i (NmDelay fc t) = pure $ "(lambda () " ++ !(schExp i t) ++ ")"
+    schExp i (NmForce fc t) = pure $ "(" ++ !(schExp {mut} i t) ++ ")"
+    schExp i (NmDelay fc t) = pure $ "(lambda () " ++ !(schExp {mut} i t) ++ ")"
     schExp i (NmConCase fc sc [] def)
-        = do tcode <- schExp (i+1) sc
-             defc <- maybe (pure "'erased") (schExp i) def
+        = do tcode <- schExp {mut} (i+1) sc
+             defc <- maybe (pure "'erased") (schExp {mut} i) def
              let n = "sc" ++ show i
              pure $ "(let ((" ++ n ++ " " ++ tcode ++ ")) "
                      ++ defc ++ ")"
     schExp i (NmConCase fc sc [alt] Nothing)
-        = do tcode <- schExp (i+1) sc
+        = do tcode <- schExp {mut} (i+1) sc
              let n = "sc" ++ show i
              pure $ "(let ((" ++ n ++ " " ++ tcode ++ ")) " ++
-                    !(schConUncheckedAlt (i+1) n alt) ++ ")"
+                    !(schConUncheckedAlt {mut} (i+1) n alt) ++ ")"
     schExp i (NmConCase fc sc alts Nothing)
-        = do tcode <- schExp (i+1) sc
+        = do tcode <- schExp {mut} (i+1) sc
              let n = "sc" ++ show i
              pure $ "(let ((" ++ n ++ " " ++ tcode ++ ")) (case (vector-ref " ++ n ++ " 0) "
                      ++ !(showAlts n alts) ++
@@ -380,37 +400,37 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
         showAlts : String -> List NamedConAlt -> Core String
         showAlts n [] = pure ""
         showAlts n [alt]
-           = pure $ "(else " ++ !(schConUncheckedAlt (i + 1) n alt) ++ ")"
+           = pure $ "(else " ++ !(schConUncheckedAlt {mut} (i + 1) n alt) ++ ")"
         showAlts n (alt :: alts)
-           = pure $ !(schConAlt (i + 1) n alt) ++ " " ++
+           = pure $ !(schConAlt {mut} (i + 1) n alt) ++ " " ++
                     !(showAlts n alts)
     schExp i (NmConCase fc sc alts def)
-        = do tcode <- schExp (i+1) sc
-             defc <- maybe (pure Nothing) (\v => pure (Just !(schExp i v))) def
+        = do tcode <- schExp {mut} (i+1) sc
+             defc <- maybe (pure Nothing) (\v => pure (Just !(schExp {mut} i v))) def
              let n = "sc" ++ show i
              pure $ "(let ((" ++ n ++ " " ++ tcode ++ ")) (case (vector-ref " ++ n ++ " 0) "
-                     ++ showSep " " !(traverse (schConAlt (i+1) n) alts)
+                     ++ showSep " " !(traverse (schConAlt {mut} (i+1) n) alts)
                      ++ schCaseDef defc ++ "))"
     schExp i (NmConstCase fc sc alts Nothing)
-        = do tcode <- schExp (i+1) sc
+        = do tcode <- schExp {mut} (i+1) sc
              let n = "sc" ++ show i
              pure $ "(let ((" ++ n ++ " " ++ tcode ++ ")) (cond "
-                      ++ !(showConstAlts n alts)
+                      ++ !(showConstAlts {mut} n alts)
                       ++ "))"
       where
-        showConstAlts : String -> List NamedConstAlt -> Core String
+        showConstAlts : {mut : List (Name, String)} -> String -> List NamedConstAlt -> Core String
         showConstAlts n [] = pure ""
         showConstAlts n [MkNConstAlt c exp]
-           = pure $ "(else " ++ !(schExp (i + 1) exp) ++ ")"
+           = pure $ "(else " ++ !(schExp {mut} (i + 1) exp) ++ ")"
         showConstAlts n (alt :: alts)
-           = pure $ !(schConstAlt (i + 1) n alt) ++ " " ++
-                    !(showConstAlts n alts)
+           = pure $ !(schConstAlt {mut} (i + 1) n alt) ++ " " ++
+                    !(showConstAlts {mut} n alts)
     schExp i (NmConstCase fc sc alts def)
-        = do defc <- maybe (pure Nothing) (\v => pure (Just !(schExp i v))) def
-             tcode <- schExp (i+1) sc
+        = do defc <- maybe (pure Nothing) (\v => pure (Just !(schExp {mut} i v))) def
+             tcode <- schExp {mut} (i+1) sc
              let n = "sc" ++ show i
              pure $ "(let ((" ++ n ++ " " ++ tcode ++ ")) (cond "
-                      ++ showSep " " !(traverse (schConstAlt (i+1) n) alts)
+                      ++ showSep " " !(traverse (schConstAlt {mut} (i+1) n) alts)
                       ++ schCaseDef defc ++ "))"
     schExp i (NmPrimVal fc c) = pure $ schConstant schString c
     schExp i (NmErased fc) = pure "'erased"
@@ -418,8 +438,8 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
 
   -- Need to convert the argument (a list of scheme arguments that may
   -- have been constructed at run time) to a scheme list to be passed to apply
-  readArgs : Int -> NamedCExp -> Core String
-  readArgs i tm = pure $ "(blodwen-read-args " ++ !(schExp i tm) ++ ")"
+  readArgs : {mut : List (Name, String)} -> Int -> NamedCExp -> Core String
+  readArgs i tm = pure $ "(blodwen-read-args " ++ !(schExp {mut} i tm) ++ ")"
 
   fileOp : String -> String
   fileOp op = "(blodwen-file-op (lambda () " ++ op ++ "))"
@@ -427,31 +447,31 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
   -- External primitives which are common to the scheme codegens (they can be
   -- overridden)
   export
-  schExtCommon : Int -> ExtPrim -> List NamedCExp -> Core String
+  schExtCommon : {mut : List (Name, String)} -> Int -> ExtPrim -> List NamedCExp -> Core String
   schExtCommon i SchemeCall [ret, NmPrimVal fc (Str fn), args, world]
      = pure $ mkWorld ("(apply " ++ fn ++" "
-                  ++ !(readArgs i args) ++ ")")
+                  ++ !(readArgs {mut} i args) ++ ")")
   schExtCommon i SchemeCall [ret, fn, args, world]
-       = pure $ mkWorld ("(apply (eval (string->symbol " ++ !(schExp i fn) ++")) "
-                    ++ !(readArgs i args) ++ ")")
+       = pure $ mkWorld ("(apply (eval (string->symbol " ++ !(schExp {mut} i fn) ++")) "
+                   ++ !(readArgs {mut} i args) ++ ")")
   schExtCommon i NewIORef [_, val, world]
-      = pure $ mkWorld $ "(box " ++ !(schExp i val) ++ ")"
+      = pure $ mkWorld $ "(box " ++ !(schExp {mut} i val) ++ ")"
   schExtCommon i ReadIORef [_, ref, world]
-      = pure $ mkWorld $ "(unbox " ++ !(schExp i ref) ++ ")"
+      = pure $ mkWorld $ "(unbox " ++ !(schExp {mut} i ref) ++ ")"
   schExtCommon i WriteIORef [_, ref, val, world]
       = pure $ mkWorld $ "(set-box! "
-                           ++ !(schExp i ref) ++ " "
-                           ++ !(schExp i val) ++ ")"
+                           ++ !(schExp {mut} i ref) ++ " "
+                           ++ !(schExp {mut} i val) ++ ")"
   schExtCommon i NewArray [_, size, val, world]
-      = pure $ mkWorld $ "(make-vector " ++ !(schExp i size) ++ " "
-                                         ++ !(schExp i val) ++ ")"
+      = pure $ mkWorld $ "(make-vector " ++ !(schExp {mut} i size) ++ " "
+                                         ++ !(schExp {mut} i val) ++ ")"
   schExtCommon i ArrayGet [_, arr, pos, world]
-      = pure $ mkWorld $ "(vector-ref " ++ !(schExp i arr) ++ " "
-                                        ++ !(schExp i pos) ++ ")"
+      = pure $ mkWorld $ "(vector-ref " ++ !(schExp {mut} i arr) ++ " "
+                                        ++ !(schExp {mut} i pos) ++ ")"
   schExtCommon i ArraySet [_, arr, pos, val, world]
-      = pure $ mkWorld $ "(vector-set! " ++ !(schExp i arr) ++ " "
-                                         ++ !(schExp i pos) ++ " "
-                                         ++ !(schExp i val) ++ ")"
+      = pure $ mkWorld $ "(vector-set! " ++ !(schExp {mut} i arr) ++ " "
+                                         ++ !(schExp {mut} i pos) ++ " "
+                                         ++ !(schExp {mut} i val) ++ ")"
   schExtCommon i VoidElim [_, _]
       = pure "(display \"Error: Executed 'void'\")"
   schExtCommon i SysOS []
@@ -463,12 +483,13 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
                                 ++ " " ++ show args))
 
   schDef : {auto c : Ref Ctxt Defs} ->
+           {mut : List (Name, String)} ->
            Name -> NamedDef -> Core String
   schDef n (MkNmFun args exp)
      = pure $ "(define " ++ schName !(getFullName n) ++ " (lambda (" ++ schArglist args ++ ") "
-                      ++ !(schExp 0 exp) ++ "))\n"
+                      ++ !(schExp {mut} 0 exp) ++ "))\n"
   schDef n (MkNmError exp)
-     = pure $ "(define (" ++ schName !(getFullName n) ++ " . any-args) " ++ !(schExp 0 exp) ++ ")\n"
+     = pure $ "(define (" ++ schName !(getFullName n) ++ " . any-args) " ++ !(schExp {mut} 0 exp) ++ ")\n"
   schDef n (MkNmForeign _ _ _) = pure "" -- compiled by specific back end
   schDef n (MkNmCon t a _) = pure "" -- Nothing to compile here
 
@@ -480,4 +501,4 @@ getScheme : {auto c : Ref Ctxt Defs} ->
             (schString : String -> String) ->
             (Name, FC, NamedDef) -> Core String
 getScheme schExtPrim schString (n, fc, d)
-    = schDef schExtPrim schString n d
+  = schDef {mut=[]} schExtPrim schString n d

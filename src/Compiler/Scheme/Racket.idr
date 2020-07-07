@@ -74,14 +74,14 @@ mutual
       = throw (InternalError ("Can't compile C FFI calls to Racket yet"))
   racketPrim i GetField [NmPrimVal _ (Str s), _, _, struct,
                          NmPrimVal _ (Str fld), _]
-      = do structsc <- schExp racketPrim racketString 0 struct
+      = do structsc <- schExp {mut=[]} racketPrim racketString 0 struct
            pure $ "(" ++ s ++ "-" ++ fld ++ " " ++ structsc ++ ")"
   racketPrim i GetField [_,_,_,_,_,_]
       = pure "(error \"bad getField\")"
   racketPrim i SetField [NmPrimVal _ (Str s), _, _, struct,
                          NmPrimVal _ (Str fld), _, val, world]
-      = do structsc <- schExp racketPrim racketString 0 struct
-           valsc <- schExp racketPrim racketString 0 val
+      = do structsc <- schExp {mut=[]} racketPrim racketString 0 struct
+           valsc <- schExp {mut=[]} racketPrim racketString 0 val
            pure $ mkWorld $
                 "(set-" ++ s ++ "-" ++ fld ++ "! " ++ structsc ++ " " ++ valsc ++ ")"
   racketPrim i SetField [_,_,_,_,_,_,_,_]
@@ -89,15 +89,15 @@ mutual
   racketPrim i SysCodegen []
       = pure $ "\"racket\""
   racketPrim i OnCollect [_, p, c, world]
-      = do p' <- schExp racketPrim racketString 0 p
-           c' <- schExp racketPrim racketString 0 c
+      = do p' <- schExp {mut=[]} racketPrim racketString 0 p
+           c' <- schExp {mut=[]} racketPrim racketString 0 c
            pure $ mkWorld $ "(blodwen-register-object " ++ p' ++ " " ++ c' ++ ")"
   racketPrim i OnCollectAny [p, c, world]
-      = do p' <- schExp racketPrim racketString 0 p
-           c' <- schExp racketPrim racketString 0 c
+      = do p' <- schExp {mut=[]} racketPrim racketString 0 p
+           c' <- schExp {mut=[]} racketPrim racketString 0 c
            pure $ mkWorld $ "(blodwen-register-object " ++ p' ++ " " ++ c' ++ ")"
   racketPrim i prim args
-      = schExtCommon racketPrim racketString i prim args
+      = schExtCommon {mut=[]} racketPrim racketString i prim args
 
 -- Reference label for keeping track of loaded external libraries
 data Loaded : Type where
@@ -369,7 +369,7 @@ compileToRKT c appdir tm outfile
          fgndefs <- traverse (getFgnCall appdir) ndefs
          compdefs <- traverse (getScheme racketPrim racketString) ndefs
          let code = fastAppend (map snd fgndefs ++ compdefs)
-         main <- schExp racketPrim racketString 0 ctm
+         main <- schExp {mut=[]} racketPrim racketString 0 ctm
          support <- readDataFile "racket/support.rkt"
          let scm = schHeader (concat (map fst fgndefs)) ++
                    support ++ code ++

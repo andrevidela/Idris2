@@ -134,7 +134,7 @@ mutual
       = do args <- getFArgs fargs
            argTypes <- traverse tySpec (map fst args)
            retType <- tySpec ret
-           argsc <- traverse (schExp chezExtPrim chezString 0) (map snd args)
+           argsc <- traverse (schExp {mut=[]} chezExtPrim chezString 0) (map snd args)
            pure $ handleRet retType ("((foreign-procedure #f " ++ show fn ++ " ("
                     ++ showSep " " argTypes ++ ") " ++ retType ++ ") "
                     ++ showSep " " argsc ++ ")")
@@ -143,14 +143,14 @@ mutual
       -- throw (InternalError ("C FFI calls must be to statically known functions (" ++ show fn ++ ")"))
   chezExtPrim i GetField [NmPrimVal _ (Str s), _, _, struct,
                           NmPrimVal _ (Str fld), _]
-      = do structsc <- schExp chezExtPrim chezString 0 struct
+      = do structsc <- schExp {mut=[]} chezExtPrim chezString 0 struct
            pure $ "(ftype-ref " ++ s ++ " (" ++ fld ++ ") " ++ structsc ++ ")"
   chezExtPrim i GetField [_,_,_,_,_,_]
       = pure "(error \"bad getField\")"
   chezExtPrim i SetField [NmPrimVal _ (Str s), _, _, struct,
                           NmPrimVal _ (Str fld), _, val, world]
-      = do structsc <- schExp chezExtPrim chezString 0 struct
-           valsc <- schExp chezExtPrim chezString 0 val
+      = do structsc <- schExp {mut=[]} chezExtPrim chezString 0 struct
+           valsc <- schExp {mut=[]} chezExtPrim chezString 0 val
            pure $ mkWorld $
               "(ftype-set! " ++ s ++ " (" ++ fld ++ ") " ++ structsc ++
               " " ++ valsc ++ ")"
@@ -159,15 +159,15 @@ mutual
   chezExtPrim i SysCodegen []
       = pure $ "\"chez\""
   chezExtPrim i OnCollect [_, p, c, world]
-      = do p' <- schExp chezExtPrim chezString 0 p
-           c' <- schExp chezExtPrim chezString 0 c
+      = do p' <- schExp {mut=[]} chezExtPrim chezString 0 p
+           c' <- schExp {mut=[]} chezExtPrim chezString 0 c
            pure $ mkWorld $ "(blodwen-register-object " ++ p' ++ " " ++ c' ++ ")"
   chezExtPrim i OnCollectAny [p, c, world]
-      = do p' <- schExp chezExtPrim chezString 0 p
-           c' <- schExp chezExtPrim chezString 0 c
+      = do p' <- schExp {mut=[]} chezExtPrim chezString 0 p
+           c' <- schExp {mut=[]} chezExtPrim chezString 0 c
            pure $ mkWorld $ "(blodwen-register-object " ++ p' ++ " " ++ c' ++ ")"
   chezExtPrim i prim args
-      = schExtCommon chezExtPrim chezString i prim args
+      = schExtCommon {mut=[]} chezExtPrim chezString i prim args
 
 -- Reference label for keeping track of loaded external libraries
 data Loaded : Type where
@@ -390,7 +390,7 @@ compileToSS c appdir tm outfile
          fgndefs <- traverse (getFgnCall appdir) ndefs
          compdefs <- traverse (getScheme chezExtPrim chezString) ndefs
          let code = fastAppend (map snd fgndefs ++ compdefs)
-         main <- schExp chezExtPrim chezString 0 ctm
+         main <- schExp {mut=[]} chezExtPrim chezString 0 ctm
          chez <- coreLift findChez
          support <- readDataFile "chez/support.ss"
          let scm = schHeader chez (map snd libs) ++

@@ -93,7 +93,7 @@ mutual
       = do args <- getFArgs fargs
            argTypes <- traverse tySpec (map fst args)
            retType <- tySpec ret
-           argsc <- traverse (schExp gambitPrim gambitString 0) (map snd args)
+           argsc <- traverse (schExp {mut=[]} gambitPrim gambitString 0) (map snd args)
            pure $ handleRet retType ("((c-lambda (" ++ showSep " " argTypes ++ ") "
                     ++ retType ++ " " ++ show fn ++ ") "
                     ++ showSep " " argsc ++ ")")
@@ -101,14 +101,14 @@ mutual
       = pure "(error \"bad ffi call\")"
   gambitPrim i GetField [NmPrimVal _ (Str s), _, _, struct,
                          NmPrimVal _ (Str fld), _]
-      = do structsc <- schExp gambitPrim gambitString 0 struct
+      = do structsc <- schExp {mut=[]} gambitPrim gambitString 0 struct
            pure $ "(" ++ s ++ "-" ++ fld ++ " " ++ structsc ++ ")"
   gambitPrim i GetField [_,_,_,_,_,_]
       = pure "(error \"bad getField\")"
   gambitPrim i SetField [NmPrimVal _ (Str s), _, _, struct,
                          NmPrimVal _ (Str fld), _, val, world]
-      = do structsc <- schExp gambitPrim gambitString 0 struct
-           valsc <- schExp gambitPrim gambitString 0 val
+      = do structsc <- schExp {mut=[]} gambitPrim gambitString 0 struct
+           valsc <- schExp {mut=[]} gambitPrim gambitString 0 val
            pure $ mkWorld $
                 "(" ++ s ++ "-" ++ fld ++ "-set! " ++ structsc ++ " " ++ valsc ++ ")"
   gambitPrim i SetField [_,_,_,_,_,_,_,_]
@@ -116,7 +116,7 @@ mutual
   gambitPrim i SysCodegen []
       = pure $ "\"gambit\""
   gambitPrim i prim args
-      = schExtCommon gambitPrim gambitString i prim args
+      = schExtCommon {mut=[]} gambitPrim gambitString i prim args
 
 -- Reference label for keeping track of loaded external libraries
 data Loaded : Type where
@@ -218,7 +218,7 @@ cCall fc cfn fnWrapName clib args ret
          let body = setBoxes ++ "\n" ++ call
 
          pure $ case ret of -- XXX
-                     CFIORes _ => (handleRet retType body, wrapDeclarations) 
+                     CFIORes _ => (handleRet retType body, wrapDeclarations)
                      _ => (body, wrapDeclarations)
   where
     mkNs : Int -> List CFType -> List (Maybe String)
@@ -235,7 +235,7 @@ cCall fc cfn fnWrapName clib args ret
     replaceChar old new = pack . replaceOn old new . unpack
 
     buildCWrapperDefs : CCallbackInfo -> CWrapperDefs
-    buildCWrapperDefs (MkCCallbackInfo arg schemeWrap callbackStr argTypes retType) = 
+    buildCWrapperDefs (MkCCallbackInfo arg schemeWrap callbackStr argTypes retType) =
       let box = schemeWrap ++ "-box"
           setBox = "\n (set-box! " ++ box ++ " " ++ callbackStr ++ ")"
           cWrapName = replaceChar '-' '_' schemeWrap
@@ -376,7 +376,7 @@ compileToSCM c tm outfile
          fgndefs <- traverse getFgnCall ndefs
          compdefs <- traverse (getScheme gambitPrim gambitString) ndefs
          let code = fastAppend (map snd fgndefs ++ compdefs)
-         main <- schExp gambitPrim gambitString 0 ctm
+         main <- schExp {mut=[]} gambitPrim gambitString 0 ctm
          support <- readDataFile "gambit/support.scm"
          foreign <- readDataFile "gambit/foreign.scm"
          let scm = showSep "\n" [schHeader, support, foreign, code, main]
@@ -392,7 +392,7 @@ compileExpr c tmpDir outputDir tm outfile
          libsname <- compileToSCM c tm srcPath
          libsfile <- traverse findLibraryFile $ map (<.> "a") (nub libsname)
          gsc <- coreLift findGSC
-         let cmd = gsc ++ 
+         let cmd = gsc ++
                    " -exe -cc-options \"-Wno-implicit-function-declaration\" -ld-options \"" ++
                    (showSep " " libsfile) ++ "\" -o \"" ++ execPath ++ "\" \"" ++ srcPath ++ "\""
          ok <- coreLift $ system cmd
