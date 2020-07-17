@@ -351,7 +351,7 @@ doubleCeiling = doubleOp ceiling
 
 -- Only reduce for concrete values
 believeMe : Vect 3 (NF vars) -> Maybe (NF vars)
-believeMe [_, _, val@(NDCon _ _ _ _ _)] = Just val
+believeMe [_, _, val@(NDCon _ _ _ _ _ _)] = Just val
 believeMe [_, _, val@(NTCon _ _ _ _ _)] = Just val
 believeMe [_, _, val@(NPrimVal _ _)] = Just val
 believeMe [_, _, NType fc] = Just (NType fc)

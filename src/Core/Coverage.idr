@@ -19,14 +19,14 @@ conflictMatch [] = False
 conflictMatch ((x, tm) :: ms) = conflictArgs x tm ms || conflictMatch ms
   where
     clash : Term vars -> Term vars -> Bool
-    clash (Ref _ (DataCon t _) _) (Ref _ (DataCon t' _) _)
+    clash (Ref _ (DataCon _ t _) _) (Ref _ (DataCon _ t' _) _)
         = t /= t'
     clash _ _ = False
 
     findN : Nat -> Term vars -> Bool
     findN i (Local _ _ i' _) = i == i'
     findN i tm
-        = let (Ref _ (DataCon _ _) _, args) = getFnArgs tm
+        = let (Ref _ (DataCon _ _ _) _, args) = getFnArgs tm
                    | _ => False in
               anyTrue (map (findN i) args)
 
@@ -34,11 +34,11 @@ conflictMatch ((x, tm) :: ms) = conflictArgs x tm ms || conflictMatch ms
     -- a name appearing strong rigid in the other term
     conflictTm : Term vars -> Term vars -> Bool
     conflictTm (Local _ _ i _) tm
-        = let (Ref _ (DataCon _ _) _, args) = getFnArgs tm
+        = let (Ref _ (DataCon _ _ _) _, args) = getFnArgs tm
                    | _ => False in
               anyTrue (map (findN i) args)
     conflictTm tm (Local _ _ i _)
-        = let (Ref _ (DataCon _ _) _, args) = getFnArgs tm
+        = let (Ref _ (DataCon _ _ _) _, args) = getFnArgs tm
                    | _ => False in
               anyTrue (map (findN i) args)
     conflictTm tm tm'
@@ -60,7 +60,7 @@ conflict defs env nfty n
     = do Just gdef <- lookupCtxtExact n (gamma defs)
               | Nothing => pure False
          case (definition gdef, type gdef) of
-              (DCon t arity _, dty)
+              (DCon ref t arity _, dty)
                   => do Nothing <- conflictNF 0 nfty !(nf defs [] dty)
                             | Just ms => pure $ conflictMatch ms
                         pure True
@@ -98,7 +98,7 @@ conflict defs env nfty n
       conflictNF i nf (NApp _ (NRef Bound n) [])
           = do empty <- clearDefs defs
                pure (Just [(n, !(quote empty env nf))])
-      conflictNF i (NDCon _ n t a args) (NDCon _ n' t' a' args')
+      conflictNF i (NDCon _ _ n t a args) (NDCon _ _ n' t' a' args')
           = if t == t'
                then conflictArgs i args args'
                else pure Nothing
@@ -148,7 +148,7 @@ getCons defs (NTCon _ tn _ _ _)
         = do Just gdef <- lookupCtxtExact cn (gamma defs)
                   | _ => pure Nothing
              case (definition gdef, type gdef) of
-                  (DCon t arity _, ty) =>
+                  (DCon ref t arity _, ty) =>
                         pure (Just (!(nf defs [] ty), cn, t, arity))
                   _ => pure Nothing
 getCons defs _ = pure []
@@ -323,7 +323,7 @@ buildArgs fc defs known not ps cs@(Case {name = var} idx el ty altsIn)
     buildArgAlt : KnownVars vars (List Int) ->
                   CaseAlt vars -> Core (List (List ClosedTerm))
     buildArgAlt not' (ConCase n t args sc)
-        = do let con = Ref fc (DataCon t (length args)) n
+        = do let con = Ref fc (DataCon Nothing t (length args)) n
              let ps' = map (substName var
                              (apply fc
                                     con (map (Ref fc Bound) args))) ps

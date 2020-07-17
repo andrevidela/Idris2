@@ -107,7 +107,7 @@ expandAmbigName mode nest env orig args (IVar fc x) exp
     -- If it's not a constructor application, dot it
     wrapDot : Bool -> EState vars ->
               ElabMode -> Name -> List RawImp -> Def -> RawImp -> RawImp
-    wrapDot _ _ _ _ _ (DCon _ _ _) tm = tm
+    wrapDot _ _ _ _ _ (DCon _ _ _ _) tm = tm
     wrapDot _ _ _ _ _ (TCon _ _ _ _ _ _ _ _) tm = tm
     -- Leave primitive applications alone, because they'll be inlined
     -- before compiling the case tree
@@ -197,7 +197,7 @@ mutual
            then do amatch <- mightMatchArgs defs args args'
                    if amatch then pure Concrete else pure NoMatch
            else pure NoMatch
-  mightMatch defs (NDCon _ n t a args) (NDCon _ n' t' a' args')
+  mightMatch defs (NDCon _ _ n t a args) (NDCon _ _ n' t' a' args')
       = if t == t'
            then do amatch <- mightMatchArgs defs args args'
                    if amatch then pure Concrete else pure NoMatch

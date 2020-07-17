@@ -123,7 +123,7 @@ searchName fc rigc opts env target topty defining (n, ndef)
          let ty = type ndef
          let namety : NameType
                  = case definition ndef of
-                        DCon tag arity _ => DataCon tag arity
+                        DCon ref tag arity _ => DataCon ref tag arity
                         TCon tag arity _ _ _ _ _ _ => TyCon tag arity
                         _ => Func
          log 5 $ "Trying " ++ show (fullname ndef)
@@ -260,7 +260,7 @@ tryRecursive fc rig opts env ty topty (Just rdata)
 
       appsDiff : Term vs -> Term vs' -> List (Term vs) -> List (Term vs') ->
                  Bool
-      appsDiff (Ref _ (DataCon _ _) f) (Ref _ (DataCon _ _) f') args args'
+      appsDiff (Ref _ (DataCon _ _ _) f) (Ref _ (DataCon _ _ _) f') args args'
          = f /= f' || anyTrue (zipWith argDiff args args')
       appsDiff (Ref _ (TyCon _ _) f) (Ref _ (TyCon _ _) f') args args'
          = f /= f' || anyTrue (zipWith argDiff args args')
@@ -268,8 +268,8 @@ tryRecursive fc rig opts env ty topty (Just rdata)
          = f == f'
            && length args == length args'
            && anyTrue (zipWith argDiff args args')
-      appsDiff (Ref _ (DataCon _ _) f) (Local _ _ _ _) _ _ = True
-      appsDiff (Local _ _ _ _) (Ref _ (DataCon _ _) f) _ _ = True
+      appsDiff (Ref _ (DataCon _ _ _) f) (Local _ _ _ _) _ _ = True
+      appsDiff (Local _ _ _ _) (Ref _ (DataCon _ _ _) f) _ _ = True
       appsDiff f f' [] [] = argDiff f f'
       appsDiff _ _ _ _ = False -- can't be sure...
 

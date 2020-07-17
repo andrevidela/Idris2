@@ -17,7 +17,8 @@ public export
 data NameType : Type where
      Bound   : NameType
      Func    : NameType
-     DataCon : (tag : Int) -> (arity : Nat) -> NameType
+     -- ref contains the reference to the value we're mutating in the linear case
+     DataCon : (ref : Maybe Name) -> (tag : Int) -> (arity : Nat) -> NameType
      TyCon   : (tag : Int) -> (arity : Nat) -> NameType
 
 public export

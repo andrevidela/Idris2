@@ -49,7 +49,7 @@ checkIfGuarded fc n
          when t $ setFlag fc n AllGuarded
   where
     guardedNF : {vars : _} -> Defs -> Env Term vars -> NF vars -> Core Bool
-    guardedNF defs env (NDCon _ _ _ _ args) = pure True
+    guardedNF defs env (NDCon _ _ _ _ _ args) = pure True
     guardedNF defs env (NApp _ (NRef _ n) args)
         = do Just gdef <- lookupCtxtExact n (gamma defs)
                   | Nothing => pure False
@@ -61,7 +61,7 @@ checkIfGuarded fc n
         = do Just gdef <- lookupCtxtExact n (gamma defs)
                   | Nothing => pure False
              case definition gdef of
-                  DCon _ _ _ => pure True
+                  DCon _ _ _ _ => pure True
                   _ => pure (multiplicity gdef == erased
                               || (AllGuarded `elem` flags gdef))
 
@@ -165,7 +165,7 @@ mutual
            case (g, fn', args) of
     -- If we're InDelay and find a constructor (or a function call which is
     -- guaranteed to return a constructor; AllGuarded set), continue as InDelay
-             (InDelay, Ref fc (DataCon _ _) cn, args) =>
+             (InDelay, Ref fc (DataCon _ _ _) cn, args) =>
                  do scs <- traverse (findSC defs env InDelay pats) args
                     pure (concat scs)
              -- If we're InDelay otherwise, just check the arguments, the
@@ -173,10 +173,10 @@ mutual
              (InDelay, _, args) =>
                  do scs <- traverse (findSC defs env Unguarded pats) args
                     pure (concat scs)
-             (Guarded, Ref fc (DataCon _ _) cn, args) =>
+             (Guarded, Ref fc (DataCon _ _ _) cn, args) =>
                  do scs <- traverse (findSC defs env Guarded pats) args
                     pure (concat scs)
-             (Toplevel, Ref fc (DataCon _ _) cn, args) =>
+             (Toplevel, Ref fc (DataCon _ _ _) cn, args) =>
                  do scs <- traverse (findSC defs env Guarded pats) args
                     pure (concat scs)
              (_, Ref fc Func fn, args) =>
@@ -203,7 +203,7 @@ mutual
                  Just gdef <- lookupCtxtExact n (gamma defs)
                       | Nothing => pure $ Ref fc Func n
                  if AllGuarded `elem` flags gdef
-                    then pure $ Ref fc (DataCon 0 0) n
+                    then pure $ Ref fc (DataCon Nothing 0 0) n
                     else pure $ Ref fc Func n
         conIfGuarded tm = pure tm
 
@@ -244,7 +244,7 @@ mutual
         -- the argument must be smaller
       = assertedSmaller big tm ||
                 case getFnArgs tm of
-                     (Ref _ (DataCon t a) cn, args)
+                     (Ref _ (DataCon ref t a) cn, args)
                          => any (smaller True defs big s) args
                      _ => case s of
                                App _ f _ => smaller inc defs big f tm
@@ -566,7 +566,7 @@ nameIn defs tyns (NTCon _ n _ _ args)
          then pure True
          else do args' <- traverse (evalClosure defs) args
                  anyM (nameIn defs tyns) args'
-nameIn defs tyns (NDCon _ n _ _ args)
+nameIn defs tyns (NDCon _ _ n _ _ args)
     = anyM (nameIn defs tyns)
            !(traverse (evalClosure defs) args)
 nameIn defs tyns _ = pure False

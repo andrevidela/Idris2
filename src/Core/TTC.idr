@@ -165,14 +165,14 @@ export
 TTC NameType where
   toBuf b Bound = tag 0
   toBuf b Func = tag 1
-  toBuf b (DataCon t arity) = do tag 2; toBuf b t; toBuf b arity
+  toBuf b (DataCon ref t arity) = do tag 2; toBuf b ref; toBuf b t; toBuf b arity
   toBuf b (TyCon t arity) = do tag 3; toBuf b t; toBuf b arity
 
   fromBuf b
       = case !getTag of
              0 => pure Bound
              1 => pure Func
-             2 => do x <- fromBuf b; y <- fromBuf b; pure (DataCon x y)
+             2 => do ref <- fromBuf b; x <- fromBuf b; y <- fromBuf b; pure (DataCon ref x y)
              3 => do x <- fromBuf b; y <- fromBuf b; pure (TyCon x y)
              _ => corrupt "NameType"
 
@@ -329,7 +329,8 @@ TTC Pat where
              0 => do fc <- fromBuf b; x <- fromBuf b;
                      y <- fromBuf b
                      pure (PAs fc x y)
-             1 => do fc <- fromBuf b; x <- fromBuf b
+             1 => do fc <- fromBuf b; 
+                     x <- fromBuf b
                      t <- fromBuf b; arity <- fromBuf b
                      xs <- fromBuf b
                      pure (PCon fc x t arity xs)
@@ -821,7 +822,7 @@ TTC Def where
       = do tag 3; toBuf b a; toBuf b cs
   toBuf b (Builtin a)
       = throw (InternalError "Trying to serialise a Builtin")
-  toBuf b (DCon t arity nt) = do tag 4; toBuf b t; toBuf b arity; toBuf b nt
+  toBuf b (DCon ref t arity nt) = do tag 4; toBuf b ref; toBuf b t; toBuf b arity; toBuf b nt
   toBuf b (TCon t arity parampos detpos u ms datacons dets)
       = do tag 5; toBuf b t; toBuf b arity; toBuf b parampos
            toBuf b detpos; toBuf b u; toBuf b ms; toBuf b datacons
@@ -848,8 +849,8 @@ TTC Def where
              3 => do a <- fromBuf b
                      cs <- fromBuf b
                      pure (ForeignDef a cs)
-             4 => do t <- fromBuf b; a <- fromBuf b; nt <- fromBuf b
-                     pure (DCon t a nt)
+             4 => do ref <- fromBuf b; t <- fromBuf b; a <- fromBuf b; nt <- fromBuf b
+                     pure (DCon ref t a nt)
              5 => do t <- fromBuf b; a <- fromBuf b
                      ps <- fromBuf b; dets <- fromBuf b;
                      u <- fromBuf b

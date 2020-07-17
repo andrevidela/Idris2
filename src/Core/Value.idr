@@ -76,7 +76,7 @@ mutual
        NBind    : FC -> (x : Name) -> Binder (NF vars) ->
                   (Defs -> Closure vars -> Core (NF vars)) -> NF vars
        NApp     : FC -> NHead vars -> List (Closure vars) -> NF vars
-       NDCon    : FC -> Name -> (tag : Int) -> (arity : Nat) ->
+       NDCon    : FC -> (ref : Maybe Name) -> Name -> (tag : Int) -> (arity : Nat) ->
                   List (Closure vars) -> NF vars
        NTCon    : FC -> Name -> (tag : Int) -> (arity : Nat) ->
                   List (Closure vars) -> NF vars
@@ -92,7 +92,7 @@ export
 getLoc : NF vars -> FC
 getLoc (NBind fc _ _ _) = fc
 getLoc (NApp fc _ _) = fc
-getLoc (NDCon fc _ _ _ _) = fc
+getLoc (NDCon fc _ _ _ _ _) = fc
 getLoc (NTCon fc _ _ _ _) = fc
 getLoc (NAs fc _ _ _) = fc
 getLoc (NDelayed fc _ _) = fc

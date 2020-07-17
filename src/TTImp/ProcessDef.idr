@@ -39,7 +39,7 @@ mutual
       = if xn /= yn
            then pure True
            else anyM (mismatch defs) (zip xargs yargs)
-  mismatchNF defs (NDCon _ _ xt _ xargs) (NDCon _ _ yt _ yargs)
+  mismatchNF defs (NDCon _ _ _ xt _ xargs) (NDCon _ _ _ yt _ yargs)
       = if xt /= yt
            then pure True
            else anyM (mismatch defs) (zip xargs yargs)
@@ -65,13 +65,13 @@ impossibleOK defs (NTCon _ xn xt xa xargs) (NTCon _ yn yt ya yargs)
          then anyM (mismatch defs) (zip xargs yargs)
          else pure False
 -- If it's a data constructor, any mismatch will do
-impossibleOK defs (NDCon _ _ xt _ xargs) (NDCon _ _ yt _ yargs)
+impossibleOK defs (NDCon _ _ _ xt _ xargs) (NDCon _ _ _ yt _ yargs)
     = if xt /= yt
          then pure True
          else anyM (mismatch defs) (zip xargs yargs)
 impossibleOK defs (NPrimVal _ x) (NPrimVal _ y) = pure (x /= y)
-impossibleOK defs (NDCon _ _ _ _ _) (NPrimVal _ _) = pure True
-impossibleOK defs (NPrimVal _ _) (NDCon _ _ _ _ _) = pure True
+impossibleOK defs (NDCon _ _ _ _ _ _) (NPrimVal _ _) = pure True
+impossibleOK defs (NPrimVal _ _) (NDCon _ _ _ _ _ _) = pure True
 impossibleOK defs x y = pure False
 
 export
@@ -102,16 +102,16 @@ recoverable defs (NTCon _ xn xt xa xargs) (NTCon _ yn yt ya yargs)
     = if xn /= yn
          then pure False
          else pure $ not !(anyM (mismatch defs) (zip xargs yargs))
-recoverable defs (NDCon _ _ xt _ xargs) (NDCon _ _ yt _ yargs)
+recoverable defs (NDCon _ _ _ xt _ xargs) (NDCon _ _ _ yt _ yargs)
     = if xt /= yt
          then pure False
          else pure $ not !(anyM (mismatch defs) (zip xargs yargs))
 recoverable defs (NApp _ (NRef _ f) fargs) (NApp _ (NRef _ g) gargs) 
     = pure True -- both functions; recoverable
 recoverable defs (NTCon _ _ _ _ _) _ = pure True 
-recoverable defs (NDCon _ _ _ _ _) _ = pure True 
+recoverable defs (NDCon _ _ _ _ _ _) _ = pure True 
 recoverable defs (NPrimVal _ x) (NPrimVal _ y) = pure (x == y)
-recoverable defs (NPrimVal _ _) (NDCon _ _ _ _ _) = pure False
+recoverable defs (NPrimVal _ _) (NDCon _ _ _ _ _ _) = pure False
 recoverable defs x y = pure False
 
 export

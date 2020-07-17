@@ -156,14 +156,14 @@ getDetags fc tys
                else disjointArgs args args'
 
       disjoint : NF [] -> NF [] -> Core Bool
-      disjoint (NDCon _ _ t _ args) (NDCon _ _ t' _ args')
+      disjoint (NDCon _ _ _ t _ args) (NDCon _ _ _ t' _ args')
           = if t /= t'
                then pure True
                else do defs <- get Ctxt
                        argsnf <- traverse (evalClosure defs) args
                        args'nf <- traverse (evalClosure defs) args'
                        disjointArgs argsnf args'nf
-      disjoint (NTCon _ n _ _ args) (NDCon _ n' _ _ args')
+      disjoint (NTCon _ n _ _ args) (NDCon _ _ n' _ _ args')
           = if n /= n'
                then pure True
                else do defs <- get Ctxt
@@ -234,7 +234,7 @@ findNewtype [con]
               | Nothing => pure ()
          updateDef (name con)
                (\d => case d of
-                           DCon t a _ => Just (DCon t a (Just arg))
+                           DCon ref t a _ => Just (DCon ref t a (Just arg))
                            _ => Nothing)
 findNewtype _ = pure ()
 

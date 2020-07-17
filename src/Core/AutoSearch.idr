@@ -215,7 +215,7 @@ usableLocal {vars} loc defaults env (NTCon _ n _ _ args)
                         then usableLocalArg (1 + i) dets cs
                         else pure False
              else usableLocalArg (1 + i) dets cs
-usableLocal loc defaults env (NDCon _ n _ _ args)
+usableLocal loc defaults env (NDCon _ _ n _ _ args)
     = do defs <- get Ctxt
          us <- traverse (usableLocal loc defaults env)
                         !(traverse (evalClosure defs) args)
@@ -370,7 +370,7 @@ searchName fc rigc defaults trying depth def top env target (n, ndef)
          let ty = type ndef
          let namety : NameType
                  = case definition ndef of
-                        DCon tag arity _ => DataCon tag arity
+                        DCon ref tag arity _ => DataCon ref tag arity
                         TCon tag arity _ _ _ _ _ _ => TyCon tag arity
                         _ => Func
          nty <- nf defs env (embed ty)
@@ -451,7 +451,7 @@ concreteDets {vars} fc defaults env top pos dets (arg :: args)
              traverse (\ parg => do argnf <- evalClosure defs parg
                                     concrete defs argnf False) args'
              pure ()
-    concrete defs (NDCon nfc n t a args) atTop
+    concrete defs (NDCon nfc ref n t a args) atTop
         = do traverse (\ parg => do argnf <- evalClosure defs parg
                                     concrete defs argnf False) args
              pure ()

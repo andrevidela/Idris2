@@ -58,7 +58,7 @@ getNameType rigc env fc x
                  rigSafe (multiplicity def) rigc
                  let nt = case definition def of
                                PMDef _ _ _ _ _ => Func
-                               DCon t a _ => DataCon t a
+                               DCon ref t a _ => DataCon ref t a
                                TCon t a _ _ _ _ _ _ => TyCon t a
                                _ => Func
                  pure (Ref fc nt (Resolved i), gnf env (embed (type def)))
@@ -92,7 +92,7 @@ getVarType rigc nest env fc x
                       Just ndef =>
                          let nt = case definition ndef of
                                        PMDef _ _ _ _ _ => Func
-                                       DCon t a _ => DataCon t a
+                                       DCon ref t a _ => DataCon ref t a
                                        TCon t a _ _ _ _ _ _ => TyCon t a
                                        _ => Func
                              tm = tmf fc nt
@@ -124,7 +124,7 @@ concrete : Defs -> Env Term vars -> NF vars -> Core Bool
 concrete defs env (NBind fc _ (Pi _ _ _) sc)
     = do sc' <- sc defs (toClosure defaultOpts env (Erased fc False))
          concrete defs env sc'
-concrete defs env (NDCon _ _ _ _ _) = pure True
+concrete defs env (NDCon _ _ _ _ _ _) = pure True
 concrete defs env (NTCon _ _ _ _ _) = pure True
 concrete defs env (NPrimVal _ _) = pure True
 concrete defs env _ = pure False
