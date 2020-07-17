@@ -82,6 +82,7 @@ mutual
   used n (CLet _ _ True val sc) = used n val + used (Later n) sc
   used n (CApp _ x args) = foldr (+) (used n x) (map (used n) args)
   used n (CCon _ _ _ args) = foldr (+) 0 (map (used n) args)
+  used n (CMut _ _ args) = foldr (+) 0 (map (used n) args)
   used n (COp _ _ args) = foldr (+) 0 (map (used n) args)
   used n (CExtPrim _ _ args) = foldr (+) 0 (map (used n) args)
   used n (CForce _ x) = used n x
@@ -189,6 +190,8 @@ mutual
       = eval rec env (!(traverse (eval rec env []) args) ++ stk) f
   eval rec env stk (CCon fc n t args)
       = pure $ unload stk $ CCon fc n t !(traverse (eval rec env []) args)
+  eval rec env stk (CMut fc n args)
+      = pure $ unload stk $ CMut fc n !(traverse (eval rec env []) args)
   eval rec env stk (COp fc p args)
       = pure $ unload stk $ COp fc p !(traverseVect (eval rec env []) args)
   eval rec env stk (CExtPrim fc p args)
@@ -311,6 +314,8 @@ fixArityTm (CApp fc f fargs) args
     = fixArityTm f (!(traverse (\tm => fixArityTm tm []) fargs) ++ args)
 fixArityTm (CCon fc n t args) []
     = pure $ CCon fc n t !(traverse (\tm => fixArityTm tm []) args)
+fixArityTm (CMut fc n args) []
+    = pure $ CMut fc n !(traverse (\tm => fixArityTm tm []) args)
 fixArityTm (COp fc op args) []
     = pure $ COp fc op !(traverseArgs args)
   where

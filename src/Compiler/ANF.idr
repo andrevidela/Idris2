@@ -30,6 +30,7 @@ mutual
     AApp : FC -> (closure : AVar) -> (arg : AVar) -> ANF
     ALet : FC -> (var : Int) -> ANF -> ANF -> ANF
     ACon : FC -> Name -> (tag : Maybe Int) -> List AVar -> ANF
+    AMut : FC -> (ref : Name) -> List AVar -> ANF
     AOp : FC -> PrimFn arity -> Vect arity AVar -> ANF
     AExtPrim : FC -> Name -> List AVar -> ANF
     AConCase : FC -> AVar -> List AConAlt -> Maybe ANF -> ANF
@@ -74,6 +75,8 @@ mutual
     show (ALet fc x val sc)
         = "%let v" ++ show x ++ " = " ++ show val ++ " in " ++ show sc
     show (ACon fc n t args)
+        = "%con " ++ show n ++ "(" ++ showSep ", " (map show args) ++ ")"
+    show (AMut fc n args)
         = "%con " ++ show n ++ "(" ++ showSep ", " (map show args) ++ ")"
     show (AOp fc op args)
         = "%op " ++ show op ++ "(" ++ showSep ", " (toList (map show args)) ++ ")"
@@ -196,6 +199,8 @@ mutual
       = do i <- nextVar
            let vs' = i :: vs
            pure $ ALet fc i !(anf vs val) !(anf vs' sc)
+  anf vs (LMut fc n args)
+      = anfArgs fc vs args (AMut fc n)
   anf vs (LCon fc n t args)
       = anfArgs fc vs args (ACon fc n t)
   anf vs (LOp {arity} fc op args)

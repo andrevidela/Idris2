@@ -25,6 +25,7 @@ mutual
   isNameUsed name (NmConstCase fc sc alts def) = isNameUsed name sc || any (isNameUsedConstAlt name) alts  || maybe False (isNameUsed name) def
   isNameUsed name (NmExtPrim fc p args) = any (isNameUsed name) args
   isNameUsed name (NmCon fc x t args) = any (isNameUsed name) args
+  isNameUsed name (NmMut fc _ args) = any (isNameUsed name) args
   isNameUsed name (NmDelay fc t) = isNameUsed name t
   isNameUsed name (NmForce fc t) = isNameUsed name t
   isNameUsed name (NmLet fc x val sc) =
@@ -143,6 +144,7 @@ mutual
     do
       (s, a) <- impListExp args
       pairToReturn toReturn (s, IEPrimFnExt p a)
+  impExp toReturn (NmMut fc ref args) = throw $ InternalError "mutation not supported in javascript backend"
   impExp toReturn (NmCon fc x tag args) =
     do
       (s, a) <- impListExp args

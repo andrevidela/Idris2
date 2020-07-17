@@ -595,15 +595,16 @@ mutual
     toBuf b (CLet fc x inl val sc) = do tag 3; toBuf b fc; toBuf b x; toBuf b inl; toBuf b val; toBuf b sc
     toBuf b (CApp fc f as) = assert_total $ do tag 4; toBuf b fc; toBuf b f; toBuf b as
     toBuf b (CCon fc t n as) = assert_total $ do tag 5; toBuf b fc; toBuf b t; toBuf b n; toBuf b as
-    toBuf b (COp {arity} fc op as) = assert_total $ do tag 6; toBuf b fc; toBuf b arity; toBuf b op; toBuf b as
-    toBuf b (CExtPrim fc f as) = assert_total $ do tag 7; toBuf b fc; toBuf b f; toBuf b as
-    toBuf b (CForce fc x) = assert_total $ do tag 8; toBuf b fc; toBuf b x
-    toBuf b (CDelay fc x) = assert_total $ do tag 9; toBuf b fc; toBuf b x
-    toBuf b (CConCase fc sc alts def) = assert_total $ do tag 10; toBuf b fc; toBuf b sc; toBuf b alts; toBuf b def
-    toBuf b (CConstCase fc sc alts def) = assert_total $ do tag 11; toBuf b fc; toBuf b sc; toBuf b alts; toBuf b def
-    toBuf b (CPrimVal fc c) = do tag 12; toBuf b fc; toBuf b c
-    toBuf b (CErased fc) = do tag 13; toBuf b fc
-    toBuf b (CCrash fc msg) = do tag 14; toBuf b fc; toBuf b msg
+    toBuf b (CMut fc n as) = assert_total $ do tag 6; toBuf b fc; toBuf b n; toBuf b as
+    toBuf b (COp {arity} fc op as) = assert_total $ do tag 7; toBuf b fc; toBuf b arity; toBuf b op; toBuf b as
+    toBuf b (CExtPrim fc f as) = assert_total $ do tag 8; toBuf b fc; toBuf b f; toBuf b as
+    toBuf b (CForce fc x) = assert_total $ do tag 9; toBuf b fc; toBuf b x
+    toBuf b (CDelay fc x) = assert_total $ do tag 10; toBuf b fc; toBuf b x
+    toBuf b (CConCase fc sc alts def) = assert_total $ do tag 11; toBuf b fc; toBuf b sc; toBuf b alts; toBuf b def
+    toBuf b (CConstCase fc sc alts def) = assert_total $ do tag 12; toBuf b fc; toBuf b sc; toBuf b alts; toBuf b def
+    toBuf b (CPrimVal fc c) = do tag 13; toBuf b fc; toBuf b c
+    toBuf b (CErased fc) = do tag 14; toBuf b fc
+    toBuf b (CCrash fc msg) = do tag 15; toBuf b fc; toBuf b msg
 
     fromBuf b
         = assert_total $ case !getTag of
@@ -628,29 +629,32 @@ mutual
                        t <- fromBuf b; n <- fromBuf b; as <- fromBuf b
                        pure (CCon fc t n as)
                6 => do fc <- fromBuf b
+                       n <- fromBuf b; as <- fromBuf b
+                       pure (CMut fc n as)
+               7 => do fc <- fromBuf b
                        arity <- fromBuf b; op <- fromBuf b; args <- fromBuf b
                        pure (COp {arity} fc op args)
-               7 => do fc <- fromBuf b
+               8 => do fc <- fromBuf b
                        p <- fromBuf b; as <- fromBuf b
                        pure (CExtPrim fc p as)
-               8 => do fc <- fromBuf b
-                       x <- fromBuf b
-                       pure (CForce fc x)
                9 => do fc <- fromBuf b
                        x <- fromBuf b
-                       pure (CDelay fc x)
+                       pure (CForce fc x)
                10 => do fc <- fromBuf b
-                        sc <- fromBuf b; alts <- fromBuf b; def <- fromBuf b
-                        pure (CConCase fc sc alts def)
+                        x <- fromBuf b
+                        pure (CDelay fc x)
                11 => do fc <- fromBuf b
                         sc <- fromBuf b; alts <- fromBuf b; def <- fromBuf b
-                        pure (CConstCase fc sc alts def)
+                        pure (CConCase fc sc alts def)
                12 => do fc <- fromBuf b
+                        sc <- fromBuf b; alts <- fromBuf b; def <- fromBuf b
+                        pure (CConstCase fc sc alts def)
+               13 => do fc <- fromBuf b
                         c <- fromBuf b
                         pure (CPrimVal fc c)
-               13 => do fc <- fromBuf b
-                        pure (CErased fc)
                14 => do fc <- fromBuf b
+                        pure (CErased fc)
+               15 => do fc <- fromBuf b
                         msg <- fromBuf b
                         pure (CCrash fc msg)
                _ => corrupt "CExp"
