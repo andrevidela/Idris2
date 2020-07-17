@@ -894,8 +894,9 @@ TTC DefFlag where
   toBuf b (SetTotal x) = do tag 6; toBuf b x
   toBuf b BlockedHint = tag 7
   toBuf b Macro = tag 8
-  toBuf b (PartialEval x) = tag 9 -- names not useful any more
-  toBuf b AllGuarded = tag 10
+  toBuf b Mutating = tag 9
+  toBuf b (PartialEval x) = tag 10 -- names not useful any more
+  toBuf b AllGuarded = tag 11
 
   fromBuf b
       = case !getTag of
@@ -906,8 +907,9 @@ TTC DefFlag where
              6 => do x <- fromBuf b; pure (SetTotal x)
              7 => pure BlockedHint
              8 => pure Macro
-             9 => pure (PartialEval [])
-             10 => pure AllGuarded
+             9 => pure Mutating
+             10 => pure (PartialEval [])
+             11 => pure AllGuarded
              _ => corrupt "DefFlag"
 
 export

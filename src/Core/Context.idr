@@ -180,6 +180,7 @@ data DefFlag
     | SetTotal TotalReq
     | BlockedHint -- a hint, but blocked for the moment (so don't use)
     | Macro
+    | Mutating -- function is mutating, /!\ UNSAFE /!\ (at least for now)
     | PartialEval (List (Name, Nat)) -- Partially evaluate on completing defintion.
          -- This means the definition is standing for a specialisation so we
          -- should evaluate the RHS, with reduction limits on the given names,
@@ -198,6 +199,7 @@ Eq DefFlag where
     (==) (SetTotal x) (SetTotal y) = x == y
     (==) BlockedHint BlockedHint = True
     (==) Macro Macro = True
+    (==) Mutating Mutating = True
     (==) (PartialEval x) (PartialEval y) = x == y
     (==) AllGuarded AllGuarded = True
     (==) _ _ = False
@@ -211,6 +213,7 @@ Show DefFlag where
   show (SetTotal x) = show x
   show BlockedHint = "blockedhint"
   show Macro = "macro"
+  show Mutating = "mutating"
   show (PartialEval _) = "partialeval"
   show AllGuarded = "allguarded"
 

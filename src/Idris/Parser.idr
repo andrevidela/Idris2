@@ -1289,6 +1289,8 @@ fnDirectOpt fname
          pure $ IFnOpt ExternFn
   <|> do pragma "macro"
          pure $ IFnOpt Macro
+  <|> do pragma "mutating"
+         pure $ IFnOpt Mutating
   <|> do pragma "spec"
          ns <- sepBy (symbol ",") name
          pure $ IFnOpt (SpecArgs ns)
