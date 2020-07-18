@@ -885,7 +885,6 @@ mkPatClause fc fn args ty pid (ps, rhs)
              pure (MkInfo p First (Builtin.snd fa_tys)
                       :: weaken !(mkNames args ps eq (Builtin.fst fa_tys)))
 
-export
 patCompile : {auto c : Ref Ctxt Defs} ->
              FC -> Name -> Phase ->
              ClosedTerm -> List (List Pat, ClosedTerm) ->
@@ -935,7 +934,6 @@ toPatClause fc n (lhs, rhs)
 -- Assumption (given 'ClosedTerm') is that the pattern variables are
 -- explicitly named. We'll assign de Bruijn indices when we're done, and
 -- the names of the top level variables we created are returned in 'args'
-export
 simpleCase : {auto c : Ref Ctxt Defs} ->
              FC -> Phase -> Name -> ClosedTerm -> (def : Maybe (CaseTree [])) ->
              (clauses : List (ClosedTerm, ClosedTerm)) ->
@@ -949,6 +947,33 @@ simpleCase fc phase fn ty def clauses
          ps <- traverse (toPatClause fc fn) clauses
          defs <- get Ctxt
          patCompile fc fn phase ty ps def
+
+mkMut : (nm : Name) -> (tag : Int) -> Term vars -> Term vars
+mkMut nm tag l@(Local fc isLet idx p) = l
+mkMut nm tag (Ref fc Bound name) = ?whut_13
+mkMut nm tag (Ref fc Func name) = ?whut_14
+mkMut nm tag (Ref fc (DataCon ref tag' arity) name) = ?wat
+mkMut nm tag (Ref fc (TyCon x arity) name) = ?whut_16
+mkMut nm tag (Meta fc x y xs) = ?whut_3
+mkMut nm tag (Bind fc x b scope) = ?whut_4
+mkMut nm tag (App fc fn arg) = ?whut_5
+mkMut nm tag (As fc x as pat) = ?whut_6
+mkMut nm tag (TDelayed fc x y) = ?whut_7
+mkMut nm tag (TDelay fc x ty arg) = ?whut_8
+mkMut nm tag (TForce fc x y) = ?whut_9
+mkMut nm tag (PrimVal fc c) = ?whut_10
+mkMut nm tag (Erased fc imp) = ?whut_11
+mkMut nm tag (TType fc) = ?whut_12
+
+
+
+replaceConstructor : CaseAlt vars -> (CaseAlt (vars))
+replaceConstructor (ConCase nm tag args (STerm idx rhs)) = ((ConCase nm tag args (STerm idx (mkMut nm tag rhs))))
+replaceConstructor n = n
+
+makeMutating : CaseTree vars -> Core ()
+makeMutating (Case idx prf ty cases) = corePrint $ "looking at cases " ++ show cases
+makeMutating n = pure ()
 
 findReached : CaseTree ns -> List Int
 findReached (Case _ _ _ alts) = concatMap findRAlts alts
@@ -983,6 +1008,9 @@ getPMDef fc phase fn ty clauses
     = do defs <- get Ctxt
          let cs = map (toClosed defs) (labelPat 0 clauses)
          (_ ** t) <- simpleCase fc phase fn ty Nothing cs
+
+         corePrint (show !(getFullName fn))
+         makeMutating t
          let reached = findReached t
          pure (_ ** (t, getUnreachable 0 reached clauses))
   where

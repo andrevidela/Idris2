@@ -229,9 +229,13 @@ mutual
       = pure $ CPrimVal fc (I tag)
   toCExpTm n (Ref fc (DataCon _ tag Z) (NS ["EqOrd", "Prelude"] (UN "GT")))
       = pure $ CPrimVal fc (I tag)
-  toCExpTm n (Ref fc (DataCon _ tag arity) fn)
+  toCExpTm n (Ref fc (DataCon Nothing tag arity) fn)
       = -- get full name for readability, and the Nat hack
         pure $ CCon fc !(getFullName fn) (Just tag) []
+  -- if the DataCon refers to a variable to mutate, return a CMut that points to that variable instead
+  --                                 v
+  toCExpTm n (Ref fc (DataCon (Just ref) tag arity) fn)
+      = pure $ CMut fc ref []
   toCExpTm n (Ref fc (TyCon tag arity) fn)
       = pure $ CCon fc fn Nothing []
   toCExpTm n (Ref fc _ fn)

@@ -461,7 +461,6 @@ compileAndInlineAll
          traverse_ inlineDef cns
          traverse_ mergeLamDef cns
          traverse_ fixArityDef cns
-         traverse_ updateMutating cns
   where
     nonErased : Name -> Core Bool
     nonErased n

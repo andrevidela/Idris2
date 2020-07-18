@@ -106,10 +106,10 @@ recoverable defs (NDCon _ _ _ xt _ xargs) (NDCon _ _ _ yt _ yargs)
     = if xt /= yt
          then pure False
          else pure $ not !(anyM (mismatch defs) (zip xargs yargs))
-recoverable defs (NApp _ (NRef _ f) fargs) (NApp _ (NRef _ g) gargs) 
+recoverable defs (NApp _ (NRef _ f) fargs) (NApp _ (NRef _ g) gargs)
     = pure True -- both functions; recoverable
-recoverable defs (NTCon _ _ _ _ _) _ = pure True 
-recoverable defs (NDCon _ _ _ _ _ _) _ = pure True 
+recoverable defs (NTCon _ _ _ _ _) _ = pure True
+recoverable defs (NDCon _ _ _ _ _ _) _ = pure True
 recoverable defs (NPrimVal _ x) (NPrimVal _ y) = pure (x == y)
 recoverable defs (NPrimVal _ _) (NDCon _ _ _ _ _ _) = pure False
 recoverable defs x y = pure False
@@ -562,6 +562,7 @@ calcRefs rt at fn
          let metas = CaseTree.getMetas tree
          traverse_ addToSave (keys metas)
          let refs_all = addRefs at metas tree
+         corelift "getting all refs, is this where we get the regerence to the scrutinee?"
          refs <- ifThenElse rt
                     (dropErased (keys refs_all) refs_all)
                     (pure refs_all)

@@ -1,4 +1,5 @@
 module Compiler.Mutate
+{-
 
 import Core.CompileExpr
 import Core.Context
@@ -23,7 +24,7 @@ interleave (x :: xs) ys = x :: (interleave2 xs ys)
 
 mutual
   export
-  mkMutating : {auto c : Ref Ctxt Defs} -> {vars : _} -> Name -> (tag : Maybe Int) -> CExp vars -> Core (CExp vars)
+  mkMutating : {auto c : Ref Ctxt Defs} -> {vars : _} -> (ref : Name) -> Name -> (tag : Maybe Int) -> CExp vars -> Core (CExp vars)
   mkMutating nm tag (CLam fc x body) =
     let mutating = (mkMutating nm tag body) in
         pure $ CLam fc x !mutating
@@ -36,7 +37,7 @@ mutual
   mkMutating nm tag con@(CCon fc nm' tag' args)  = do
     corePrint $ "looking to replace " ++ show !(getFullName nm) ++ " and we got " ++ show !(getFullName nm')
     pure $ if nm == nm' && tag == tag'
-       then CMut fc nm args
+       then CMut fc ref args
        else con
   mkMutating nm tag (COp fc aty args) = pure $ COp fc aty !(traverseVect (mkMutating nm tag) args)
   mkMutating nm tag (CExtPrim fc n args) = pure $ CExtPrim fc n !(traverse (mkMutating nm tag) args)
@@ -94,3 +95,4 @@ updateMutating n = do
              setCompiled n (MkFun fargs !(mkMutating (UN "") Nothing body))
      else pure ()
 
+-}
