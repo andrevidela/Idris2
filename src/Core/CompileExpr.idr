@@ -29,7 +29,7 @@ mutual
        CApp : FC -> CExp vars -> List (CExp vars) -> CExp vars
        -- A saturated constructor application
        CCon : FC -> Name -> (tag : Maybe Int) -> List (CExp vars) -> CExp vars
-       -- Mutation at runtime, ref is the variable to mutate, only works when 
+       -- Mutation at runtime, ref is the variable to mutate, only works when
        -- mutating into the same data constructor.
        CMut : FC -> (ref : Name) -> List (CExp vars) -> CExp vars
        -- Internally defined primitive operations
@@ -228,6 +228,10 @@ addLocs [] ns = ns
 addLocs (x :: xs) ns
     = let rec = addLocs xs ns in
           uniqueName x rec :: rec
+
+export
+addLocNames : (args : List Name) -> Names args
+addLocNames args = rewrite sym $ appendNilRightNeutral args in addLocs args []
 
 conArgs : (args : List Name) -> Names (args ++ vars) -> List Name
 conArgs [] ns = []

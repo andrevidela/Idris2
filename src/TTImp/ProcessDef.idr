@@ -1,6 +1,7 @@
 module TTImp.ProcessDef
 
 import Core.CaseBuilder
+import Core.CompileExpr
 import Core.CaseTree
 import Core.Context
 import Core.Core
@@ -562,7 +563,6 @@ calcRefs rt at fn
          let metas = CaseTree.getMetas tree
          traverse_ addToSave (keys metas)
          let refs_all = addRefs at metas tree
-         corelift "getting all refs, is this where we get the regerence to the scrutinee?"
          refs <- ifThenElse rt
                     (dropErased (keys refs_all) refs_all)
                     (pure refs_all)
@@ -689,6 +689,7 @@ processDef opts nest env fc n_in cs_in
          defs <- get Ctxt
          Just gdef <- lookupCtxtExact n (gamma defs)
               | Nothing => throw (NoDeclaration fc n)
+         corePrint $ "processing def " ++ show (fullname gdef)
          let None = definition gdef
               | _ => throw (AlreadyDefined fc n)
          let ty = type gdef
@@ -703,6 +704,11 @@ processDef opts nest env fc n_in cs_in
 
          (cargs ** (tree_ct, unreachable)) <-
              getPMDef fc (CompileTime mult) n ty (rights cs)
+
+         case tree_ct of
+           (Case idx prf ty cases) => corePrint $ "it has cases, idx is " ++
+                                     show (getLocName idx (addLocNames cargs) prf)
+           _ => pure ()
 
          traverse_ warnUnreachable unreachable
 

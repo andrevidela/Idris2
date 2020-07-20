@@ -965,8 +965,6 @@ mkMut nm tag (PrimVal fc c) = ?whut_10
 mkMut nm tag (Erased fc imp) = ?whut_11
 mkMut nm tag (TType fc) = ?whut_12
 
-
-
 replaceConstructor : CaseAlt vars -> (CaseAlt (vars))
 replaceConstructor (ConCase nm tag args (STerm idx rhs)) = ((ConCase nm tag args (STerm idx (mkMut nm tag rhs))))
 replaceConstructor n = n
@@ -1009,8 +1007,6 @@ getPMDef fc phase fn ty clauses
          let cs = map (toClosed defs) (labelPat 0 clauses)
          (_ ** t) <- simpleCase fc phase fn ty Nothing cs
 
-         corePrint (show !(getFullName fn))
-         makeMutating t
          let reached = findReached t
          pure (_ ** (t, getUnreachable 0 reached clauses))
   where
