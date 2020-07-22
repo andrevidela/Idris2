@@ -10,6 +10,7 @@ import Core.Value
 import Data.Bool.Extra
 import Data.List
 import Data.NameMap
+import Data.Maybe
 
 %default covering
 
@@ -298,7 +299,7 @@ replaceDefaults fc defs nfty cs
 -- when we reach a leaf we know what patterns were used to get there,
 -- and return those patterns.
 -- The returned patterns are those arising from the *missing* cases
-buildArgs : {vars : _} ->
+buildArgs : Ref Ctxt Defs => {vars : _} ->
             FC -> Defs ->
             KnownVars vars Int -> -- Things which have definitely match
             KnownVars vars (List Int) -> -- Things an argument *can't* be

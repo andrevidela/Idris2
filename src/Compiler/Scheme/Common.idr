@@ -367,7 +367,8 @@ parameters (schExtPrim : Int -> ExtPrim -> List NamedCExp -> Core String,
     schExp i (NmCon fc x tag args)
         = pure $ schConstructor schString x tag !(traverse (schExp i) args)
     schExp i (NmMut fc ref args)
-        = pure $ schMutate (schName ref) !(traverse (schExp i) args)
+        = do corePrint "found mutation"
+             pure $ schMutate (schName ref) !(traverse (schExp i) args)
     schExp i (NmOp fc op args)
         = pure $ schOp op !(schArgs i args)
     schExp i (NmExtPrim fc p args)

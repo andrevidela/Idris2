@@ -13,6 +13,7 @@ import Data.List
 import Data.Maybe
 import Data.NameMap
 import Data.Vect
+import Data.Maybe
 
 %default covering
 
@@ -365,7 +366,7 @@ mutual
 -- works in a nice principled way.
 --                      if noworld -- just substitute the scrutinee into
 --                                 -- the RHS
---                         then 
+--                         then
                              let env : SubstCEnv args vars
                                      = mkSubst 0 scr pos args in
                                  pure $ Just (substs env !(toCExpTree n sc))

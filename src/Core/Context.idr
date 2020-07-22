@@ -117,6 +117,32 @@ data Def : Type where
     Delayed : Def
 
 export
+foundCMut : Term vars -> Maybe Name
+foundCMut (Bind fc x (Let y val ty) scope) =
+  maybe (foundCMut val) Just (foundCMut scope)
+foundCMut (Bind fc x _ scope) =
+  foundCMut scope
+foundCMut (App fc (Ref fc1 (DataCon ref tag arity) name) arg) =
+  maybe (foundCMut arg) Just ref
+foundCMut (App fc (Ref fc1 other name) arg) = foundCMut arg
+foundCMut (App fc fn arg) = maybe (foundCMut arg) Just (foundCMut fn)
+foundCMut (TDelayed fc x y) = foundCMut y
+foundCMut (TDelay fc x ty arg) = foundCMut arg
+foundCMut (TForce fc x y) = foundCMut y
+foundCMut _ =  Nothing
+
+
+export
+defHasCMut : Def -> Maybe Name
+defHasCMut (PMDef _ _ _ (Case _ _ _ cases) _) =
+  choiceMap findInCaseTree cases
+  where
+    findInCaseTree : (CaseAlt vars) -> Maybe Name
+    findInCaseTree (ConCase _ _ _ (STerm _ rhs)) = foundCMut rhs
+    findInCaseTree _ = Nothing
+defHasCMut _ = Nothing
+
+export
 Show Def where
   show None = "undefined"
   show (PMDef _ args ct rt pats)

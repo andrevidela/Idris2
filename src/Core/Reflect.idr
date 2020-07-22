@@ -268,10 +268,11 @@ Reify NameType where
       = case (!(full (gamma defs) n), args) of
              (NS _ (UN "Bound"), _) => pure Bound
              (NS _ (UN "Func"), _) => pure Func
-             (NS _ (UN "DataCon"), [t,i])
-                  => do t' <- reify defs !(evalClosure defs t)
+             (NS _ (UN "DataCon"), [n, t,i])
+                  => do n' <- reify defs !(evalClosure defs n)
+                        t' <- reify defs !(evalClosure defs t)
                         i' <- reify defs !(evalClosure defs i)
-                        pure (DataCon Nothing t' i')
+                        pure (DataCon n' t' i')
              (NS _ (UN "TyCon"), [t,i])
                   => do t' <- reify defs !(evalClosure defs t)
                         i' <- reify defs !(evalClosure defs i)
@@ -284,9 +285,10 @@ Reflect NameType where
   reflect fc defs lhs env Bound = getCon fc defs (reflectiontt "Bound")
   reflect fc defs lhs env Func = getCon fc defs (reflectiontt "Func")
   reflect fc defs lhs env (DataCon ref t i)
-      = do t' <- reflect fc defs lhs env t
+      = do n' <- reflect fc defs lhs env ref
+           t' <- reflect fc defs lhs env t
            i' <- reflect fc defs lhs env i
-           appCon fc defs (reflectiontt "DataCon") [t', i']
+           appCon fc defs (reflectiontt "DataCon") [n', t', i']
   reflect fc defs lhs env (TyCon t i)
       = do t' <- reflect fc defs lhs env t
            i' <- reflect fc defs lhs env i

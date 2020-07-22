@@ -607,7 +607,11 @@ mkRunTime fc n
                               MissingCases _ => addErrorCase clauses_init
                               _ => clauses_init
 
-           (rargs ** (tree_rt, _)) <- getPMDef (location gdef) RunTime n ty clauses
+           (rargs ** (tree_rt', _)) <- getPMDef (location gdef) RunTime n ty clauses
+           tree_rt <- if Mutating `elem` flags gdef
+              then makeMutating tree_rt'
+              else pure tree_rt'
+
            log 5 $ show cov ++ ":\nRuntime tree for " ++ show (fullname gdef) ++ ": " ++ show tree_rt
 
            let Just Refl = nameListEq cargs rargs
@@ -704,11 +708,6 @@ processDef opts nest env fc n_in cs_in
 
          (cargs ** (tree_ct, unreachable)) <-
              getPMDef fc (CompileTime mult) n ty (rights cs)
-
-         case tree_ct of
-           (Case idx prf ty cases) => corePrint $ "it has cases, idx is " ++
-                                     show (getLocName idx (addLocNames cargs) prf)
-           _ => pure ()
 
          traverse_ warnUnreachable unreachable
 

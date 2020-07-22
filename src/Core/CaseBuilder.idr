@@ -7,9 +7,11 @@ import Core.Env
 import Core.Normalise
 import Core.TT
 import Core.Value
+import Core.CompileExpr
 
 import Data.LengthMatch
 import Data.List
+import Data.Maybe
 
 import Decidable.Equality
 
@@ -948,30 +950,53 @@ simpleCase fc phase fn ty def clauses
          defs <- get Ctxt
          patCompile fc fn phase ty ps def
 
-mkMut : (nm : Name) -> (tag : Int) -> Term vars -> Term vars
-mkMut nm tag l@(Local fc isLet idx p) = l
-mkMut nm tag (Ref fc Bound name) = ?whut_13
-mkMut nm tag (Ref fc Func name) = ?whut_14
-mkMut nm tag (Ref fc (DataCon ref tag' arity) name) = ?wat
-mkMut nm tag (Ref fc (TyCon x arity) name) = ?whut_16
-mkMut nm tag (Meta fc x y xs) = ?whut_3
-mkMut nm tag (Bind fc x b scope) = ?whut_4
-mkMut nm tag (App fc fn arg) = ?whut_5
-mkMut nm tag (As fc x as pat) = ?whut_6
-mkMut nm tag (TDelayed fc x y) = ?whut_7
-mkMut nm tag (TDelay fc x ty arg) = ?whut_8
-mkMut nm tag (TForce fc x y) = ?whut_9
-mkMut nm tag (PrimVal fc c) = ?whut_10
-mkMut nm tag (Erased fc imp) = ?whut_11
-mkMut nm tag (TType fc) = ?whut_12
+parameters (ref : Name)
+  ||| Replace the constructor that we are matching on, by a mutating instruction on the RHS
+  ||| @cName : The name of the constructor to replace
+  ||| @tag : The tag of the constructor to replace
+  ||| @rhs : The body of the clause we're inspecting
+  replaceConstructor : (cName : Name) -> (tag : Int) ->
+                       (rhs : Term vars) ->
+                       Core (Term vars)
+  replaceConstructor cName tag (Bind fc varName (Let rig val ty) scope) = do
+    newVal <- replaceConstructor cName tag val
+    newScope <- replaceConstructor cName tag scope
+    pure $ Bind fc varName (Let rig newVal ty) newScope
+  replaceConstructor cName tag (Bind fc varName binder scope) =
+    Bind fc varName binder <$> replaceConstructor cName tag scope
+  replaceConstructor cName tag (App fc (Ref fc' (DataCon nref t arity) nm) arg) = do
+    -- corePrint $ "checking application with name " ++ show nm ++ " looking for " ++ show ref
+    if cName == nm then pure (App fc (Ref fc' (DataCon (Just ref) t arity) nm) arg)
+                   else App fc (Ref fc' (DataCon nref t arity) nm) <$> replaceConstructor cName tag arg
+  -- We gonna trust the linearity checked that the value is use only on the function side of the app
+  -- or only on the argument side of the app
+  replaceConstructor cName tag (App fc fn arg) = do
+    newFn <- replaceConstructor cName tag fn
+    newArg <- replaceConstructor cName tag arg
+    pure $ App fc newFn newArg
+  replaceConstructor cName tag (TDelayed fc r t) =
+    TDelayed fc r <$> replaceConstructor cName tag t
+  replaceConstructor cName tag (TDelay fc r tpe arg) = do
+    TDelay fc r tpe <$> replaceConstructor cName tag arg
+  replaceConstructor cName tag (TForce fc x rhs) =
+    TForce fc x <$> replaceConstructor cName tag rhs
+  replaceConstructor cName tag rhs  = pure rhs
 
-replaceConstructor : CaseAlt vars -> (CaseAlt (vars))
-replaceConstructor (ConCase nm tag args (STerm idx rhs)) = ((ConCase nm tag args (STerm idx (mkMut nm tag rhs))))
-replaceConstructor n = n
+  toMut : {vars : _} -> CaseAlt vars -> Core (CaseAlt vars)
+  toMut (ConCase name tag args (STerm id rhs)) = do
+    newRhs <- replaceConstructor name tag rhs
+    if isJust (foundCMut newRhs) then corePrint "mutation worked"
+                                 else pure ()
+    pure $ ConCase name tag args (STerm id newRhs)
+  toMut c = pure c
 
-makeMutating : CaseTree vars -> Core ()
-makeMutating (Case idx prf ty cases) = corePrint $ "looking at cases " ++ show cases
-makeMutating n = pure ()
+export
+makeMutating : {vars : List Name} -> CaseTree vars -> Core (CaseTree vars)
+makeMutating (Case idx prf ty cases) =
+  let name = (getLocName idx (addLocNames vars) prf)
+      newRhs = traverse (toMut name) cases in
+      Case idx prf ty <$> newRhs
+makeMutating n = pure n
 
 findReached : CaseTree ns -> List Int
 findReached (Case _ _ _ alts) = concatMap findRAlts alts
