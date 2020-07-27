@@ -144,7 +144,13 @@ mutual
     do
       (s, a) <- impListExp args
       pairToReturn toReturn (s, IEPrimFnExt p a)
-  impExp toReturn (NmMut fc ref args) = throw $ InternalError "mutation not supported in javascript backend"
+  impExp toReturn (NmMut fc ref args) = do
+      (s, a) <- impListExp args
+      let nargs = length args
+      let reps = map (\n => IEConstructorArg (cast n) (IEVar ref))[1..nargs+1]
+      let updates = zipWith MutateStatementExp reps a
+      pairToReturn toReturn (concat updates, IEVar ref)
+
   impExp toReturn (NmCon fc x tag args) =
     do
       (s, a) <- impListExp args

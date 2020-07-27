@@ -29,11 +29,15 @@ mutual
                            | SwitchStatement ImperativeExp (List (ImperativeExp, ImperativeStatement)) (Maybe ImperativeStatement)
                            | LetDecl Name (Maybe ImperativeExp)
                            | ConstDecl Name ImperativeExp
-                           | MutateStatement Name ImperativeExp
+                           | MutateStatementExp ImperativeExp ImperativeExp
                            | ErrorStatement String
                            | EvalExpStatement ImperativeExp
                            | CommentStatement String
                            | ForEverLoop ImperativeStatement
+
+export
+MutateStatement : Name -> ImperativeExp -> ImperativeStatement
+MutateStatement n = MutateStatementExp (IEVar n)
 
 public export
 Semigroup ImperativeStatement where
@@ -72,7 +76,7 @@ mutual
     show (SwitchStatement e alts d) = "(SwitchStatement " ++ show e ++ " " ++ show alts ++ " " ++ show d ++ ")"
     show (LetDecl n v) = "(LetDecl " ++ show n ++ " " ++ show v ++ ")"
     show (ConstDecl n v) = "(ConstDecl " ++ show n ++ " " ++ show v ++ ")"
-    show (MutateStatement n v) = "(MutateStatement " ++ show n ++ " " ++ show v ++ ")"
+    show (MutateStatementExp n v) = "(MutateStatement " ++ show n ++ " " ++ show v ++ ")"
     show (ErrorStatement s) = "(ErrorStatement " ++ s ++ ")"
     show (EvalExpStatement x) =  "(EvalExpStatement " ++ show x ++ ")"
     show (CommentStatement x) = "(CommentStatement " ++ show x ++ ")"
@@ -131,8 +135,8 @@ mutual
     LetDecl n $ replaceNamesExp reps <$> v
   replaceNamesExpS reps (ConstDecl n v) =
     ConstDecl n $ replaceNamesExp reps v
-  replaceNamesExpS reps (MutateStatement n v) =
-    MutateStatement n $ replaceNamesExp reps v
+  replaceNamesExpS reps (MutateStatementExp n v) =
+    MutateStatementExp (replaceNamesExp reps n) (replaceNamesExp reps v)
   replaceNamesExpS reps (ErrorStatement s) =
     ErrorStatement s
   replaceNamesExpS reps (EvalExpStatement x) =

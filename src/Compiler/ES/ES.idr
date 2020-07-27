@@ -371,8 +371,8 @@ mutual
       Just v_ => pure $ nSpaces indent ++ "let " ++ jsName x ++ " = " ++ !(impExp2es v_) ++ ";"
   imperative2es indent (ConstDecl x v) =
     pure $ nSpaces indent ++ "const " ++ jsName x ++ " = " ++ !(impExp2es v) ++ ";"
-  imperative2es indent (MutateStatement x v) =
-    pure $ nSpaces indent ++ jsName x ++ " = " ++ !(impExp2es v) ++ ";"
+  imperative2es indent (MutateStatementExp x v) =
+    pure $ nSpaces indent ++ !(impExp2es x) ++ " = " ++ !(impExp2es v) ++ ";"
   imperative2es indent (ErrorStatement msg) =
     pure $ nSpaces indent ++ "throw new Error("++ jsString msg ++");"
   imperative2es indent (EvalExpStatement e) =

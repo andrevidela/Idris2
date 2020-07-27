@@ -53,6 +53,7 @@ etaExpand i Z exp args = mkApp exp (map (mkLocal (getFC exp)) (reverse args))
     mkApp tm [] = tm
     mkApp (CApp fc f args) args' = CApp fc f (args ++ args')
     mkApp (CCon fc n t args) args' = CCon fc n t (args ++ args')
+    mkApp (CMut fc n args) args' = CMut fc n (args ++ args')
     mkApp (CExtPrim fc p args) args' = CExtPrim fc p (args ++ args')
     mkApp tm args = CApp (getFC tm) tm args
 etaExpand i (S k) exp args
@@ -76,6 +77,7 @@ expandToArity (S k) f (a :: args) = expandToArity k (addArg f a) args
     addArg : CExp vars -> CExp vars -> CExp vars
     addArg (CApp fc fn args) a = CApp fc fn (args ++ [a])
     addArg (CCon fc n tag args) a = CCon fc n tag (args ++ [a])
+    addArg (CMut fc n args) a = CMut fc n (args ++ [a])
     addArg (CExtPrim fc p args) a = CExtPrim fc p (args ++ [a])
     addArg f a = CApp (getFC f) f [a]
 -- Underapplied, saturate with lambdas
