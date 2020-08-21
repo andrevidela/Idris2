@@ -520,10 +520,6 @@ mutual
       getFn (IImplicitApp _ f _ a) = getFn f
       getFn _ = fail "Not a function application"
 
-  ifThenElse : Bool -> Lazy t -> Lazy t -> t
-  ifThenElse True t e = t
-  ifThenElse False t e = e
-
   clause : Nat -> FileName -> IndentInfo -> Rule (Name, ImpClause)
   clause withArgs fname indents
       = do start <- location
@@ -649,14 +645,14 @@ namespaceDecl
     = do keyword "namespace"
          commit
          ns <- namespacedIdent
-         pure (List1.toList ns)
+         pure (forget ns)
 
 directive : FileName -> IndentInfo -> Rule ImpDecl
 directive fname indents
     = do pragma "logging"
          commit
          ps <- optional namespacedIdent
-         let topic = fromMaybe [] $ map List1.toList ps
+         let topic = fromMaybe [] $ map forget ps
          lvl <- intLit
          atEnd indents
          pure (ILog (topic, integerToNat lvl))

@@ -67,7 +67,7 @@ mutual
     show (AAppName fc n args)
         = show n ++ "(" ++ showSep ", " (map show args) ++ ")"
     show (AUnderApp fc n m args)
-        = "<" ++ show n ++ " underapp " ++ show m ++ ">(" ++ 
+        = "<" ++ show n ++ " underapp " ++ show m ++ ">(" ++
           showSep ", " (map show args) ++ ")"
     show (AApp fc c arg)
         = show c ++ " @ (" ++ show arg ++ ")"
@@ -92,7 +92,7 @@ mutual
   export
   Show AConAlt where
     show (MkAConAlt n t args sc)
-        = "%conalt " ++ show n ++ 
+        = "%conalt " ++ show n ++
              "(" ++ showSep ", " (map showArg args) ++ ") => " ++ show sc
       where
         showArg : Int -> String
@@ -159,7 +159,7 @@ letBind fc args f
 toVect : (n : Nat) -> List a -> Maybe (Vect n a)
 toVect Z [] = Just []
 toVect (S k) (x :: xs)
-    = do xs' <- toVect k xs
+    = do xs' <- ANF.toVect k xs
          pure (x :: xs')
 toVect _ _ = Nothing
 
@@ -168,7 +168,7 @@ mlet : {auto v : Ref Next Int} ->
 mlet fc (AV _ var) sc = pure $ sc var
 mlet fc val sc
     = do i <- nextVar
-         pure $ ALet fc i val (sc (ALocal i)) 
+         pure $ ALet fc i val (sc (ALocal i))
 
 mutual
   anfArgs : {vars : _} ->
@@ -201,7 +201,7 @@ mutual
   anf vs (LOp {arity} fc op args)
       = do args' <- traverse (anf vs) (toList args)
            letBind fc args'
-                (\args => case toVect arity args of
+                (\args => case ANF.toVect arity args of
                                Nothing => ACrash fc "Can't happen (AOp)"
                                Just argsv => AOp fc op argsv)
   anf vs (LExtPrim fc p args)

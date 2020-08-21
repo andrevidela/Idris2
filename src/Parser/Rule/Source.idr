@@ -161,7 +161,7 @@ namespacedIdent
     = terminal "Expected namespaced name"
         (\x => case x.val of
             DotSepIdent ns => Just ns
-            Ident i => Just [i]
+            Ident i => Just (i ::: [])
             _ => Nothing)
 
 export
@@ -170,7 +170,7 @@ moduleIdent
     = terminal "Expected module identifier"
         (\x => case x.val of
             DotSepIdent ns => Just ns
-            Ident i => Just [i]
+            Ident i => Just (i ::: [])
             _ => Nothing)
 
 export
@@ -200,11 +200,11 @@ name = opNonNS <|> do
   reserved n = n `elem` reservedNames
 
   nameNS : List1 String -> SourceEmptyRule Name
-  nameNS [x] =
+  nameNS (x ::: []) =
     if reserved x
       then fail $ "can't use reserved name " ++ x
       else pure $ UN x
-  nameNS (x :: xs) =
+  nameNS (x ::: xs) =
     if reserved x
       then fail $ "can't use reserved name " ++ x
       else pure $ NS xs (UN x)
@@ -217,7 +217,7 @@ name = opNonNS <|> do
     symbol ".("
     n <- operator
     symbol ")"
-    pure (NS (toList ns) n)
+    pure (NS (forget ns) n)
 
 export
 IndentInfo : Type

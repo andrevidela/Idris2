@@ -351,7 +351,7 @@ TTC a => TTC (List a) where
 
 export
 TTC a => TTC (List1 a) where
-  toBuf b xs = toBuf b (List1.toList xs)
+  toBuf b xs = toBuf b (forget xs)
 
   fromBuf b = do
     xs <- fromBuf b

@@ -49,7 +49,7 @@ Show Token where
   -- Identifiers
   show (HoleIdent x) = "hole identifier " ++ x
   show (Ident x) = "identifier " ++ x
-  show (DotSepIdent xs) = "namespaced identifier " ++ dotSep (List1.toList $ reverse xs)
+  show (DotSepIdent xs) = "namespaced identifier " ++ dotSep (List1.forget $ reverse xs)
   show (DotIdent x) = "dot+identifier " ++ x
   show (Symbol x) = "symbol " ++ x
   -- Comments
@@ -72,7 +72,7 @@ Pretty Token where
   -- Identifiers
   pretty (HoleIdent x) = reflow "hole identifier" <++> pretty x
   pretty (Ident x) = pretty "identifier" <++> pretty x
-  pretty (DotSepIdent xs) = reflow "namespaced identifier" <++> concatWith (surround dot) (pretty <$> reverse (List1.toList xs))
+  pretty (DotSepIdent xs) = reflow "namespaced identifier" <++> concatWith (surround dot) (pretty <$> reverse (forget xs))
   pretty (DotIdent x) = pretty "dot+identifier" <++> pretty x
   pretty (Symbol x) = pretty "symbol" <++> pretty x
   -- Comments
@@ -248,7 +248,7 @@ rawTokens =
                    else Ident x
     parseNamespace : String -> Token
     parseNamespace ns = case List1.reverse . split (== '.') $ ns of
-                             [ident] => parseIdent ident
+                             ident ::: [] => parseIdent ident
                              ns      => DotSepIdent ns
 
 export
