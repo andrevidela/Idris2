@@ -65,7 +65,7 @@ Show Name where
   show (DN str y) = str
 
 public export
-data Count = M0 | M1 | MW
+data Count = N Nat | Infinity
 
 public export
 data PiInfo t = ImplicitArg | ExplicitArg | AutoImplicit | DefImplicit t

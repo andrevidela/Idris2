@@ -10,8 +10,22 @@ public export
 interface Semiring a where
   (|+|) : a -> a -> a
   plusNeutral : a
+  plusAssociative : (x, y, z : a) -> x |+| (y |+| z) = (x |+| y) |+| z
+  plusCommutative : (x, y : a) -> x |+| y = y |+| x
+  plusIdentityLeft : (x : a) -> plusNeutral |+| x = x
+  plusIdentityLeft x = rewrite plusCommutative plusNeutral x in plusIdentityRight x
+  plusIdentityRight : (x : a) -> x |+| plusNeutral = x
+  plusIdentityRight x = rewrite plusCommutative x plusNeutral in plusIdentityLeft x
+
   (|*|) : a -> a -> a
   timesNeutral : a
+  timesAssociative : (x, y, z : a) -> x |*| (y |*| z) = (x |*| y) |*| z
+  timesIdentityRight : (x : a) -> x |*| timesNeutral = x
+  timesIdentityLeft : (x : a) -> timesNeutral |*| x = x
+  timesDistributiveLeft : (x, y, z : a) -> x |*| (y |+| z) = (x |*| y) |+| (x |*| z)
+  timesDistributiveRight : (x, y, z : a) -> (x |+| y) |*| z = (x |*| z) |+| (y |*| z)
+  timesAnnihilationRight : (x : a) -> x |*| plusNeutral = plusNeutral
+  timesAnnihilationLeft : (x : a) -> plusNeutral |*| x = plusNeutral
 
 ||| Erased linearity corresponds to the neutral for |+|
 public export

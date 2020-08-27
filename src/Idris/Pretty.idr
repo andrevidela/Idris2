@@ -99,9 +99,11 @@ pragma = annotate Pragma
 
 export
 prettyRig : RigCount -> Doc ann
-prettyRig = elimSemi (pretty '0' <+> space)
-                     (pretty '1' <+> space)
-                     (const emptyDoc)
+prettyRig (N n) = pretty n <+> space
+prettyRig Infinity = emptyDoc
+--prettyRig = elimSemi (pretty '0' <+> space)
+--                     (pretty '1' <+> space)
+--                     (const emptyDoc)
 
 mutual
   prettyAlt : PClause -> Doc IdrisAnn
@@ -156,10 +158,9 @@ mutual
       go d (PRef _ n) = pretty n
       go d (PPi _ rig Explicit Nothing arg ret) =
         parenthesise (d > startPrec) $ group $
-          branchVal
-            (go startPrec arg <++> "->" <++> go startPrec ret)
-            (parens (prettyRig rig <+> "_" <++> colon <++> go startPrec arg) <++> "->" <+> line <+> go startPrec ret)
-            rig
+          if rig == top
+             then (go startPrec arg <++> "->" <++> go startPrec ret)
+             else (parens (prettyRig rig <+> "_" <++> colon <++> go startPrec arg) <++> "->" <+> line <+> go startPrec ret)
       go d (PPi _ rig Explicit (Just n) arg ret) =
         parenthesise (d > startPrec) $ group $
           parens (prettyRig rig <+> pretty n <++> colon <++> go startPrec arg) <++> "->" <+> line <+> go startPrec ret
@@ -171,10 +172,9 @@ mutual
           braces (prettyRig rig <+> pretty n <++> colon <++> go startPrec arg) <++> "->" <+> line <+> go startPrec ret
       go d (PPi _ rig AutoImplicit Nothing arg ret) =
         parenthesise (d > startPrec) $ group $
-          branchVal
-            (go startPrec arg <++> "=>" <+> line <+> go startPrec ret)
-            (braces (auto_ <++> prettyRig rig <+> "_" <++> colon <++> go startPrec arg) <++> "->" <+> line <+> go startPrec ret)
-            rig
+          if rig == top
+             then (go startPrec arg <++> "=>" <+> line <+> go startPrec ret)
+             else (braces (auto_ <++> prettyRig rig <+> "_" <++> colon <++> go startPrec arg) <++> "->" <+> line <+> go startPrec ret)
       go d (PPi _ rig AutoImplicit (Just n) arg ret) =
         parenthesise (d > startPrec) $ group $
           braces (auto_ <++> prettyRig rig <+> pretty n <++> colon <++> go startPrec arg) <++> "->" <+> line <+> go startPrec ret

@@ -73,17 +73,14 @@ TTC Name where
 
 export
 TTC RigCount where
-  toBuf b = elimSemi
-              (tag 0)
-              (tag 1)
-              (const $ tag 2)
+  toBuf b (N n) = do tag 0 
+                     toBuf b n
+  toBuf b Infinity = tag 1
 
-  fromBuf b
-      = case !getTag of
-             0 => pure erased
-             1 => pure linear
-             2 => pure top
-             _ => corrupt "RigCount"
+  fromBuf b = case !getTag of
+                   0 => pure (N !(fromBuf b))
+                   1 => pure Infinity
+                   _ => corrupt "RigCount"
 
 export
 TTC t => TTC (PiInfo t) where

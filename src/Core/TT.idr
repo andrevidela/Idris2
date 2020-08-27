@@ -329,7 +329,8 @@ setMultiplicity (PLet c val ty) c' = PLet c' val ty
 setMultiplicity (PVTy c ty) c' = PVTy c' ty
 
 showCount : RigCount -> String
-showCount = elimSemi "0 " "1 " (const "")
+showCount (N n) = show n ++ " "
+showCount Infinity = ""
 
 Show ty => Show (Binder ty) where
 	show (Lam c _ t) = "\\" ++ showCount c ++ show t

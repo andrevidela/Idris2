@@ -16,11 +16,11 @@ mkPoint n
     = let type = "Point" ++ show n ++ "D" in
       IRecord emptyFC Public
       (MkRecord emptyFC (NS ["Main"] (UN type)) [] (NS ["Main"] (UN ("Mk" ++ type)))
-        (toList $ map (\axis => MkIField emptyFC MW ExplicitArg (UN axis) `(Double)) (axes n)))
+        (toList $ map (\axis => MkIField emptyFC Infinity ExplicitArg (UN axis) `(Double)) (axes n)))
 
 logDecls : TTImp -> Elab (Int -> Int)
 logDecls v
-    = do declare [IClaim EmptyFC MW Public []
+    = do declare [IClaim EmptyFC Infinity Public []
                  (MkTy EmptyFC `{{ Main.foo }}
                                `(Int -> Int -> Int) )]
 

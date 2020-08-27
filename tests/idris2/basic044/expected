@@ -21,11 +21,11 @@ LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
-LOG unify.meta:5: Adding new meta ({P:cut:1675}, (Term.idr:11:15--11:18, Rig0))
-LOG unify.meta:5: Adding new meta ({P:vars:1675}, (Term.idr:11:19--11:23, Rig0))
+LOG unify.meta:5: Adding new meta ({P:cut:1675}, (Term.idr:11:15--11:18, 0))
+LOG unify.meta:5: Adding new meta ({P:vars:1675}, (Term.idr:11:19--11:23, 0))
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
-LOG unify.meta:5: Adding new meta ({P:cut:1678}, (Term.idr:12:15--12:18, Rig0))
-LOG unify.meta:5: Adding new meta ({P:vars:1678}, (Term.idr:12:19--12:23, Rig0))
+LOG unify.meta:5: Adding new meta ({P:cut:1678}, (Term.idr:12:15--12:18, 0))
+LOG unify.meta:5: Adding new meta ({P:vars:1678}, (Term.idr:12:19--12:23, 0))
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG declare.data:1: Processing Term.Chk
@@ -33,14 +33,14 @@ LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
-LOG unify.meta:5: Adding new meta ({P:cut:1681}, (Term.idr:16:15--16:18, Rig0))
-LOG unify.meta:5: Adding new meta ({P:vars:1681}, (Term.idr:16:19--16:23, Rig0))
+LOG unify.meta:5: Adding new meta ({P:cut:1681}, (Term.idr:16:15--16:18, 0))
+LOG unify.meta:5: Adding new meta ({P:vars:1681}, (Term.idr:16:19--16:23, 0))
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
-LOG unify.meta:5: Adding new meta ({P:cut:1684}, (Term.idr:17:15--17:18, Rig0))
-LOG unify.meta:5: Adding new meta ({P:vars:1684}, (Term.idr:17:19--17:23, Rig0))
-LOG unify.meta:5: Adding new meta ({P:n:1684}, (Term.idr:17:35--17:36, Rig0))
+LOG unify.meta:5: Adding new meta ({P:cut:1684}, (Term.idr:17:15--17:18, 0))
+LOG unify.meta:5: Adding new meta ({P:vars:1684}, (Term.idr:17:19--17:23, 0))
+LOG unify.meta:5: Adding new meta ({P:n:1684}, (Term.idr:17:35--17:36, 0))
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG declare.data:1: Processing Term.Syn
@@ -48,16 +48,16 @@ LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
-LOG unify.meta:5: Adding new meta ({P:vars:1688}, (Term.idr:22:15--22:19, Rig0))
-LOG unify.meta:5: Adding new meta ({P:cut:1688}, (Term.idr:22:27--22:30, Rig0))
+LOG unify.meta:5: Adding new meta ({P:vars:1688}, (Term.idr:22:15--22:19, 0))
+LOG unify.meta:5: Adding new meta ({P:cut:1688}, (Term.idr:22:27--22:30, 0))
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
-LOG unify.meta:5: Adding new meta ({P:cut:1691}, (Term.idr:23:15--23:18, Rig0))
-LOG unify.meta:5: Adding new meta ({P:vars:1691}, (Term.idr:23:19--23:23, Rig0))
+LOG unify.meta:5: Adding new meta ({P:cut:1691}, (Term.idr:23:15--23:18, 0))
+LOG unify.meta:5: Adding new meta ({P:vars:1691}, (Term.idr:23:19--23:23, 0))
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
-LOG unify.meta:5: Adding new meta ({P:vars:1694}, (Term.idr:24:20--24:24, Rig0))
+LOG unify.meta:5: Adding new meta ({P:vars:1694}, (Term.idr:24:20--24:24, 0))
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
 LOG unify.equal:10: Skipped unification (equal already): Type and Type
