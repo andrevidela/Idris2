@@ -109,7 +109,7 @@ record EState (vars : List Name) where
   -- the only things that unbound implicits can depend on
   outerEnv : Env Term outer
   subEnv : SubVars outer vars
-  boundNames : List (Name, ImplBinding vars)
+  boundNames : List (Name, Nat, ImplBinding vars)
                   -- implicit pattern/type variable bindings and the
                   -- term/type they elaborated to
   toBind : List (Name, ImplBinding vars)
@@ -130,7 +130,7 @@ record EState (vars : List Name) where
                   -- Holes standing for pattern variables, which we'll delete
                   -- once we're done elaborating
   delayDepth : Nat -- if it gets too deep, it gets slow, so fail quicker
-  linearUsed : List (Var vars)
+  linearUsed : List (RigCount, Var vars)
   saveHoles : NameMap () -- things we'll need to save to TTC, even if solved
 
   unambiguousNames : StringMap (Name, Int, GlobalDef)
@@ -167,23 +167,22 @@ weakenedEState {e}
                     (MkEState (defining est)
                               (outerEnv est)
                               (DropCons (subEnv est))
-                              (map wknTms (boundNames est))
-                              (map wknTms (toBind est))
+                              (map (\(f, n, tm) : (Name, Nat, ImplBinding vars) => (f, n, wknTms tm)) (boundNames est))
+                              (map (\(f, tm) : (Name, ImplBinding vars) => (f, wknTms tm)) (toBind est))
                               (bindIfUnsolved est)
                               (lhsPatVars est)
                               (allPatVars est)
                               (delayDepth est)
-                              (map weaken (linearUsed est))
+                              (map (\(r, v) => (r, weaken v)) (linearUsed est))
                               (saveHoles est)
                               (unambiguousNames est))
          pure eref
   where
-    wknTms : (Name, ImplBinding vs) ->
-             (Name, ImplBinding (n :: vs))
-    wknTms (f, NameBinding c p x y)
-        = (f, NameBinding c (map weaken p) (weaken x) (weaken y))
-    wknTms (f, AsBinding c p x y z)
-        = (f, AsBinding c (map weaken p) (weaken x) (weaken y) (weaken z))
+    wknTms : ImplBinding vs -> ImplBinding (n :: vs)
+    wknTms (NameBinding c p x y)
+        = NameBinding c (map weaken p) (weaken x) (weaken y)
+    wknTms (AsBinding c p x y z)
+        = (AsBinding c (map weaken p) (weaken x) (weaken y) (weaken z))
 
 strengthenedEState : {n, vars : _} ->
                      Ref Ctxt Defs ->
@@ -194,8 +193,8 @@ strengthenedEState {n} {vars} c e fc env
     = do est <- get EST
          defs <- get Ctxt
          svs <- dropSub (subEnv est)
-         bns <- traverse (strTms defs) (boundNames est)
-         todo <- traverse (strTms defs) (toBind est)
+         bns <- traverse (\(f, n, tm) => pure (f, n, !(strTms defs f tm))) (boundNames est)
+         todo <- traverse (\(f, tm) => pure (f, !(strTms defs f tm))) (toBind est)
 
          pure (MkEState (defining est)
                         (outerEnv est)
@@ -206,7 +205,7 @@ strengthenedEState {n} {vars} c e fc env
                         (lhsPatVars est)
                         (allPatVars est)
                         (delayDepth est)
-                        (mapMaybe dropTop (linearUsed est))
+                        (mapMaybe (\(r, v) => Just (r, !(dropTop v))) (linearUsed est))
                         (saveHoles est)
                         (unambiguousNames est))
   where
@@ -246,18 +245,18 @@ strengthenedEState {n} {vars} c e fc env
                       f' <- shrinkTerm f (DropCons SubRefl)
                       pure (apply (getLoc f) f' args')
 
-    strTms : Defs -> (Name, ImplBinding (n :: vars)) ->
-             Core (Name, ImplBinding vars)
-    strTms defs (f, NameBinding c p x y)
+    strTms : Defs -> Name -> ImplBinding (n :: vars) ->
+             Core (ImplBinding vars)
+    strTms defs f (NameBinding c p x y)
         = do xnf <- normaliseHoles defs env x
              ynf <- normaliseHoles defs env y
              case (shrinkPi p (DropCons SubRefl),
                    removeArg xnf,
                    shrinkTerm ynf (DropCons SubRefl)) of
                (Just p', Just x', Just y') =>
-                    pure (f, NameBinding c p' x' y')
+                    pure (NameBinding c p' x' y')
                _ => throw (BadUnboundImplicit fc env f y)
-    strTms defs (f, AsBinding c p x y z)
+    strTms defs f (AsBinding c p x y z)
         = do xnf <- normaliseHoles defs env x
              ynf <- normaliseHoles defs env y
              znf <- normaliseHoles defs env z
@@ -266,7 +265,7 @@ strengthenedEState {n} {vars} c e fc env
                    shrinkTerm ynf (DropCons SubRefl),
                    shrinkTerm znf (DropCons SubRefl)) of
                (Just p', Just x', Just y', Just z') =>
-                    pure (f, AsBinding c p' x' y' z')
+                    pure (AsBinding c p' x' y' z')
                _ => throw (BadUnboundImplicit fc env f y)
 
     dropTop : (Var (n :: vs)) -> Maybe (Var vs)

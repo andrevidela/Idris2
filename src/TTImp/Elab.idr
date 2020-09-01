@@ -45,6 +45,7 @@ doPLetRenames ns drops (Bind fc n b sc)
            Nothing => Bind fc n b (doPLetRenames ns drops sc)
 doPLetRenames ns drops sc = sc
 
+-- NOTE: Why linear when not erased?
 getRigNeeded : ElabMode -> RigCount
 getRigNeeded InType = erased -- unrestricted usage in types
 getRigNeeded (InLHS r) = if isErased r then erased
@@ -120,6 +121,7 @@ elabTermSub {vars} defining mode opts nest env env' sub tm ty
          let rigc = getRigNeeded mode
 
          (chktm, chkty) <- check {e} rigc (initElabInfo mode) nest env tm ty
+         -- TODO CHECK
          -- Final retry of constraints and delayed elaborations
          -- - Solve any constraints, then retry any delayed elaborations
          -- - Finally, last attempts at solving constraints, but this
@@ -239,7 +241,7 @@ checkTermSub defining mode opts nest env env' sub tm ty
             catch {t = Error}
                   (elabTermSub defining mode opts nest
                                env env' sub tm (Just ty))
-                  (\err => case err of
+                  (\err => case err of -- TODO CHECK
                               TryWithImplicits loc benv ns
                                  => do put Ctxt defs
                                        put UST ust

@@ -38,6 +38,7 @@ processDecl : {auto c : Ref Ctxt Defs} ->
               PDecl -> Core (Maybe Error)
 processDecl decl
     = catch (do impdecls <- desugarDecl [] decl
+                -- coreLift $ putStrLn $ "Desugar " ++ show decl ++ " to " ++ show impdecls
                 traverse (Check.processDecl [] (MkNested []) []) impdecls
                 pure Nothing)
             (\err => do giveUpConstraints -- or we'll keep trying...

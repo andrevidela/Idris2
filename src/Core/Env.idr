@@ -124,8 +124,7 @@ abstractFullEnvType fc [] tm = tm
 abstractFullEnvType fc (Pi c e ty :: env) tm
     = abstractFullEnvType fc env (Bind fc _ (Pi c e ty) tm)
 abstractFullEnvType fc (b :: env) tm
-    = abstractFullEnvType fc env (Bind fc _
-						(Pi (multiplicity b) Explicit (binderType b)) tm)
+    = abstractFullEnvType fc env (Bind fc _ (Pi (multiplicity b) Explicit (binderType b)) tm)
 
 export
 letToLam : Env Term vars -> Env Term vars

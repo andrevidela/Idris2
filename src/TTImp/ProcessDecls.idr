@@ -34,15 +34,15 @@ process : {vars : _} ->
           {auto u : Ref UST UState} ->
           List ElabOpt ->
           NestedNames vars -> Env Term vars -> ImpDecl -> Core ()
-process eopts nest env (IClaim fc rig vis opts ty)
+process eopts nest env (IClaim fc rig vis opts ty) -- TODO CHECK
     = processType eopts nest env fc rig vis opts ty
-process eopts nest env (IData fc vis ddef)
+process eopts nest env (IData fc vis ddef) -- TODO CHECK
     = processData eopts nest env fc vis ddef
-process eopts nest env (IDef fc fname def)
+process eopts nest env (IDef fc fname def) -- TODO CHECK
     = processDef eopts nest env fc fname def
-process eopts nest env (IParameters fc ps decls)
+process eopts nest env (IParameters fc ps decls) -- TODO CHECK
     = processParams nest env fc ps decls
-process eopts nest env (IRecord fc ns vis rec)
+process eopts nest env (IRecord fc ns vis rec) -- TODO CHECK
     = processRecord eopts nest env ns vis rec
 process eopts nest env (INamespace fc ns decls)
     = do defs <- get Ctxt

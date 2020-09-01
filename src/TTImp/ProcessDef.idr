@@ -247,7 +247,7 @@ combineLinear loc ((n, count) :: cs)
     -- Those combine rules are obtuse enough that they are worth investigating
     combine : RigCount -> RigCount -> Core RigCount
     combine l r = if l |+| r == top && not (isErased $ l `glb` r) && (l `glb` r) /= top
-                     then throw (LinearUsed loc 2 n)
+                     then throw (LinearUsed loc (N 2) linear n)
                      -- if everything is fine, return the linearity that has the
                      -- highest bound
                      else pure (l `lub` r)

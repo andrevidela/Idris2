@@ -47,7 +47,7 @@ checkAs rig elabinfo nest env fc side n_in pat topexp
                     defs <- get Ctxt
                     est <- get EST
                     put EST
-                        (record { boundNames $= ((n, AsBinding rigAs Explicit tm exp pattm) :: ),
+                        (record { boundNames $= ((n, 1, AsBinding rigAs Explicit tm exp pattm) :: ),
                                   toBind $= ((n, AsBinding rigAs Explicit tm bty pattm) ::) }
                                 est)
                     (ntm, nty) <- checkExp rig elabinfo env fc tm (gnf env exp)
@@ -59,15 +59,15 @@ checkAs rig elabinfo nest env fc side n_in pat topexp
     -- to be the new variable (UseRight), but in generated case blocks it's
     -- better if it's the pattern (UseLeft)
     rigPat' : UseSide -> RigCount
-    rigPat' UseLeft = if isLinear rig then linear else rig
-    rigPat' UseRight = if isLinear rig then erased else rig
+    rigPat' UseLeft  = rig
+    rigPat' UseRight = if isNeitherErasedNorTop rig then erased else rig
 
     rigPat : RigCount
     rigPat = rigPat' side
 
     rigAs' : UseSide -> RigCount
-    rigAs' UseLeft = if isLinear rig then erased else rig
-    rigAs' UseRight = if isLinear rig then linear else rig
+    rigAs' UseLeft  = if isNeitherErasedNorTop rig then erased else rig
+    rigAs' UseRight = rig
 
     rigAs : RigCount
     rigAs = rigAs' side

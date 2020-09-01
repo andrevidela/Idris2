@@ -77,7 +77,7 @@ data Error : Type where
      BadDataConType : FC -> Name -> Name -> Error
      NotCovering : FC -> Name -> Covering -> Error
      NotTotal : FC -> Name -> PartialReason -> Error
-     LinearUsed : FC -> Nat -> Name -> Error
+     LinearUsed : FC -> RigCount -> RigCount -> Name -> Error
      LinearMisuse : FC -> Name -> RigCount -> RigCount -> Error
      BorrowPartial : {vars : _} ->
                      FC -> Env Term vars -> Term vars -> Term vars -> Error
@@ -202,8 +202,8 @@ Show Error where
 
   show (NotTotal fc n r)
        = show fc ++ ":" ++ show n ++ " is not total"
-  show (LinearUsed fc count n)
-      = show fc ++ ":There are " ++ show count ++ " uses of linear name " ++ show n
+  show (LinearUsed fc count exp n)
+      = show fc ++ ":There are " ++ show count ++ " of expected " ++ show exp ++ " uses of linear name " ++ show n
   show (LinearMisuse fc n exp ctx)
       = show fc ++ ":Trying to use " ++ showRig exp ++ " name " ++ show n ++
                    " in " ++ showRel ctx ++ " context"
@@ -334,7 +334,7 @@ getErrorLoc (BadTypeConType loc _) = Just loc
 getErrorLoc (BadDataConType loc _ _) = Just loc
 getErrorLoc (NotCovering loc _ _) = Just loc
 getErrorLoc (NotTotal loc _ _) = Just loc
-getErrorLoc (LinearUsed loc _ _) = Just loc
+getErrorLoc (LinearUsed loc _ _ _) = Just loc
 getErrorLoc (LinearMisuse loc _ _ _) = Just loc
 getErrorLoc (BorrowPartial loc _ _ _) = Just loc
 getErrorLoc (BorrowPartialType loc _ _) = Just loc

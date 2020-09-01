@@ -10,6 +10,8 @@ import Core.Value
 import TTImp.Elab.Check
 import TTImp.TTImp
 
+import public Data.List.Elem
+
 %default covering
 
 detagSafe : Defs -> NF [] -> Core Bool
@@ -113,3 +115,16 @@ bindReq {vs = n :: _} fc (b :: env) (KeepCons p) ns tm
             (Bind fc _ (Pi (multiplicity b) Explicit (binderType b')) tm)
 bindReq fc (b :: env) (DropCons p) ns tm
     = bindReq fc env p ns tm
+
+export
+lookupName : (x : Name) -> (xs : List (Name, b)) -> Maybe (y ** Elem (x, y) xs)
+lookupName x [] = Nothing
+lookupName x ((y, z) :: xs) with (nameEq x y)
+  lookupName x ((x, z) :: xs) | Just Refl = Just (z ** Here)
+  lookupName x ((y, z) :: xs) | Nothing = do (_ ** prf) <- lookupName x xs
+                                             pure (_ ** There prf)
+
+export
+update : (1 _ : a) -> (xs : List a) -> (1 idx : Elem x xs) -> List a
+update x (_ :: xs) Here = (x :: xs)
+update x (y :: xs) (There p) = y :: update x xs p

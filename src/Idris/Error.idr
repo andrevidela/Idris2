@@ -219,8 +219,9 @@ perror (NotCovering fc n (NonCoveringCall ns))
 perror (NotTotal fc n r)
     = pure $ errorDesc (code (pretty !(prettyName n)) <++> reflow "is not total," <++> pretty r)
         <+> line <+> !(ploc fc)
-perror (LinearUsed fc count n)
-    = pure $ errorDesc (reflow "There are" <++> pretty count <++> reflow "uses of linear name"
+perror (LinearUsed fc count exp n)
+    = pure $ errorDesc (reflow "There are" <++> prettyRig count <+> reflow "uses, expected"
+        <++> prettyRig exp <+> reflow "uses of linear name"
         <++> code (pretty (sugarName n)) <+> dot)
         <++> line <+> !(ploc fc)
         <+> line <+> reflow "Suggestion: linearly bounded variables must be used exactly once."

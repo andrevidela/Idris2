@@ -74,7 +74,7 @@ delayOnFailure fc rig env expected pred pri elab
                  if pred err
                     then
                       do nm <- genName "delayed"
-                         (ci, dtm) <- newDelayed fc linear env nm !(getTerm expected)
+                         (ci, dtm) <- newDelayed fc linear env nm !(getTerm expected) -- TODO CHECK
                          logGlueNF "elab.delay" 5 ("Postponing elaborator " ++ show nm ++
                                       " at " ++ show fc ++
                                       " for") env expected
@@ -101,7 +101,7 @@ delayElab {vars} fc rig env exp pri elab
     = do est <- get EST
          nm <- genName "delayed"
          expected <- mkExpected exp
-         (ci, dtm) <- newDelayed fc linear env nm !(getTerm expected)
+         (ci, dtm) <- newDelayed fc linear env nm !(getTerm expected) -- TODO CHECK
          logGlueNF "elab.delay" 5 ("Postponing elaborator " ++ show nm ++
                       " for") env expected
          ust <- get UST

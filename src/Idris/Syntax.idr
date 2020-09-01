@@ -618,6 +618,43 @@ mutual
     showPrec d (PWithUnambigNames fc ns rhs)
         = "with " ++ show ns ++ " " ++ showPrec d rhs
 
+  export
+  Show PTypeDecl where
+    show (MkPTy fc n doc type) = show n ++ " : " ++ show type
+
+  export
+  Show PDataDecl where
+    show (MkPData fc tyname tycon opts datacons) =
+      "data " ++ show tyname ++ " : " ++ show tycon ++ " where\n" ++ concat (("  " ++) . show <$> datacons)
+    show (MkPLater fc tyname tycon) = "data " ++ show tyname ++ " : " ++ show tycon ++ " where"
+
+  export
+  Show PClause where
+    show (MkPatClause fc lhs rhs whereblock) = show lhs ++ " = " ++ show rhs ++ "\nwhere\n" ++ concat (("  " ++) . show <$> whereblock)
+    show (MkWithClause fc lhs wval flag xs) = show lhs ++ " with (" ++ show wval ++ ")\n" ++ concat (("  " ++) . show <$> xs)
+    show (MkImpossible fc lhs) = show lhs ++ " impossible"
+
+  export
+  Show PDecl where -- TODO Finish
+    show (PClaim fc r v opts typedecl) = show r ++ " " ++ show typedecl
+    show (PDef fc xs) = showSep "\n" (show <$> xs)
+    show (PData fc doc v decl) = show decl
+    show (PParameters fc par xs) = "parameters " ++ show par ++ "\n" ++ concat (("  " ++) . show <$> xs)
+    show (PUsing fc us xs) = "using " ++ show us ++ "\n" ++ concat (("  " ++) . show <$> xs)
+    show (PReflect fc x) = "%runElab " ++ show x
+    show (PInterface fc v constraints n doc params det conName xs) =
+      show "interface " ++ show constraints ++ " => " ++ show n ++ " " ++ show params ++ " | " ++ show det ++ " where\n"
+          ++ maybe "" (\x => "constructor " ++ show x ++ "\n") conName
+          ++ concat (("  " ++) . show <$> xs)
+    show (PImplementation fc x xs y implicits constraints z params implName nusing w) = "<< interface impl >>"
+    show (PRecord fc doc x y params conName xs) = "<< record >>"
+    show (PMutual fc xs) = "mutual\n" ++ concat (("  " ++) . show <$> xs)
+    show (PFixity fc x k y) = "<< fixity >>"
+    show (PNamespace fc xs ys) = "<< namespace >>"
+    show (PTransform fc x y z) = "<< transform >>"
+    show (PRunElabDecl fc x) = "<< runelab >>"
+    show (PDirective fc x) = "<< directive >>"
+
 public export
 record IFaceInfo where
   constructor MkIFaceInfo

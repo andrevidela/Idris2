@@ -197,7 +197,20 @@ Top InfNat where
   topAbs x = LTEInf
 
 export
-isNeitherZeroNorTop : InfNat -> Bool
-isNeitherZeroNorTop (N 0) = False
-isNeitherZeroNorTop (N _) = True
-isNeitherZeroNorTop Infinity = False
+isNeitherErasedNorTop : InfNat -> Bool
+isNeitherErasedNorTop (N 0) = False
+isNeitherErasedNorTop (N _) = True
+isNeitherErasedNorTop Infinity = False
+
+export
+branchRig : Lazy a -> (Nat -> a) -> Lazy a -> InfNat -> a
+branchRig zero rel inf (N 0) = zero
+branchRig zero rel inf (N n) = rel n
+branchRig zero rel inf Infinity = inf
+
+export
+minus : InfNat -> InfNat -> InfNat
+minus (N n) (N m) = N (n `minus` m)
+minus (N n) Infinity = N 0
+minus Infinity (N m) = Infinity
+minus Infinity Infinity = Infinity

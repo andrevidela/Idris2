@@ -880,4 +880,6 @@ mutual
       = do b <- newRef Bang initBangs
            tm' <- desugarB s ps tm
            bd <- get Bang
-           pure $ bindBangs (bangNames bd) tm'
+           let tm' = bindBangs (bangNames bd) tm'
+           -- coreLift $ putStrLn $ "Desugar " ++ show tm ++ " to " ++ show tm'
+           pure $ tm'

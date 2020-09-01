@@ -30,6 +30,6 @@ processRunElab eopts nest env fc tm
          unit <- getCon fc defs (builtin "Unit")
          exp <- appCon fc defs n [unit]
 
-         stm <- checkTerm tidx InExpr eopts nest env tm (gnf env exp)
+         stm <- checkTerm tidx InExpr eopts nest env tm (gnf env exp) -- TODO CHECK
          elabScript fc nest env !(nfOpts withAll defs env stm) Nothing
          pure ()

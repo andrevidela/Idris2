@@ -31,7 +31,7 @@ changeVar old new (Meta fc nm i args)
     = Meta fc nm i (map (changeVar old new) args)
 changeVar (MkVar old) (MkVar new) (Bind fc x b sc)
     = Bind fc x (assert_total (map (changeVar (MkVar old) (MkVar new)) b))
-		            (changeVar (MkVar (Later old)) (MkVar (Later new)) sc)
+                (changeVar (MkVar (Later old)) (MkVar (Later new)) sc)
 changeVar old new (App fc fn arg)
     = App fc (changeVar old new fn) (changeVar old new arg)
 changeVar old new (As fc s nm p)
@@ -71,11 +71,15 @@ allow : Maybe (Var vs) -> Env Term vs -> Env Term vs
 allow Nothing env = env
 allow (Just (MkVar p)) env = toRig1 p env
 
+minusRig : {idx : Nat} -> RigCount -> (0 p : IsVar name idx vs) -> Env Term vs -> Env Term vs
+minusRig rig First (b :: bs) = setMultiplicity b ((multiplicity b) `minus` rig) :: bs
+minusRig rig (Later p) (b :: bs) = b :: minusRig rig p bs
+
 -- If the name is used elsewhere, update its multiplicity so it's
 -- not required to be used in the case block
-updateMults : List (Var vs) -> Env Term vs -> Env Term vs
+updateMults : List (RigCount, Var vs) -> Env Term vs -> Env Term vs
 updateMults [] env = env
-updateMults (MkVar p :: us) env = updateMults us (toRig0 p env)
+updateMults ((rig, MkVar p) :: us) env = updateMults us (minusRig rig p env)
 
 findImpsIn : {vars : _} ->
              FC -> Env Term vars -> List (Name, Term vars) -> Term vars ->
@@ -182,7 +186,9 @@ caseBlock {vars} rigc elabinfo fc nest env scr scrtm scrty caseRig alts expected
 
          -- Update environment so that linear bindings which were used
          -- (esp. in the scrutinee!) are set to 0 in the case type
+         log "elab.case" 10 $ "linearUsed: " ++ show (linearUsed est)
          let env = updateMults (linearUsed est) env
+         logEnv "elab.case" 10 "Updated env" env
          defs <- get Ctxt
          let vis = case !(lookupCtxtExact (Resolved (defining est)) (gamma defs)) of
                         Just gdef =>
@@ -203,11 +209,13 @@ caseBlock {vars} rigc elabinfo fc nest env scr scrtm scrty caseRig alts expected
 
          (caseretty, _) <- bindImplicits fc (implicitMode elabinfo) defs env
                                          fullImps caseretty_in (TType fc)
+         log "debug.case" 10 $ "caseretty: " ++ show caseretty
+         log "debug.case" 10 $ "splitOn: " ++ show splitOn
          let casefnty
                = abstractFullEnvType fc (allow splitOn (explicitPi env))
-                            (maybe (Bind fc scrn (Pi caseRig Explicit scrty)
-                                       (weaken caseretty))
-                                   (const caseretty) splitOn)
+                            (maybe (Bind fc scrn (Pi caseRig Explicit scrty) (weaken caseretty))
+                                   (const caseretty)
+                                   splitOn)
 
          logEnv "elab.case" 10 "Case env" env
          logTermNF "elab.case" 2 ("Case function type: " ++ show casen) [] casefnty
@@ -261,7 +269,7 @@ caseBlock {vars} rigc elabinfo fc nest env scr scrtm scrty caseRig alts expected
     mkLocalEnv : Env Term vs -> Env Term vs
     mkLocalEnv [] = []
     mkLocalEnv (b :: bs)
-        = let b' = if isLinear (multiplicity b)
+        = let b' = if isNeitherErasedNorTop (multiplicity b)
                       then setMultiplicity b erased
                       else b in
               b' :: mkLocalEnv bs
@@ -373,12 +381,12 @@ checkCase rig elabinfo nest env fc scr scrty_in alts exp
            -- Try checking at the given multiplicity; if that doesn't work,
            -- try checking at Rig1 (meaning that we're using a linear variable
            -- so the scrutinee should be linear)
-           let chrig = if isErased rig then erased else top
-           log "elab.case" 5 $ "Checking " ++ show scr ++ " at " ++ show chrig
+           -- let chrig = if isErased rig then erased else top
+           log "elab.case" 5 $ "Checking " ++ show scr ++ " at " ++ show rig
 
            (scrtm_in, gscrty, caseRig) <- handle
-              (do c <- runDelays 10 $ check chrig elabinfo nest env scr (Just (gnf env scrtyv))
-                  pure (fst c, snd c, chrig))
+              (do c <- runDelays 10 $ check rig elabinfo nest env scr (Just (gnf env scrtyv))
+                  pure (fst c, snd c, rig))
               (\err => case err of
                             e@(LinearMisuse _ _ r _)
                               => branchOne

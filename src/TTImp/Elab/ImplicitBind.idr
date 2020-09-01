@@ -13,6 +13,7 @@ import Core.Value
 
 import TTImp.Elab.Check
 import TTImp.Elab.Delayed
+import TTImp.Elab.Utils
 import TTImp.TTImp
 
 import Data.List
@@ -415,7 +416,7 @@ checkBindVar rig elabinfo nest env fc str topexp
          noteLHSPatVar elabmode (UN str)
          notePatVar n
          est <- get EST
-         case lookup n (boundNames est) of
+         case lookupName n (boundNames est) of
               Nothing =>
                 do (tm, exp, bty) <- mkPatternHole fc rig n env
                                               (implicitMode elabinfo)
@@ -426,17 +427,18 @@ checkBindVar rig elabinfo nest env fc str topexp
                         _ => pure ()
                    log "elab" 5 $ "Added Bound implicit " ++ show (n, (rig, tm, exp, bty))
                    est <- get EST
-                   put EST (record { boundNames $= ((n, NameBinding rig Explicit tm exp) ::),
+                   put EST (record { boundNames $= ((n, 1, NameBinding rig Explicit tm exp) ::),
                                      toBind $= ((n, NameBinding rig Explicit tm bty) :: ) } est)
                    addNameType fc (UN str) env exp
                    checkExp rig elabinfo env fc tm (gnf env exp) topexp
-              Just bty =>
+              Just ((c, bty) ** idx) =>
                 do -- Check rig is consistent with the one in bty, and
                    -- update if necessary
-                   combine (UN str) rig (bindingRig bty)
+                   combine (UN str) rig c (bindingRig bty)
                    let tm = bindingTerm bty
                    let ty = bindingType bty
                    addNameType fc (UN str) env ty
+                   put EST (record { boundNames = update (n, c + 1, bty) (boundNames est) idx } est)
                    checkExp rig elabinfo env fc tm (gnf env ty) topexp
   where
     updateRig : Name -> RigCount -> List (Name, ImplBinding vars) ->
@@ -451,12 +453,13 @@ checkBindVar rig elabinfo nest env fc str topexp
 
     -- Two variables are incompatble if at least one of them appears in a linear position
     -- and their sum is bigger than 1
-    isIncompatible : RigCount -> RigCount -> Bool
-    isIncompatible l r = (isLinear l || isLinear r) && linear < l |+| r
+    isIncompatible : RigCount -> Nat -> RigCount -> Bool
+    isIncompatible l c r = (isNeitherErasedNorTop l || isNeitherErasedNorTop r) && l |*| (N c) <= r -- TODO IS linear < ENOUGH
 
-    combine : Name -> RigCount -> RigCount -> Core ()
-    combine n l r = when (isIncompatible l r)
-                         (throw (LinearUsed fc 2 n))
+    combine : Name -> RigCount -> Nat -> RigCount -> Core ()
+    combine n l c r = do -- coreLift $ putStrLn $ "l: " ++ show l ++ ", r: " ++ show r
+                       when (isIncompatible l c r)
+                            (throw (LinearUsed fc (l |*| (N c)) r n))
 
 export
 checkBindHere : {vars : _} ->

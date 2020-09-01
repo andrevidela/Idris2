@@ -44,10 +44,10 @@ getNameType rigc env fc x
                  let binder = getBinder lv env
                  let bty = binderType binder
                  addNameType fc x env bty
-                 when (isLinear rigb) $
+                 when (isNeitherErasedNorTop rigb) $
                       do est <- get EST
                          put EST
-                            (record { linearUsed $= ((MkVar lv) :: ) } est)
+                            (record { linearUsed $= ((rigc, MkVar lv) :: ) } est)
                  pure (Local fc (Just (isLet binder)) _ lv, gnf env bty)
            Nothing =>
               do defs <- get Ctxt
@@ -317,7 +317,7 @@ mutual
 
   dotErased : {auto c : Ref Ctxt Defs} -> (argty : NF vars) ->
               Maybe Name -> Nat -> ElabMode -> RigCount -> RawImp -> Core RawImp
-  dotErased argty mn argpos (InLHS lrig ) rig tm
+  dotErased argty mn argpos (InLHS lrig) rig tm
       = if not (isErased lrig) && isErased rig
           then do
             -- if the argument type aty has a single constructor, there's no need
@@ -509,7 +509,7 @@ mutual
                 _ => makeAutoImplicit rig argRig elabinfo nest env fc tm x aty sc argdata [] [] kr (Just expty_in)
   checkAppWith rig elabinfo nest env fc tm ty@(NBind tfc x (Pi rigb (DefImplicit aval) aty) sc)
                argdata [] [] kr (Just expty_in)
-      = do let argRig = rigMult rig rigb
+      = do let argRig = rig |*| rigb
            expty <- getNF expty_in
            defs <- get Ctxt
            case expty of
@@ -565,7 +565,7 @@ mutual
   -- Check next default argument
   checkAppWith rig elabinfo nest env fc tm (NBind tfc x (Pi rigb (DefImplicit arg) aty) sc)
                argdata expargs impargs kr expty
-      = let argRig = rigMult rig rigb in
+      = let argRig = rig |*| rigb in
             case useImp [] impargs of
                Nothing => makeDefImplicit rig argRig elabinfo nest env fc tm
                                           x arg aty sc argdata expargs impargs kr expty

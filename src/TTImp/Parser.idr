@@ -217,8 +217,10 @@ mutual
   getMult : Maybe Integer -> SourceEmptyRule RigCount
   getMult (Just 0) = pure erased
   getMult (Just 1) = pure linear
+  getMult (Just n) = if n < 2
+                        then fatalError "Invalid multiplicity (must be a natural number)"
+                        else pure (N $ fromInteger n)
   getMult Nothing = pure top
-  getMult _ = fatalError "Invalid multiplicity (must be 0 or 1)"
 
   pibindAll : FC -> PiInfo RawImp -> List (RigCount, Maybe Name, RawImp) ->
               RawImp -> RawImp
