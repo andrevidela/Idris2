@@ -156,13 +156,6 @@ letBind fc args f
         = ALet fc i t (doBind (ALocal i :: vs) xs)
     doBind vs ((var, _) :: xs) = doBind (var :: vs) xs
 
-toVect : (n : Nat) -> List a -> Maybe (Vect n a)
-toVect Z [] = Just []
-toVect (S k) (x :: xs)
-    = do xs' <- ANF.toVect k xs
-         pure (x :: xs')
-toVect _ _ = Nothing
-
 mlet : {auto v : Ref Next Int} ->
        FC -> ANF -> (AVar -> ANF) -> Core ANF
 mlet fc (AV _ var) sc = pure $ sc var

@@ -640,19 +640,17 @@ recordDecl fname indents
                    IRecord fc Nothing vis
                            (MkImpRecord fc n params dc (concat flds)))
 
-namespaceDecl : Rule (List String)
+namespaceDecl : Rule Namespace
 namespaceDecl
     = do keyword "namespace"
          commit
-         ns <- namespacedIdent
-         pure (forget ns)
+         namespaceId
 
 directive : FileName -> IndentInfo -> Rule ImpDecl
 directive fname indents
     = do pragma "logging"
          commit
-         ps <- optional namespacedIdent
-         let topic = fromMaybe [] $ map forget ps
+         topic <- [| unqualifiedName :: many aDotIdent |]
          lvl <- intLit
          atEnd indents
          pure (ILog (topic, integerToNat lvl))
