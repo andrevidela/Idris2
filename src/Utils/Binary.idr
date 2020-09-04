@@ -356,9 +356,10 @@ TTC a => TTC (List1 a) where
           toBuf b xs
 
   fromBuf b = do
-    x <- fromBuf b
     xs <- fromBuf b
-    pure (x :: xs)
+    case fromList xs of
+      Nothing => corrupt "List1"
+      Just xs => pure xs
 
 export
 {n : Nat} -> TTC a => TTC (Vect n a) where
