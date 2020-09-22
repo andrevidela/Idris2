@@ -358,7 +358,7 @@ TTC a => TTC (List1 a) where
   fromBuf b = do
     x <- fromBuf b
     xs <- fromBuf b
-    pure (x :: xs)
+    pure (x ::: xs)
 
 export
 {n : Nat} -> TTC a => TTC (Vect n a) where
