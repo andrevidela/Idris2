@@ -23,6 +23,10 @@ data Usage : List Name -> Type where
      Nil : Usage vars
      (::) : Var vars -> Usage vars -> Usage vars
 
+replicate : Nat -> Var vars -> Usage vars
+replicate Z _ = []
+replicate (S n) v = v :: replicate n v
+
 Show (Usage vars) where
   show xs = "[" ++ showAll xs ++ "]"
     where
@@ -205,10 +209,7 @@ mutual
       -- count the usage if we're in a linear context. If not, the usage doesn't
       -- matter
       used : RigCount -> Usage vars
-      -- used r = if isNeitherErasedNorTop r then [MkVar prf] else []
-      used (N 0) = []
-      used (N (S n)) = MkVar prf :: used (N n)
-      used Infinity = []
+      used rig = fromMaybe [] (map (\x => replicate x (MkVar prf)) (toNat rig))
 
   lcheck rig erase env (Ref fc nt fn)
       = do log "debug.lcheck" 10 $ "lcheck " ++ show erase ++ " Ref " ++ show rig ++ " " ++ show !(toFullNames $ Ref {vars} fc nt fn)
@@ -277,10 +278,10 @@ mutual
            (sc', sct, usedsc) <- lcheck rig erase (b' :: env') sc
            defs <- get Ctxt
 
-           let used_in = N (count 0 usedsc)
+           let used_in = fromNat (count 0 usedsc)
            let rigb = multiplicity b
            log "debug.quantity" 10 $ "rigb: " ++ show rigb ++ " used_in: " ++ show used_in
-           holeFound <- if not erase && isNeitherErasedNorTop rigb
+           holeFound <- if not erase && isRelevant rigb
                            then updateHoleUsage (toMaybe (used_in < rigb) (rigb `minus` used_in))
                                          (MkVar First)
                                          (map weaken (getZeroes env'))
@@ -289,7 +290,7 @@ mutual
 
            -- if there's a hole, assume it will contain the missing usage
            -- if there is none already
-           let used = if isNeitherErasedNorTop (rigb |*| rig) &&
+           let used = if isRelevant (rigb |*| rig) &&
                          holeFound && used_in < rigb
                          then rigb
                          else used_in
@@ -316,12 +317,12 @@ mutual
       eraseLinear : Env Term vs -> Env Term vs
       eraseLinear [] = []
       eraseLinear (b :: bs)
-          = if isNeitherErasedNorTop (multiplicity b)
+          = if isRelevant (multiplicity b)
                then setMultiplicity b erased :: eraseLinear bs
                else b :: eraseLinear bs
 
       checkUsageOK : RigCount -> RigCount -> RigCount -> Core ()
-      checkUsageOK used r rigb = when (isNeitherErasedNorTop r && used /= rigb)
+      checkUsageOK used r rigb = when (isRelevant r && used /= rigb)
                                  (throw (LinearUsed fc used rigb nm))
 
   lcheck rig erase env (App fc f a)
@@ -489,11 +490,11 @@ mutual
       getCaseUsage ty env (As _ _ _ p :: args) used rhs
           = getCaseUsage ty env (p :: args) used rhs
       getCaseUsage (Bind _ n (Pi _ rig _ ty) sc) env (arg :: args) used rhs
-          = if isNeitherErasedNorTop rig
+          = if isRelevant rig
                then case arg of
                          (Local _ _ idx p) =>
                            do rest <- getCaseUsage sc env args used rhs
-                              let used_in = N (count idx used)
+                              let used_in = fromNat (count idx used)
                               log "debug.quantity" 10 $ "rig: " ++ show rig ++ " used_in: " ++ show used_in
                               holeFound <- updateHoleUsage (toMaybe (used_in < rig) (rig `minus` used_in))
                                                            (MkVar p) [] rhs
@@ -516,7 +517,7 @@ mutual
 
       checkUsageOK : FC -> RigCount -> RigCount -> Name -> Bool -> RigCount -> Core ()
       checkUsageOK fc used rigb nm isloc rig
-          = when (isNeitherErasedNorTop rig && ((isloc && rigb < used) || (not isloc && used /= rigb)))
+          = when (isRelevant rig && ((isloc && rigb < used) || (not isloc && used /= rigb)))
                  (throw (LinearUsed fc used rigb nm))
 
       -- Is the variable one of the lhs arguments; i.e. do we treat it as
@@ -540,15 +541,15 @@ mutual
       checkEnvUsage rig [] usage args tm = pure ()
       checkEnvUsage rig {done} {vars = nm :: xs} (b :: env) usage args tm
           = do let pos = localPrf {later = done}
-               let used_in = N (count (varIdx pos) usage)
+               let used_in = fromNat (count (varIdx pos) usage)
                let rigb = multiplicity b
 
                log "debug.quantity" 10 $ "rigb: " ++ show rigb ++ " used_in: " ++ show used_in
-               holeFound <- if isNeitherErasedNorTop rigb
+               holeFound <- if isRelevant rigb
                                then updateHoleUsage (toMaybe (used_in < rigb) (rigb `minus` used_in))
                                                     pos [] tm
                                else pure False
-               let used = if isNeitherErasedNorTop (rigb |*| rig) &&
+               let used = if isRelevant (rigb |*| rig) &&
                              holeFound && used_in < rigb
                              then multiplicity b
                              else used_in
@@ -643,7 +644,7 @@ mutual
       updateUsage (u :: us) (Bind bfc n (Pi fc c e ty) sc)
           = let sc' = updateUsage us sc
                 c' = case u of
-                          UseN n => (N n)
+                          UseN n => fromNat n
                           UseUnknown => c -- don't know, assumed unchanged and update hole types
                           UseKeep => c -- matched here, so count usage elsewhere
                           UseAny => c in -- no constraint, so leave alone
@@ -719,15 +720,15 @@ checkEnvUsage : {vars, done : _} ->
 checkEnvUsage fc rig [] usage tm = pure ()
 checkEnvUsage fc rig {done} {vars = nm :: xs} (b :: env) usage tm
     = do let pos = localPrf {later = done}
-         let used_in = N (count (varIdx pos) usage)
+         let used_in = fromNat (count (varIdx pos) usage)
          let rigb = multiplicity b
 
          log "debug.quantity" 10 $ "rigb: " ++ show rigb ++ " used_in: " ++ show used_in
-         holeFound <- if isNeitherErasedNorTop rigb
+         holeFound <- if isRelevant rigb
                          then updateHoleUsage (toMaybe (used_in < rigb) (rigb `minus` used_in))
                                               pos [] tm
                          else pure False
-         let used = if isNeitherErasedNorTop (rigb |*| rig) &&
+         let used = if isRelevant (rigb |*| rig) &&
                        holeFound && used_in < rigb
                        then rigb
                        else used_in
@@ -737,7 +738,7 @@ checkEnvUsage fc rig {done} {vars = nm :: xs} (b :: env) usage tm
                (rewrite sym (appendAssociative done [nm] xs) in tm)
   where
     checkUsageOK : RigCount -> RigCount -> RigCount -> Core ()
-    checkUsageOK used r rigb = when (isNeitherErasedNorTop r && used /= rigb)
+    checkUsageOK used r rigb = when (isRelevant r && used /= rigb)
                                (throw (LinearUsed fc used rigb nm))
 
 -- Linearity check an elaborated term. If 'erase' is set, erase anything that's in

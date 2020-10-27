@@ -67,7 +67,7 @@ checkLocal {vars} rig elabinfo nest env fc nestdecls_in scope expty
     dropLinear : Env Term vs -> Env Term vs
     dropLinear [] = []
     dropLinear (b :: bs)
-        = if isNeitherErasedNorTop (multiplicity b)
+        = if isRelevant (multiplicity b)
              then setMultiplicity b erased :: dropLinear bs
              else b :: dropLinear bs
 

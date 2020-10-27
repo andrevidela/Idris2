@@ -111,22 +111,22 @@ export
 export
 {free : _} -> Show (NF free) where
   show (NBind _ x (Lam _ c info ty) _)
-    = "\\" ++ withPiInfo info (showCount c ++ show x ++ " : " ++ show ty) ++
+    = "\\" ++ withPiInfo info (showAppendSpace c ++ show x ++ " : " ++ show ty) ++
       " => [closure]"
   show (NBind _ x (Let _ c val ty) _)
-    = "let " ++ showCount c ++ show x ++ " : " ++ show ty ++
+    = "let " ++ showAppendSpace c ++ show x ++ " : " ++ show ty ++
       " = " ++ show val ++ " in [closure]"
   show (NBind _ x (Pi _ c info ty) _)
-    = withPiInfo info (showCount c ++ show x ++ " : " ++ show ty) ++
+    = withPiInfo info (showAppendSpace c ++ show x ++ " : " ++ show ty) ++
       " -> [closure]"
   show (NBind _ x (PVar _ c info ty) _)
-    = withPiInfo info ("pat " ++ showCount c ++ show x ++ " : " ++ show ty) ++
+    = withPiInfo info ("pat " ++ showAppendSpace c ++ show x ++ " : " ++ show ty) ++
       " => [closure]"
   show (NBind _ x (PLet _ c val ty) _)
-    = "plet " ++ showCount c ++ show x ++ " : " ++ show ty ++
+    = "plet " ++ showAppendSpace c ++ show x ++ " : " ++ show ty ++
       " = " ++ show val ++ " in [closure]"
   show (NBind _ x (PVTy _ c ty) _)
-    = "pty " ++ showCount c ++ show x ++ " : " ++ show ty ++
+    = "pty " ++ showAppendSpace c ++ show x ++ " : " ++ show ty ++
       " => [closure]"
   show (NApp _ hd args) = show hd ++ " [" ++ show (length args) ++ " closures]"
   show (NDCon _ n _ _ args) = show n ++ " [" ++ show (length args) ++ " closures]"

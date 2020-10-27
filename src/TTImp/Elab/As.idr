@@ -61,13 +61,13 @@ checkAs rig elabinfo nest env fc side n_in pat topexp
     -- better if it's the pattern (UseLeft)
     rigPat' : UseSide -> RigCount
     rigPat' UseLeft  = rig
-    rigPat' UseRight = if isNeitherErasedNorTop rig then erased else rig
+    rigPat' UseRight = if isRelevant rig then erased else rig
 
     rigPat : RigCount
     rigPat = rigPat' side
 
     rigAs' : UseSide -> RigCount
-    rigAs' UseLeft  = if isNeitherErasedNorTop rig then erased else rig
+    rigAs' UseLeft  = if isRelevant rig then erased else rig
     rigAs' UseRight = rig
 
     rigAs : RigCount

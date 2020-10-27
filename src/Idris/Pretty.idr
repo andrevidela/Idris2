@@ -99,11 +99,7 @@ pragma = annotate Pragma
 
 export
 prettyRig : RigCount -> Doc ann
-prettyRig (N n) = pretty n <+> space
-prettyRig Infinity = emptyDoc
---prettyRig = elimSemi (pretty '0' <+> space)
---                     (pretty '1' <+> space)
---                     (const emptyDoc)
+prettyRig = pretty . showAppendSpace
 
 mutual
   prettyAlt : PClause -> Doc IdrisAnn

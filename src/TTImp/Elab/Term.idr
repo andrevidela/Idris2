@@ -145,7 +145,7 @@ checkTerm rig elabinfo nest env (ILam fc r p Nothing argTy scope) exp
 checkTerm rig elabinfo nest env (ILet fc r n nTy nVal scope) exp
     = checkLet rig elabinfo nest env fc r n nTy nVal scope exp
 checkTerm rig elabinfo nest env (ICase fc scr scrty alts) exp
-    = do log "debug.profile" 10 $ show rig ++ " " ++ show (ICase fc scr scrty alts) ++ " : " ++ show !(traverseOpt getTerm exp)
+    = do -- log "debug.profile" 10 $ show rig ++ " " ++ show (ICase fc scr scrty alts) ++ " : " ++ show !(traverseOpt getTerm exp)
          checkCase rig elabinfo nest env fc scr scrty alts exp
 checkTerm rig elabinfo nest env (ILocal fc nested scope) exp
     = checkLocal rig elabinfo nest env fc nested scope exp
@@ -276,25 +276,20 @@ checkTerm rig elabinfo nest env (IWithUnambigNames fc ns rhs) exp
 -- If we've just inserted an implicit coercion (in practice, that's either
 -- a force or delay) then check the term with any further insertions
 TTImp.Elab.Check.check rigc elabinfo nest env (ICoerced fc tm) exp
-    = do log "debug.profile" 10 $ show rigc ++ " " ++ show (ICoerced fc tm) ++ " : " ++ show !(traverseOpt getTerm exp)
-    -- = do coreLift $ putStrLn $ show rigc ++ " " ++ show (ICoerced fc tm) ++ " : " ++ show !(traverseOpt getTerm exp)
+    = do --log "debug.profile" 10 $ show rigc ++ " " ++ show (ICoerced fc tm) ++ " : " ++ show !(traverseOpt getTerm exp)
          checkImp rigc elabinfo nest env tm exp
 -- Don't add implicits/coercions on local blocks or record updates
 TTImp.Elab.Check.check rigc elabinfo nest env tm@(ILet fc c n nty nval sc) exp
-    = do log "debug.profile" 10 $ show rigc ++ " " ++ show (ILet fc c n nty nval sc) ++ " : " ++ show !(traverseOpt getTerm exp)
-    -- = do coreLift $ putStrLn $ show rigc ++ " " ++ show (ILet fc c n nty nval sc) ++ " : " ++ show !(traverseOpt getTerm exp)
+    = do -- log "debug.profile" 10 $ show rigc ++ " " ++ show (ILet fc c n nty nval sc) ++ " : " ++ show !(traverseOpt getTerm exp)
          checkImp rigc elabinfo nest env tm exp
 TTImp.Elab.Check.check rigc elabinfo nest env tm@(ILocal fc ds sc) exp
-    = do log "debug.profile" 10 $ show rigc ++ " " ++ show (ILocal fc ds sc) ++ " : " ++ show !(traverseOpt getTerm exp)
-    -- = do coreLift $ putStrLn $ show rigc ++ " " ++ show (ILocal fc ds sc) ++ " : " ++ show !(traverseOpt getTerm exp)
+    = do -- log "debug.profile" 10 $ show rigc ++ " " ++ show (ILocal fc ds sc) ++ " : " ++ show !(traverseOpt getTerm exp)
          checkImp rigc elabinfo nest env tm exp
 TTImp.Elab.Check.check rigc elabinfo nest env tm@(IUpdate fc fs rec) exp
-    = do log "debug.profile" 10 $ show rigc ++ " " ++ show (IUpdate fc fs rec) ++ " : " ++ show !(traverseOpt getTerm exp)
-    -- = do coreLift $ putStrLn $ show rigc ++ " " ++ show (IUpdate fc fs rec) ++ " : " ++ show !(traverseOpt getTerm exp)
+    = do -- log "debug.profile" 10 $ show rigc ++ " " ++ show (IUpdate fc fs rec) ++ " : " ++ show !(traverseOpt getTerm exp)
          checkImp rigc elabinfo nest env tm exp
 TTImp.Elab.Check.check rigc elabinfo nest env tm_in exp
-    = do log "debug.profile" 10 $ show rigc ++ " " ++ show tm_in ++ " : " ++ show !(traverseOpt getTerm exp)
-    -- = do coreLift $ putStrLn $ show rigc ++ " " ++ show tm_in ++ " : " ++ show !(traverseOpt getTerm exp)
+    = do -- log "debug.profile" 10 $ show rigc ++ " " ++ show tm_in ++ " : " ++ show !(traverseOpt getTerm exp)
          defs <- get Ctxt
          est <- get EST
          tm <- expandAmbigName (elabMode elabinfo) nest env tm_in [] tm_in exp

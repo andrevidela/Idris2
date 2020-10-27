@@ -51,10 +51,6 @@ showName (UN "_") = False
 showName (MN _ _) = False
 showName _ = True
 
-showCount : RigCount -> String
-showCount (N n) = " " ++ show n ++ " "
-showCount Infinity = "   "
-
 impBracket : Bool -> String -> String
 impBracket False str = str
 impBracket True str = "{" ++ str ++ "}"
@@ -124,7 +120,7 @@ showHole defs env fn args ty
          case hdata.context of
            [] => pure $ show (hdata.name) ++ " : " ++ show hdata.type
            _  => pure $ concat
-              (map (\premise => " " ++ showCount premise.multiplicity ++ " "
+              (map (\premise => " " ++ showInHole premise.multiplicity ++ " "
                              ++ (impBracket premise.isImplicit $
                                  tidy premise.name ++ " : " ++ (show premise.type) ++ "\n" )
                    ) hdata.context)
@@ -133,8 +129,7 @@ showHole defs env fn args ty
 
 export
 prettyRigHole : RigCount -> Doc ann
-prettyRigHole (N n) = pretty n <+> space
-prettyRigHole Infinity = space <+> space
+prettyRigHole = pretty . showInHole
 
 export
 prettyHole : {vars : _} ->
@@ -155,7 +150,7 @@ prettyHole defs env fn args ty
 
 sexpPremise : HolePremise -> SExp
 sexpPremise premise =
-  SExpList [StringAtom $ " " ++ showCount premise.multiplicity ++ " "
+  SExpList [StringAtom $ " " ++ showInHole premise.multiplicity ++ " "
                        ++ (impBracket premise.isImplicit $
                            tidy premise.name)
            ,StringAtom $ show premise.type

@@ -219,7 +219,7 @@ mutual
   getMult (Just 1) = pure linear
   getMult (Just n) = if n < 2
                         then fatalError "Invalid multiplicity (must be a natural number)"
-                        else pure (N $ fromInteger n)
+                        else pure (fromNat $ fromInteger n)
   getMult Nothing = pure top
 
   pibindAll : FC -> PiInfo RawImp -> List (RigCount, Maybe Name, RawImp) ->

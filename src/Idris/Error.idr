@@ -102,14 +102,14 @@ ploc2 (MkFC fn1 s1 e1) (MkFC fn2 s2 e2) =
                        (True, True, True) => do
                          let line = fileCtxt pipe <++> maybe emptyDoc pretty (elemAt source sr1)
                          let emph = fileCtxt pipe <++> spaces (cast sc1) <+> error (pretty (Extra.replicate (ec1 `minus` sc1) '^'))
-                                      <+> spaces (cast $ sc2 `minus` ec1) <+> error (pretty (Extra.replicate (ec2 `minus` sc2) '^'))
+                                      <+> spaces (cast $ sc2 `Prelude.minus` ec1) <+> error (pretty (Extra.replicate (ec2 `minus` sc2) '^'))
                          pure $ vsep [emptyDoc, head, firstRow, fileCtxt (space <+> pretty (sr1 + 1)) <++> align (vsep [line, emph]), emptyDoc]
                        (True, True, False) => do
                          let line1 = fileCtxt pipe <++> maybe emptyDoc pretty (elemAt source sr1)
                          let emph1 = fileCtxt pipe <++> spaces (cast sc1) <+> error (pretty (Extra.replicate (ec1 `minus` sc1) '^'))
                          let line2 = fileCtxt pipe <++> maybe emptyDoc pretty (elemAt source sr2)
                          let emph2 = fileCtxt pipe <++> spaces (cast sc2) <+> error (pretty (Extra.replicate (ec2 `minus` sc2) '^'))
-                         let numbered = if (sr2 `minus` er1) == 1
+                         let numbered = if (sr2 `Prelude.minus` er1) == 1
                                            then []
                                            else addLineNumbers nsize (sr1 + 1) (pretty <$> extractRange (sr1 + 1) er1 source)
                          pure $ vsep $ [emptyDoc, head, firstRow, fileCtxt (space <+> pretty (sr1 + 1)) <++> align (vsep [line1, emph1])]

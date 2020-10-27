@@ -45,7 +45,7 @@ getNameType rigc env fc x
                  let binder = getBinder lv env
                  let bty = binderType binder
                  addNameType fc x env bty
-                 when (isNeitherErasedNorTop rigb) $
+                 when (isRelevant rigb) $
                       do est <- get EST
                          put EST
                             (record { linearUsed $= ((rigc, MkVar lv) :: ) } est)

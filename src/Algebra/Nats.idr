@@ -4,10 +4,12 @@ import Data.Nat
 
 import Algebra.Semiring
 import Algebra.Preorder
+import Utils.Show
+import Algebra.Utils
 
 %default total
 
-public export
+export
 data InfNat = N Nat | Infinity
 
 public export
@@ -60,6 +62,8 @@ export
 Show InfNat where
   show (N n) = show n
   show Infinity = "∞"
+
+
 
 export
 rigPlus : InfNat -> InfNat -> InfNat
@@ -193,14 +197,7 @@ Semiring InfNat where
 export
 Top InfNat where
   top = Infinity
-
   topAbs x = LTEInf
-
-export
-isNeitherErasedNorTop : InfNat -> Bool
-isNeitherErasedNorTop (N 0) = False
-isNeitherErasedNorTop (N _) = True
-isNeitherErasedNorTop Infinity = False
 
 export
 branchRig : Lazy a -> (Nat -> a) -> Lazy a -> InfNat -> a
@@ -209,8 +206,14 @@ branchRig zero rel inf (N n) = rel n
 branchRig zero rel inf Infinity = inf
 
 export
-minus : InfNat -> InfNat -> InfNat
-minus (N n) (N m) = N (n `minus` m)
-minus (N n) Infinity = N 0
-minus Infinity (N m) = Infinity
-minus Infinity Infinity = Infinity
+AdditiveInverse InfNat where
+  minus (N n) (N m) = N (n `minus` m)
+  minus (N n) Infinity = N 0
+  minus Infinity (N m) = Infinity
+  minus Infinity Infinity = Infinity
+
+export
+AsNat InfNat where
+  toNat (N n) = Just n
+  toNat Infinity = Nothing
+  fromNat = N

@@ -266,7 +266,7 @@ caseBlock {vars} rigc elabinfo fc nest env scr scrtm scrty caseRig alts expected
     mkLocalEnv : Env Term vs -> Env Term vs
     mkLocalEnv [] = []
     mkLocalEnv (b :: bs)
-        = let b' = if isNeitherErasedNorTop (multiplicity b)
+        = let b' = if isRelevant (multiplicity b)
                       then setMultiplicity b erased
                       else b in
               b' :: mkLocalEnv bs

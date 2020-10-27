@@ -4,6 +4,7 @@ import Decidable.Equality
 
 import Algebra.Semiring
 import Algebra.Preorder
+import Algebra.Utils
 
 %default total
 
@@ -207,3 +208,20 @@ Top ZeroOneOmega where
   topAbs Rig0 = LTEZero
   topAbs Rig1 = LTEOneOmega
   topAbs RigW = LTEOmegaOmega
+
+export
+AsNat ZeroOneOmega where
+  toNat Rig0 = Just 0
+  toNat Rig1 = Just 1
+  toNat RigW = Nothing
+  fromNat Z = Rig0
+  fromNat 1 = Rig1
+  fromNat _ = RigW
+
+export
+AdditiveInverse ZeroOneOmega where
+  minus r Rig0 = r
+  minus Rig0 _ = Rig0
+  minus Rig1 Rig1 = Rig0
+  minus Rig1 RigW = Rig0
+  minus RigW _ = RigW

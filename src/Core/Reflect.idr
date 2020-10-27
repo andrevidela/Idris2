@@ -468,26 +468,27 @@ Reflect TotalReq where
   reflect fc defs lhs env CoveringOnly = getCon fc defs (reflectiontt "CoveringOnly")
   reflect fc defs lhs env PartialOK = getCon fc defs (reflectiontt "PartialOK")
 
+-- This should be dealt with somewhere else
 export
 Reify RigCount where
-  reify defs val@(NDCon _ n _ _ args)
-      = case (!(full (gamma defs) n), args) of
-             (NS _ (UN "N"), [c])
-                 => do c' <- reify defs !(evalClosure defs c)
-                       pure (N c')
-             (NS _ (UN "Infinity"), [])
-                 => do pure Infinity
-             _ => cantReify val "Count"
-  reify defs val = cantReify val "Count"
+--   reify defs val@(NDCon _ n _ _ args)
+--       = case (!(full (gamma defs) n), args) of
+--              (NS _ (UN "N"), [c])
+--                  => do c' <- reify defs !(evalClosure defs c)
+--                        pure (N c')
+--              (NS _ (UN "Infinity"), [])
+--                  => do pure Infinity
+--              _ => cantReify val "Count"
+--   reify defs val = cantReify val "Count"
 
 export
 Reflect RigCount where
-  reflect fc defs lhs env (N x)
-      = do x' <- reflect fc defs lhs env x
-           appCon fc defs (reflectiontt "N") [x']
-  reflect fc defs lhs env Infinity
-      = getCon fc defs (reflectiontt "Infinity")
-  reflect fc defs lhs env val = cantReflect fc "RigCount"
+--  reflect fc defs lhs env (N x)
+--      = do x' <- reflect fc defs lhs env x
+--           appCon fc defs (reflectiontt "N") [x']
+--  reflect fc defs lhs env Infinity
+--      = getCon fc defs (reflectiontt "Infinity")
+--  reflect fc defs lhs env val = cantReflect fc "RigCount"
 
 export
 Reify t => Reify (PiInfo t) where

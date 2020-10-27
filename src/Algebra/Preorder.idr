@@ -55,3 +55,7 @@ public export
 interface Preorder a => Top a where
    top : a
    topAbs : (x : a) -> LTE x top
+
+export
+ifTop : (Top a, Eq a) => (tn : b) -> (el : a -> b) -> a -> b
+ifTop tn el t = if t == top then tn else el t

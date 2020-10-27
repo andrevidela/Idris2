@@ -436,7 +436,7 @@ checkBindVar rig elabinfo nest env fc str topexp
               Just ((c, bty) ** idx) =>
                 do -- Check rig is consistent with the one in bty, and
                    -- update if necessary
-                   combine (UN str) rig c (bindingRig bty)
+                   combine (UN str) rig (fromNat c) (bindingRig bty)
                    let tm = bindingTerm bty
                    let ty = bindingType bty
                    addNameType fc (UN str) env ty
@@ -455,13 +455,13 @@ checkBindVar rig elabinfo nest env fc str topexp
 
     -- Two variables are incompatble if at least one of them appears in a linear position
     -- and their sum is bigger than 1
-    isIncompatible : RigCount -> Nat -> RigCount -> Bool
-    isIncompatible l c r = (isNeitherErasedNorTop l || isNeitherErasedNorTop r) && l |*| (N c) <= r -- TODO IS linear < ENOUGH
+    isIncompatible : RigCount -> RigCount -> RigCount -> Bool
+    isIncompatible l c r = (isRelevant l || isRelevant r) && l |*| c <= r -- TODO IS linear < ENOUGH
 
-    combine : Name -> RigCount -> Nat -> RigCount -> Core ()
+    combine : Name -> RigCount -> RigCount -> RigCount -> Core ()
     combine n l c r = do -- coreLift $ putStrLn $ "l: " ++ show l ++ ", r: " ++ show r
                        when (isIncompatible l c r)
-                            (throw (LinearUsed fc (l |*| (N c)) r n))
+                            (throw (LinearUsed fc (l |*| c) r n))
 
 export
 checkBindHere : {vars : _} ->

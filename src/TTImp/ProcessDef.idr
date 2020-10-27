@@ -253,10 +253,9 @@ combineLinear loc ((n, count) :: cs)
     lookupAll n ((n', c) :: cs)
        = if n == n' then c :: lookupAll n cs else lookupAll n cs
 
-    -- Those combine rules are obtuse enough that they are worth investigating
     combine : RigCount -> RigCount -> Core RigCount
-    combine l r = if l |+| r == top && not (isErased $ l `glb` r) && (l `glb` r) /= top
-                     then throw (LinearUsed loc (N 2) linear n)
+    combine l r = if l |+| r == top && isRelevant (l `glb` r)
+                     then throw (LinearUsed loc (l `glb` r) (l |+| r) n)
                      -- if everything is fine, return the linearity that has the
                      -- highest bound
                      else pure (l `lub` r)

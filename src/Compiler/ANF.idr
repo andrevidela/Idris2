@@ -194,7 +194,7 @@ mutual
   anf vs (LOp {arity} fc op args)
       = do args' <- traverse (anf vs) (toList args)
            letBind fc args'
-                (\args => case ANF.toVect arity args of
+                (\args => case toVect arity args of
                                Nothing => ACrash fc "Can't happen (AOp)"
                                Just argsv => AOp fc op argsv)
   anf vs (LExtPrim fc p args)
