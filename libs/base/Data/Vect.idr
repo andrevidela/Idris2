@@ -816,6 +816,11 @@ range : {len : Nat} -> Vect len (Fin len)
 range {len=Z}   = []
 range {len=S _} = FZ :: map FS range
 
+||| Pair up each element with its index
+export
+enumerate : {len : Nat} -> Vect len a -> Vect len (Fin len, a)
+enumerate xs = zip range xs
+
 --------------------------------------------------------------------------------
 -- Matrix transposition
 --------------------------------------------------------------------------------

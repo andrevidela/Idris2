@@ -358,6 +358,11 @@ export
 zip3 : List a -> List b -> List c -> List (a, b, c)
 zip3 = zipWith3 \x, y, z => (x, y, z)
 
+||| Pair up each element with its index
+export
+enumerate : List a -> List (Nat, a)
+enumerate ls = zip [0 .. length ls] ls
+
 public export
 data NonEmpty : (xs : List a) -> Type where
     IsNonEmpty : NonEmpty (x :: xs)

@@ -279,6 +279,10 @@ public export
 product : (Foldable t, Num a) => t a -> a
 product = foldr (*) 1
 
+export
+count : (Foldable t, Num n) => (a -> Bool) -> t a -> n
+count p = foldr (\e => if p e then (+ 1) else id) 0
+
 ||| Multiply together all elements of a structure.
 ||| Same as `product` but tail recursive.
 export
