@@ -99,12 +99,19 @@ mutual
        PPostfixApp : FC -> PTerm -> List Name -> PTerm
        -- .x.y
        PPostfixAppPartial : FC -> List Name -> PTerm
+       -- Interpolated strings
+       PInterpolated : FC -> InterpolatedString -> PTerm
 
        -- Debugging
        PUnifyLog : FC -> LogLevel -> PTerm -> PTerm
 
        -- with-disambiguation
        PWithUnambigNames : FC -> List Name -> PTerm -> PTerm
+
+  public export
+  data InterpolatedString : Type where
+    Done : FC -> String -> InterpolatedString
+    More : FC -> String -> PTerm -> InterpolatedString -> InterpolatedString
 
   export
   getPTermLoc : PTerm -> FC
@@ -155,6 +162,7 @@ mutual
   getPTermLoc (PRangeStream fc _ _) = fc
   getPTermLoc (PPostfixApp fc _ _) = fc
   getPTermLoc (PPostfixAppPartial fc _) = fc
+  getPTermLoc (PInterpolated fc _) = fc
   getPTermLoc (PUnifyLog fc _ _) = fc
   getPTermLoc (PWithUnambigNames fc _ _) = fc
 
@@ -493,6 +501,10 @@ mutual
   showUpdate (PSetField p v) = showSep "." p ++ " = " ++ show v
   showUpdate (PSetFieldApp p v) = showSep "." p ++ " $= " ++ show v
 
+  Show InterpolatedString where
+    show (Done fc x) = x
+    show (More fc x y z) = x ++ "{" ++ show y ++ "}" ++ show z
+
   export
   Show PTerm where
     showPrec d (PRef _ n) = showPrec d n
@@ -617,6 +629,8 @@ mutual
         = showPrec d rec ++ concatMap (\n => "." ++ show n) fields
     showPrec d (PPostfixAppPartial fc fields)
         = concatMap (\n => "." ++ show n) fields
+    showPrec d (PInterpolated fc interpolated)
+        = "s\"" ++ show interpolated ++ "\""
     showPrec d (PWithUnambigNames fc ns rhs)
         = "with " ++ show ns ++ " " ++ showPrec d rhs
 
@@ -923,9 +937,15 @@ mapPTermM f = goPTerm where
       >>= f
     goPTerm (PPostfixAppPartial fc fields) =
       f (PPostfixAppPartial fc fields)
+    goPTerm (PInterpolated fc interpolated) =
+      PInterpolated fc <$> (goInterpolated interpolated)
     goPTerm (PWithUnambigNames fc ns rhs) =
       PWithUnambigNames fc ns <$> goPTerm rhs
       >>= f
+
+    goInterpolated : InterpolatedString -> Core InterpolatedString
+    goInterpolated (Done fc x) = pure $ Done fc x
+    goInterpolated (More fc x y z) = pure (More fc x) <*> f y <*> goInterpolated z
 
     goPFieldUpdate : PFieldUpdate -> Core PFieldUpdate
     goPFieldUpdate (PSetField p t)    = PSetField p <$> goPTerm t

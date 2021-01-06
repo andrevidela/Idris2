@@ -45,6 +45,7 @@ import Data.List
 -- * Replacing !-notation
 -- * Dependent pair notation
 -- * Idiom brackets
+-- * Interpolated strings
 
 %default covering
 
@@ -365,8 +366,23 @@ mutual
       = desugarB side ps $
           PLam fc top Explicit (PRef fc (MN "paRoot" 0)) (PImplicit fc) $
             foldl (\r, proj => PApp fc (PRef fc proj) r) (PRef fc (MN "paRoot" 0)) projs
+  desugarB side ps (PInterpolated fc interpolated)
+      = desugarInterpolated side ps interpolated
   desugarB side ps (PWithUnambigNames fc ns rhs)
       = IWithUnambigNames fc ns <$> desugarB side ps rhs
+
+  desugarInterpolated : {auto s : Ref Syn SyntaxInfo} ->
+                        {auto b : Ref Bang BangData} ->
+                        {auto c : Ref Ctxt Defs} ->
+                        {auto u : Ref UST UState} ->
+                        {auto m : Ref MD Metadata} ->
+                        Side -> List Name -> InterpolatedString -> Core RawImp
+  desugarInterpolated side ps (Done fc x) = pure $ IPrimVal fc (Str x)
+  desugarInterpolated side ps (More fc str exp z)
+      = do rest <- desugarInterpolated side ps z
+           expr <- desugarB side ps exp
+           let append = \lhs, rhs => IApp fc (IApp fc (IVar fc (MN "++" 0)) lhs) rhs
+           pure $ (IPrimVal fc (Str str)) `append` (expr `append` rest)
 
   desugarUpdate : {auto s : Ref Syn SyntaxInfo} ->
                   {auto b : Ref Bang BangData} ->
