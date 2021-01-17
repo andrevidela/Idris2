@@ -83,7 +83,7 @@ idrisTestsInterface = MkTestPool []
        "interface017", "interface018", "interface019", "interface020",
        -- String Interpolation
        "interpolation001", "interpolation002", "interpolation003", "interpolation004",
-       "interpolation005",
+       "interpolation005", "interpolation000",
        -- Miscellaneous REPL
        "interpreter001", "interpreter002", "interpreter003", "interpreter004",
        "interpreter005", "interpreter006",

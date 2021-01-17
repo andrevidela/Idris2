@@ -24,7 +24,12 @@ data Token
   = CharLit String
   | DoubleLit Double
   | IntegerLit Integer
+  -- String literals
   | StringLit Nat String
+  | InterpolatedPlain String
+  | InterpolatedStart String
+  | InterpolatedMiddle String
+  | InterpolatedEnd String
   -- Identifiers
   | HoleIdent String
   | Ident String
@@ -48,6 +53,10 @@ Show Token where
   show (DoubleLit x) = "double " ++ show x
   show (IntegerLit x) = "literal " ++ show x
   show (StringLit n x) = "string" ++ replicate n '#' ++ " " ++ show x
+  show (InterpolatedPlain x) = "string " ++ show x
+  show (InterpolatedStart x) = "interpolated start " ++ show x
+  show (InterpolatedMiddle x) = "interpolated midle " ++ show x
+  show (InterpolatedEnd x) = "interpolated end " ++ show x
   -- Identifiers
   show (HoleIdent x) = "hole identifier " ++ x
   show (Ident x) = "identifier " ++ x
@@ -71,7 +80,10 @@ Pretty Token where
   pretty (DoubleLit x) = pretty "double" <++> pretty x
   pretty (IntegerLit x) = pretty "literal" <++> pretty x
   pretty (StringLit n x) = pretty ("string" ++ String.Extra.replicate n '#') <++> dquotes (pretty x)
-  -- Identifiers
+  pretty (InterpolatedPlain x) = pretty "string" <++> dquotes (pretty x)
+  pretty (InterpolatedStart x) = reflow "interpolated start" <++> dquotes (pretty x)
+  pretty (InterpolatedMiddle x) = reflow "interpolated middle" <++> dquotes (pretty x)
+  pretty (InterpolatedEnd x) = reflow "interpolated end" <++> dquotes (pretty x)
   pretty (HoleIdent x) = reflow "hole identifier" <++> pretty x
   pretty (Ident x) = pretty "identifier" <++> pretty x
   pretty (DotSepIdent ns n) = reflow "namespaced identifier" <++> pretty ns <+> dot <+> pretty n
@@ -264,6 +276,10 @@ rawTokens =
      (stringLit1, \x => StringLit 1 (stripSurrounds 2 2 x)),
      (stringLit2, \x => StringLit 2 (stripSurrounds 3 3 x)),
      (stringLit3, \x => StringLit 3 (stripSurrounds 4 4 x)),
+     (plainInterpolated, \x => InterpolatedPlain (stripQuotes (assert_total $ strTail x))),
+     (startInterpolated, \x => InterpolatedStart (stripQuotes (assert_total $ strTail x))),
+     -- (middleInterpolated, \x => InterpolatedMiddle (stripQuotes x)),
+     (endInterpolated, \x => InterpolatedEnd (stripQuotes x)),
      (charLit, \x => CharLit (stripQuotes x)),
      (dotIdent, \x => DotIdent (assert_total $ strTail x)),
      (namespacedIdent, parseNamespace),

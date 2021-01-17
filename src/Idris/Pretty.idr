@@ -282,6 +282,7 @@ mutual
       go d (PPostfixAppPartial fc fields) =
         parens (dot <+> concatWith (surround dot) (map pretty fields))
       go d (PWithUnambigNames fc ns rhs) = parenthesise (d > appPrec) $ group $ with_ <++> pretty ns <+> line <+> go startPrec rhs
+      go _ (PInterpolated _ _) = ?wot
 
 getPageWidth : {auto o : Ref ROpts REPLOpts} -> Core PageWidth
 getPageWidth = do

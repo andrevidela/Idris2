@@ -66,3 +66,19 @@ namespacedIdent = namespaceIdent <+> opt (is '.' <+> identNormal)
 export
 spacesOrNewlines : Lexer
 spacesOrNewlines = some (space <|> newline)
+
+export
+plainInterpolated : Lexer
+plainInterpolated = surround (exact "s\"") (is '"') (escape '\\' any <|> any)
+
+export
+startInterpolated : Lexer
+startInterpolated = surround (exact "s\"") (exact "\\{") (escape '\\' any <|> any)
+
+export
+middleInterpolated : Lexer
+middleInterpolated = surround (is '}') (exact "\\{") (escape '\\' any <|> any)
+
+export
+endInterpolated : Lexer
+endInterpolated = surround (is '}') (is '"') (escape '\\' any <|> any)

@@ -4,7 +4,7 @@ module Interpolated
 data Eq = Add Eq Eq | N = Nat
 
 Show Eq where
-  Add a b = s"{a} + {b}"
+  Add a b = s"\{a} + \{b}"
   N a = show a
 
 main : IO ()

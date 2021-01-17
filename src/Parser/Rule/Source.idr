@@ -38,9 +38,8 @@ constant
                                              Just c' => Just (Ch c')
                            DoubleLit d  => Just (Db d)
                            IntegerLit i => Just (BI i)
-                           StringLit n s => case escape n s of
-                                               Nothing => Nothing
-                                               Just s' => Just (Str s')
+                           StringLit n s => Str <$> escape n s
+                           InterpolatedPlain s => Str <$> escape s
                            Ident "Char"    => Just CharType
                            Ident "Double"  => Just DoubleType
                            Ident "Int"     => Just IntType
@@ -86,6 +85,22 @@ strLit
                (\x => case x.val of
                            StringLit 0 s => Just s
                            _ => Nothing)
+
+export
+interpStart : Rule String
+interpStart
+    = terminal "Expected interpolated string"
+               (\x => case x.val of
+                      InterpolatedStart s => Just s
+                      _ => Nothing)
+
+export
+interpEnd : Rule String
+interpEnd
+    = terminal "Expected interpolated string"
+               (\x => case x.val of
+                      (InterpolatedEnd s) => Just s
+                      _ => Nothing)
 
 export
 aDotIdent : Rule String

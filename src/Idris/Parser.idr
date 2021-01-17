@@ -1,6 +1,6 @@
 module Idris.Parser
 
-import        Core.Options
+-- import        Core.Options
 import        Idris.Syntax
 import public Parser.Source
 import        Parser.Lexer.Source
@@ -373,6 +373,14 @@ mutual
           b <- bounds (some postfixProj)
           pure $ PPostfixAppPartial (boundToFC fname b) b.val
 
+  interpolated : FileName -> IndentInfo -> Rule PTerm
+  interpolated fname idts = do s <- bounds interpStart
+                               expr <- simpleExpr fname idts
+                               e <- bounds interpEnd
+                               startFC <- pure $ boundToFC fname s
+                               endFC <- pure $ boundToFC fname e
+                               pure (PInterpolated startFC
+                                                   (More startFC s.val expr (Done endFC e.val)))
   simplerExpr : FileName -> IndentInfo -> Rule PTerm
   simplerExpr fname indents
       = do b <- bounds (do x <- unqualifiedName
