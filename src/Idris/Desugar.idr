@@ -381,7 +381,7 @@ mutual
   desugarInterpolated side ps (More fc str exp z)
       = do rest <- desugarInterpolated side ps z
            expr <- desugarB side ps exp
-           let append = \lhs, rhs => IApp fc (IApp fc (IVar fc (MN "++" 0)) lhs) rhs
+           let append = \lhs, rhs => IApp fc (IApp fc (IVar fc (UN "++")) lhs) rhs
            pure $ (IPrimVal fc (Str str)) `append` (expr `append` rest)
 
   desugarUpdate : {auto s : Ref Syn SyntaxInfo} ->

@@ -93,6 +93,13 @@ interpStart
                (\x => case x.val of
                       InterpolatedStart s => Just s
                       _ => Nothing)
+export
+interpMiddle : Rule String
+interpMiddle
+    = terminal "Expected interpolated string"
+               (\x => case x.val of
+                      (InterpolatedMiddle s) => Just s
+                      _ => Nothing)
 
 export
 interpEnd : Rule String

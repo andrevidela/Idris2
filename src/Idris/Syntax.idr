@@ -110,8 +110,8 @@ mutual
 
   public export
   data InterpolatedString : Type where
-    Done : FC -> String -> InterpolatedString
-    More : FC -> String -> PTerm -> InterpolatedString -> InterpolatedString
+    Done : FC -> (literal : String) -> InterpolatedString
+    More : FC -> (literal : String) -> (expr : PTerm) ->  InterpolatedString -> InterpolatedString
 
   export
   getPTermLoc : PTerm -> FC

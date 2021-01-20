@@ -1,7 +1,7 @@
 module Interpolated
 
 
-data Eq = Add Eq Eq | N = Nat
+data Eq = Add Eq Eq | N Nat
 
 Show Eq where
   Add a b = s"\{a} + \{b}"

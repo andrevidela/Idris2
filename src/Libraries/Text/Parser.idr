@@ -261,3 +261,7 @@ between : {c : Bool} ->
           (p : Grammar tok c a) ->
           Grammar tok True a
 between left right contents = left *> contents <* right
+
+export
+sequence : {t, s : Bool} -> (l : Grammar tok t a) -> (r : Grammar tok s b) -> Grammar tok (t || s) (a, b)
+sequence l r = seq l (\a => (a, ) <$> r)

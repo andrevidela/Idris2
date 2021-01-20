@@ -375,12 +375,24 @@ mutual
 
   interpolated : FileName -> IndentInfo -> Rule PTerm
   interpolated fname idts = do s <- bounds interpStart
-                               expr <- simpleExpr fname idts
-                               e <- bounds interpEnd
-                               startFC <- pure $ boundToFC fname s
-                               endFC <- pure $ boundToFC fname e
-                               pure (PInterpolated startFC
-                                                   (More startFC s.val expr (Done endFC e.val)))
+                               middle <- many (bounds (simpleExpr fname idts) `sequence`
+                                               bounds interpMiddle)
+                               e <- bounds (simpleExpr fname idts)
+                               end <- bounds interpEnd
+                               pure (PInterpolated (boundToFC fname s)
+                                                   (makeInterpolated (offset s middle e) end))
+    where
+      offset : b -> List (a, b) -> a -> List (b, a)
+      offset start [] end = [(start, end)]
+      offset start ((a, b) :: xs) end = (start, a) :: offset b xs end
+
+      makeInterpolated : List (WithBounds String, WithBounds PTerm) -> WithBounds String -> InterpolatedString
+      makeInterpolated []             end = Done (boundToFC fname end) end.val
+      makeInterpolated ((s, x) :: xs) end = More (boundToFC fname (s `mergeBounds` x))
+                                                 s.val
+                                                 x.val
+                                                 (makeInterpolated xs end)
+
   simplerExpr : FileName -> IndentInfo -> Rule PTerm
   simplerExpr fname indents
       = do b <- bounds (do x <- unqualifiedName
@@ -391,6 +403,7 @@ mutual
            (x, expr) <- pure b.val
            pure (PAs (boundToFC fname b) (UN x) expr)
     <|> atom fname
+    <|> interpolated fname indents
     <|> binder fname indents
     <|> rewrite_ fname indents
     <|> record_ fname indents
