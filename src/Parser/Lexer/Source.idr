@@ -302,10 +302,10 @@ rawTokens =
                              (Just ns, n)     => DotSepIdent ns n
 
 export
-lexTo : (WithBounds Token -> Bool) ->
+lexTo : -- (WithBounds Token -> Bool) ->
         String -> Either (Int, Int, String) (List (WithBounds Token))
-lexTo pred str
-    = case lexTo pred rawTokens str of
+lexTo str
+    = case lexTo ?raw str of
            -- Add the EndInput token so that we'll have a line and column
            -- number to read when storing spans in the file
            (tok, (l, c, "")) => Right (filter notComment tok ++
@@ -319,4 +319,4 @@ lexTo pred str
 
 export
 lex : String -> Either (Int, Int, String) (List (WithBounds Token))
-lex = lexTo (const False)
+lex = lexTo

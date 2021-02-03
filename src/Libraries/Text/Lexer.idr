@@ -12,7 +12,7 @@ import public Libraries.Text.Token
 
 export
 toTokenMap : List (Lexer, k) -> TokenMap (Token k)
-toTokenMap = map $ \(l, kind) => (l, Tok kind)
+toTokenMap = map $ \(l, kind) => (l , Tok kind)
 
 ||| Recognise any character.
 ||| /./

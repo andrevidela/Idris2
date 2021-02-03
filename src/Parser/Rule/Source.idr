@@ -39,7 +39,7 @@ constant
                            DoubleLit d  => Just (Db d)
                            IntegerLit i => Just (BI i)
                            StringLit n s => Str <$> escape n s
-                           InterpolatedPlain s => Str <$> escape s
+                           InterpolatedPlain s => Str <$> escape 0 s
                            Ident "Char"    => Just CharType
                            Ident "Double"  => Just DoubleType
                            Ident "Int"     => Just IntType

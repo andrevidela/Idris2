@@ -153,7 +153,7 @@ pathTokenMap = toTokenMap $
   ]
 
 lexPath : String -> List (WithBounds PathToken)
-lexPath str = let (tokens, _, _, _) = lex pathTokenMap str in tokens
+lexPath str = let (tokens, _, _, _) = lex (map (, Nothing) pathTokenMap) str in tokens
 
 -- match both '/' and '\\' regardless of the platform.
 bodySeparator : Grammar PathToken True ()

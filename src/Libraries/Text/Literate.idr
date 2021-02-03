@@ -55,7 +55,7 @@ Show Token where
 
 rawTokens : (delims  : List (String, String))
          -> (markers : List String)
-         -> TokenMap (Token)
+         -> TokenMap Token
 rawTokens delims ls =
           map (\(l,r) => (block l r, CodeBlock (trim l) (trim r))) delims
        ++ map (\m => (line m, CodeLine (trim m))) ls
@@ -164,7 +164,7 @@ extractCode : (specification : LiterateStyle)
            -> (litStr        : String)
            -> Either LiterateError String
 extractCode (MkLitStyle delims markers exts) str =
-      case lex (rawTokens delims markers) str of
+      case lex (toMode $ rawTokens delims markers) str of
         (toks, (_,_,"")) => Right (reduce toks Nil)
         (_, (l,c,i))     => Left (MkLitErr l c i)
 
@@ -184,7 +184,7 @@ export
 isLiterateLine : (specification : LiterateStyle)
               -> (str : String)
               -> Pair (Maybe String) String
-isLiterateLine (MkLitStyle delims markers _) str with (lex (rawTokens delims markers) str)
+isLiterateLine (MkLitStyle delims markers _) str with (lex (toMode $ rawTokens delims markers) str)
   isLiterateLine (MkLitStyle delims markers _) str | ([MkBounded (CodeLine m str') _ _ _ _ _], (_,_, "")) = (Just m, str')
   isLiterateLine (MkLitStyle delims markers _) str | (_, _) = (Nothing, str)
 

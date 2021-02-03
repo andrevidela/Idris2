@@ -11,18 +11,18 @@ import Libraries.Utils.Either
 
 export
 runParserTo : {e : _} ->
-              Maybe LiterateStyle -> (WithBounds Token -> Bool) ->
+              Maybe LiterateStyle -> -- (WithBounds Token -> Bool) ->
               String -> Grammar Token e ty -> Either (ParseError Token) ty
-runParserTo lit pred str p
+runParserTo lit str p
     = do str    <- mapError LitFail $ unlit lit str
-         toks   <- mapError LexFail $ lexTo pred str
+         toks   <- mapError LexFail $ lexTo str
          parsed <- mapError toGenericParsingError $ parse p toks
          Right (fst parsed)
 
 export
 runParser : {e : _} ->
             Maybe LiterateStyle -> String -> Grammar Token e ty -> Either (ParseError Token) ty
-runParser lit = runParserTo lit (const False)
+runParser lit = runParserTo lit
 
 export covering
 parseFile : (fn : String) -> Rule ty -> IO (Either (ParseError Token) ty)

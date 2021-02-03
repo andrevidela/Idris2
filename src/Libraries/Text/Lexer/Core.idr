@@ -3,6 +3,8 @@ module Libraries.Text.Lexer.Core
 import public Libraries.Control.Delayed
 import Libraries.Data.Bool.Extra
 import Data.List
+import Data.Fin
+import Data.Vect
 import Data.Maybe
 import Data.Nat
 import Data.Strings
@@ -122,29 +124,69 @@ scan (SeqSame r1 r2) tok str
 scan (Alt r1 r2) tok str
     = maybe (scan r2 tok str) Just (scan r1 tok str)
 
-||| A mapping from lexers to the tokens they produce.
-||| This is a list of pairs `(Lexer, String -> tokenType)`
-||| For each Lexer in the list, if a substring in the input matches, run
-||| the associated function to produce a token of type `tokenType`
+infix 4 %%
+
+public export
+LexToken : (tokenType : Type) -> Type
+LexToken tokenType = (Lexer,  String -> tokenType)
+
+
+public export
+record EnterMode tokenType (modeCount : Nat) where
+    constructor MkEnterMode
+    mode : Fin modeCount
+    lexer : LexToken tokenType
+
+basicMode : LexToken tkn -> EnterMode tkn 1
+basicMode lexer = MkEnterMode 0 lexer
+
 public export
 TokenMap : (tokenType : Type) -> Type
-TokenMap tokenType = List (Lexer, String -> tokenType)
+TokenMap tokenType = List (LexToken tokenType)
 
-tokenise : (WithBounds a -> Bool) ->
-           (line : Int) -> (col : Int) ->
-           List (WithBounds a) -> TokenMap a ->
-           List Char -> (List (WithBounds a), (Int, Int, List Char))
-tokenise pred line col acc tmap str
-    = case getFirstToken tmap str of
-           Just (tok, line', col', rest) =>
-           -- assert total because getFirstToken must consume something
-               if pred tok
-                  then (reverse acc, (line, col, []))
-                  else assert_total (tokenise pred line' col' (tok :: acc) tmap rest)
-           Nothing => (reverse acc, (line, col, str))
+
+public export
+TokenMode : (tokenType : Type) -> (modeCount : Nat) -> Type
+TokenMode tokenType modeCount = List (LexToken tokenType, Maybe (EnterMode tokenType modeCount))
+
+export
+toMode : TokenMap tkn -> TokenMode tkn 1
+toMode = map (, Nothing)
+
+-- tokenise' : (WithBounds a -> Bool) ->
+--            (line : Int) -> (col : Int) ->
+--            List (WithBounds a) -> TokenMode a ->
+--            List Char -> (List (WithBounds a), (Int, Int, List Char))
+-- tokenise' pred line col acc tmap str
+--     = case getFirstToken tmap str of
+--            Just (tok, line', col', rest) =>
+--            -- assert total because getFirstToken must consume something
+--                if pred tok
+--                   then (reverse acc, (line, col, []))
+--                   else assert_total (tokenise' pred line' col' (tok :: acc) tmap rest)
+--            Nothing => (reverse acc, (line, col, str))
+
+tokenise : (line, col : Int)
+        -> (acc : List (WithBounds a))
+        -> (modes : List (EnterMode a modeCount))
+        -> (tokenMap : Vect modeCount (TokenMode a modeCount))
+        -> (str : List Char)
+        -> (List (WithBounds a), (Int, Int, List Char))
+tokenise line col acc [] tmap str
+    = (reverse acc, (line, col, str))
+tokenise line col acc (currMode :: modes) tmap str
+    = let Nothing = getFirstToken [(currMode.lexer, Nothing)] str
+            | Just (tok, _, line', col', rest) =>
+                assert_total (tokenise line' col' (tok :: acc) modes tmap rest)
+          Nothing = getFirstToken (Vect.index currMode.mode tmap) str
+            | Just (tok, Just enterMode, line', col', rest) =>
+                assert_total (tokenise line' col' (tok :: acc) (enterMode::currMode::modes) tmap rest)
+            | Just (tok, Nothing, line', col', rest) =>
+                assert_total (tokenise line' col' (tok :: acc) (currMode::modes) tmap rest)
+       in (reverse acc, (line, col, str))
   where
     countNLs : List Char -> Nat
-    countNLs str = List.length (filter (== '\n') str)
+    countNLs str = count (== '\n') str
 
     getCols : List Char -> Int -> Int
     getCols x c
@@ -152,31 +194,38 @@ tokenise pred line col acc tmap str
                 (incol, []) => c + cast (length incol)
                 (incol, _) => cast (length incol)
 
-    getFirstToken : TokenMap a -> List Char ->
-                    Maybe (WithBounds a, Int, Int, List Char)
+    getFirstToken : (tokenMap : TokenMode a modeCount) ->
+                    (str : List Char) ->
+                    Maybe (WithBounds a, Maybe (EnterMode a modeCount), Int, Int, List Char)
     getFirstToken [] str = Nothing
-    getFirstToken ((lex, fn) :: ts) str
+    getFirstToken (((lex, fn), mode) :: ts) str
         = case scan lex [] str of
                Just (tok, rest) =>
                  let line' = line + cast (countNLs tok)
-                     col' = getCols tok col in
-                     Just (MkBounded (fn (fastPack (reverse tok))) False line col line' col',
-                           line', col', rest)
+                     col' = getCols tok col
+                     tok' = fn (fastPack (reverse tok)) in
+                     Just (MkBounded tok' False line col line' col',
+                           mode, line', col', rest)
                Nothing => getFirstToken ts str
 
+-- tokenise : (WithBounds a -> Bool) ->
+--            (line : Int) -> (col : Int) ->
+--            List (WithBounds a) -> TokenMode a ->
+--
+
 ||| Given a mapping from lexers to token generating functions (the
-||| TokenMap a) and an input string, return a list of recognised tokens,
+||| TokenMode a) and an input string, return a list of recognised tokens,
 ||| and the line, column, and remainder of the input at the first point in the
 ||| string where there are no recognised tokens.
 export
-lex : TokenMap a -> String -> (List (WithBounds a), (Int, Int, String))
-lex tmap str
-    = let (ts, (l, c, str')) = tokenise (const False) 0 0 [] tmap (unpack str) in
-          (ts, (l, c, fastPack str'))
+lex : TokenMode a 1 -> String -> (List (WithBounds a), (Int, Int, String))
+lex tmap str =
+  let (t, l, c, str) = tokenise {modeCount=1} 0 0 [] (map (basicMode . fst) tmap) [tmap] (unpack str) in
+      (t, l, c, fastPack str)
 
 export
-lexTo : (WithBounds a -> Bool) ->
-        TokenMap a -> String -> (List (WithBounds a), (Int, Int, String))
-lexTo pred tmap str
-    = let (ts, (l, c, str')) = tokenise pred 0 0 [] tmap (unpack str) in
-          (ts, (l, c, fastPack str'))
+lexTo : -- (WithBounds a -> Bool) ->
+        TokenMode a 0 -> String -> (List (WithBounds a), (Int, Int, String))
+lexTo tmap str
+    = let (ts, (l, c, str')) = tokenise 0 0 [] ?wot [] (unpack str) in
+          (ts, l, c, fastPack str')
