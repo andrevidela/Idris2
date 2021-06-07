@@ -73,22 +73,18 @@ prelude:
 base: prelude
 	${MAKE} -C libs/base IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 
-network: prelude
-	${MAKE} -C libs/network IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
-
 contrib: base
 	${MAKE} -C libs/contrib IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 
 test-lib: contrib
 	${MAKE} -C libs/test IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 
-libs : prelude base contrib network test-lib
+libs : prelude base contrib test-lib
 
 libdocs:
 	${MAKE} -C libs/prelude docs IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 	${MAKE} -C libs/base docs IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 	${MAKE} -C libs/contrib docs IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
-	${MAKE} -C libs/network docs IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 	${MAKE} -C libs/test docs IDRIS2=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 
 ${TEST_PREFIX}/${NAME_VERSION} :
@@ -97,7 +93,6 @@ ${TEST_PREFIX}/${NAME_VERSION} :
 	ln -s ${IDRIS2_CURDIR}/libs/base/build/ttc    ${TEST_PREFIX}/${NAME_VERSION}/base-${IDRIS2_VERSION}
 	ln -s ${IDRIS2_CURDIR}/libs/test/build/ttc    ${TEST_PREFIX}/${NAME_VERSION}/test-${IDRIS2_VERSION}
 	ln -s ${IDRIS2_CURDIR}/libs/contrib/build/ttc ${TEST_PREFIX}/${NAME_VERSION}/contrib-${IDRIS2_VERSION}
-	ln -s ${IDRIS2_CURDIR}/libs/network/build/ttc ${TEST_PREFIX}/${NAME_VERSION}/network-${IDRIS2_VERSION}
 
 testenv:
 	@${MAKE} ${TEST_PREFIX}/${NAME_VERSION}
@@ -135,7 +130,6 @@ clean-libs:
 	${MAKE} -C libs/prelude clean
 	${MAKE} -C libs/base clean
 	${MAKE} -C libs/contrib clean
-	${MAKE} -C libs/network clean
 	${MAKE} -C libs/test clean
 
 clean: clean-libs support-clean testenv-clean
@@ -177,7 +171,6 @@ install-libs:
 	${MAKE} -C libs/prelude install IDRIS2?=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 	${MAKE} -C libs/base install IDRIS2?=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 	${MAKE} -C libs/contrib install IDRIS2?=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
-	${MAKE} -C libs/network install IDRIS2?=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 	${MAKE} -C libs/test  install IDRIS2?=${TARGET} IDRIS2_PATH=${IDRIS2_BOOT_PATH}
 
 
