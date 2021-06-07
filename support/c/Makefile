@@ -18,6 +18,7 @@ endif
 OBJS = $(SRCS:.c=.o)
 DEPS = $(OBJS:.o=.d)
 
+CC = /opt/devkitpro/devkitARM/bin/arm-none-eabi-gcc
 
 all: build
 
