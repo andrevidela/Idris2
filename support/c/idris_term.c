@@ -28,22 +28,22 @@ int idris2_getTermLines() {
 
 #else
 
-#include <sys/ioctl.h>
-
-void idris2_setupTerm() {
-    // NOTE: Currently not needed for non windows systems
-}
-
-int idris2_getTermCols() {
-    struct winsize ts;
-    ioctl(0, TIOCGWINSZ, &ts);
-    return (int) ts.ws_col;
-}
-
-int idris2_getTermLines() {
-    struct winsize ts;
-    ioctl(0, TIOCGWINSZ, &ts);
-    return (int) ts.ws_row;
-}
+// #include <sys/ioctl.h>
+//
+// void idris2_setupTerm() {
+//     // NOTE: Currently not needed for non windows systems
+// }
+//
+// int idris2_getTermCols() {
+//     struct winsize ts;
+//     ioctl(0, TIOCGWINSZ, &ts);
+//     return (int) ts.ws_col;
+// }
+//
+// int idris2_getTermLines() {
+//     struct winsize ts;
+//     ioctl(0, TIOCGWINSZ, &ts);
+//     return (int) ts.ws_row;
+// }
 
 #endif
