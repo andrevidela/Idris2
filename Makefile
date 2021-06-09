@@ -151,14 +151,14 @@ install-api: src/IdrisPaths.idr
 
 install-idris2:
 	mkdir -p ${PREFIX}/bin/
-	install ${TARGET} ${PREFIX}/bin
+	install -m +x ${TARGET} ${PREFIX}/bin
 ifeq ($(OS), windows)
 	-install ${TARGET}.cmd ${PREFIX}/bin
 endif
 	mkdir -p ${PREFIX}/lib/
-	install support/c/${IDRIS2_SUPPORT} ${PREFIX}/lib
+	install -m +x support/c/${IDRIS2_SUPPORT} ${PREFIX}/lib
 	mkdir -p ${PREFIX}/bin/${NAME}_app
-	install ${TARGETDIR}/${NAME}_app/* ${PREFIX}/bin/${NAME}_app
+	install -m +x ${TARGETDIR}/${NAME}_app/* ${PREFIX}/bin/${NAME}_app
 
 install-support:
 	mkdir -p ${PREFIX}/${NAME_VERSION}/support/docs
