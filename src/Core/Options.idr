@@ -59,6 +59,7 @@ data CG = Chez
         | Node
         | Javascript
         | RefC
+        | GBA
         | Other String
 
 export
@@ -71,6 +72,7 @@ Eq CG where
   Javascript == Javascript = True
   RefC == RefC = True
   Other s == Other t = s == t
+  GBA == GBA = True
   _ == _ = False
 
 export
@@ -82,6 +84,7 @@ Show CG where
   show Node = "node"
   show Javascript = "javascript"
   show RefC = "refc"
+  show GBA = "GBA"
   show (Other s) = s
 
 public export
@@ -200,6 +203,7 @@ availableCGs o
        ("node", Node),
        ("javascript", Javascript),
        ("refc", RefC),
+       ("gba", GBA),
        ("gambit", Gambit)] ++ additionalCGs o
 
 export

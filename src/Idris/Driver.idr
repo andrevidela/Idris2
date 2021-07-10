@@ -72,7 +72,8 @@ updateEnv
          cg <- coreLift $ idrisGetEnv "IDRIS2_CG"
          case cg of
               Just e => case getCG (options defs) e of
-                             Just cg => setCG cg
+                             Just cg => coreLift (putStrLn "got cg \{show cg}")
+                                     *> setCG cg
                              Nothing => throw (InternalError ("Unknown code generator " ++ show e))
               Nothing => pure ()
          inccgs <- coreLift $ idrisGetEnv "IDRIS2_INC_CGS"
