@@ -61,6 +61,7 @@ data CG = Chez
         | Javascript
         | RefC
         | VMCodeInterp
+        | GBA
         | Other String
 
 export
@@ -74,6 +75,7 @@ Eq CG where
   RefC == RefC = True
   VMCodeInterp == VMCodeInterp = True
   Other s == Other t = s == t
+  GBA == GBA = True
   _ == _ = False
 
 export
@@ -86,6 +88,7 @@ Show CG where
   show Javascript = "javascript"
   show RefC = "refc"
   show VMCodeInterp = "vmcode-interp"
+  show GBA = "GBA"
   show (Other s) = s
 
 public export
@@ -213,6 +216,7 @@ availableCGs o
        ("javascript", Javascript),
        ("refc", RefC),
        ("gambit", Gambit),
+       ("gba", GBA),
        ("vmcode-interp", VMCodeInterp)] ++ additionalCGs o
 
 export

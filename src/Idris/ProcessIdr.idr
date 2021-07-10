@@ -1,5 +1,6 @@
 module Idris.ProcessIdr
 
+import Compiler.GBA
 import Compiler.RefC.RefC
 import Compiler.Scheme.Chez
 import Compiler.Scheme.ChezSep
@@ -249,6 +250,7 @@ getCG Node = pure $ Just codegenNode
 getCG Javascript = pure $ Just codegenJavascript
 getCG RefC = pure $ Just codegenRefC
 getCG VMCodeInterp = pure $ Just codegenVMCodeInterp
+getCG GBA = pure $ Just codegenGBA
 getCG (Other s) = getCodegen s
 
 export
