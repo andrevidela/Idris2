@@ -16,4 +16,4 @@ sourcedir = "src"
 -- opts = "--inc chez"
 
 main = Idris.Main
-executable = idris2
+executable = idris2-GBA
