@@ -1,6 +1,7 @@
 module Compiler.GBA
 
 import Compiler.ANF
+import Compiler.VMCode
 import Compiler.Common
 import Core.Context
 import Core.Core
@@ -31,6 +32,9 @@ namespace CDSL
 
   public export
   data Expr = FCall String (List Expr)
+            | BoolLit Bool
+            | IntLit Int
+            | While Expr (List Expr)
             | Var String
             | VarAssign String Expr
             | Deref Expr
@@ -67,6 +71,12 @@ renderExpr (VarAssign x y) = pretty x <++> equals <++> renderExpr y
 renderExpr (Deref x) = star <+> parens (renderExpr x)
 renderExpr (Infix x y z) = parens (renderExpr x <++> renderOp y <++> renderExpr z)
 renderExpr (Prefix x y) = ?renderExpr_rhs_6
+renderExpr (While cond body) = pretty "while" <+> parens (renderExpr cond) <++> braces
+    (hardline <+> indent 4 (vsep (map ((<+> semi) . renderExpr) body)) <+>
+     hardline)
+renderExpr (BoolLit True) = "1"
+renderExpr (BoolLit False) = "0"
+renderExpr (IntLit int) = pretty int
 
 render : TopDef -> Doc String
 render (Include x) = pretty "#include" <++> angles (pretty x)
@@ -90,8 +100,8 @@ void = Plain "void"
 
 compileANF : Ref Ctxt Defs => Name -> ANFDef -> Core TopDef
 compileANF name (MkAFun args x) = do
-  corePutStrLn "printing function \{show args}, \{show x}"
   nm <- toFullNames name
+  corePutStrLn "printing function \{show nm}, with args \{show args}, and body \{show x}"
   let fn = FnDef (Ptr void) (show nm) ?args ?expt
   -- pure (FnDef (Ptr void)
   ?rest
@@ -103,14 +113,59 @@ compileANF name (MkAForeign ccs fargs x) =
 compileANF name (MkAError x) =
   throw (InternalError "MkError in ANF tree")
 
+builtins : List (String, TopDef)
+builtins = [("Main.loop", FnDef (Plain "int") "_while" [] [While (BoolLit True) []])]
+
+compileVMCode : Ref Ctxt Defs => Name -> VMDef -> Core TopDef
+compileVMCode nm code = do
+  nm <- toFullNames nm
+  corePutStrLn "printing function \{show nm} with code \{show code}"
+  ?whut
+  -- pure (FnDef (Plain "int") "main"  [] [])
+
+var : Int -> String
+var i = "var_\{show i}"
+
+convertInstruction : VMInst -> List Expr
+convertInstruction (DECLARE RVal) = []
+convertInstruction (DECLARE (Loc x)) = [Var "var_\{show x}"]
+convertInstruction (DECLARE Discard) = []
+convertInstruction START = []
+convertInstruction (ASSIGN (Loc x) y) = [VarAssign "var_\{show x}" ?exp]
+convertInstruction (ASSIGN Discard y) = []
+convertInstruction (ASSIGN RVal y) = []
+convertInstruction (MKCON x tag args) = ?convertInstruction_rhs_4
+convertInstruction (MKCLOSURE x y missing args) = ?convertInstruction_rhs_5
+convertInstruction (MKCONSTANT x y) = ?convertInstruction_rhs_6
+convertInstruction (APPLY (Loc x) (Loc f) a) = [VarAssign (var x) (FCall (var f) ?wsdhu)]
+convertInstruction (CALL x tailpos y args) = ?convertInstruction_rhs_8
+convertInstruction (OP x y xs) = ?convertInstruction_rhs_9
+convertInstruction (EXTPRIM x y xs) = ?convertInstruction_rhs_10
+convertInstruction (CASE x alts def) = ?convertInstruction_rhs_11
+convertInstruction (CONSTCASE x alts def) = ?convertInstruction_rhs_12
+convertInstruction (PROJECT x value pos) = ?convertInstruction_rhs_13
+convertInstruction (NULL x) = ?convertInstruction_rhs_14
+convertInstruction (ERROR x) = ?convertInstruction_rhs_15
+
+compileBody : List (Name, VMDef) -> VMDef -> Core (List Expr)
+compileBody xs (MkVMFun args []) = pure []
+compileBody xs (MkVMFun args (x :: ys)) = ?compileBody_rhs_4
+compileBody xs (MkVMError ys) = ?compileBody_rhs_2
+
+
 compileGBA : Ref Ctxt Defs -> (tmpDir : String) -> (outputDir : String)
           -> ClosedTerm -> (outfile : String) -> Core (Maybe String)
 compileGBA c tmpDir outputDir tm outfile = do
-  cdata <- getCompileData False ANF tm
-  let anf = cdata.anf
-  coreLift $ putStrLn (String.unlines (map (\(x, y) => "\{show x}: \{show y}") cdata.anf))
-  topDef <- traverse (\(n, anf) => compileANF n anf) anf
-  corePrint (vsep $ map render topDef)
+  cdata <- getCompileData False VMCode tm
+  let code = cdata.vmcode
+  let Just main = lookup (UN "Main.main")  code
+    | Nothing => throw (InternalError "cannot find main")
+  mainBody <- compileBody code main
+  let finalProgram  = FnDef (Plain "int") "main" [] mainBody
+  -- coreLift $ putStrLn (String.unlines (map (\(x, y) => "\{show x}: \{show y}") cdata.anf))
+  -- coreLift $ putStrLn (String.unlines (map (\(x, y) => "\{show x}: \{show y}") cdata.vmcode))
+  -- topDef <- traverse (\(n, code) => compileVMCode n code) code
+  -- corePrint (vsep $ map render topDef)
   throw (InternalError "GBA Backend unfinished")
 
 export

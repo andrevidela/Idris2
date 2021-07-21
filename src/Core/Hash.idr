@@ -383,6 +383,10 @@ Hashable (PrimFn arity) where
       h `hashWithSalt` 36
     Crash =>
       h `hashWithSalt` 37
+    Write =>
+      h `hashWithSalt` 38
+    Read =>
+      h `hashWithSalt` 39
 
     DoublePow =>
       h `hashWithSalt` 38

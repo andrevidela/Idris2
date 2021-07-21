@@ -588,6 +588,8 @@ export
   toBuf b (Cast x y) = do tag 99; toBuf b x; toBuf b y
   toBuf b BelieveMe = tag 100
   toBuf b Crash = tag 101
+  toBuf b Write = tag 102
+  toBuf b Read = tag 103
 
   fromBuf {n} b
       = case n of
@@ -642,6 +644,8 @@ export
                  38 => do ty <- fromBuf b; pure (BOr ty)
                  39 => do ty <- fromBuf b; pure (BXOr ty)
                  101 => pure Crash
+                 102 => pure Write
+                 103 => pure Read
                  _ => corrupt "PrimFn 2"
 
       fromBuf3 : Core (PrimFn 3)

@@ -188,6 +188,8 @@ schOp (Cast from to)                [x] = castInt constPrimitives from to x
 
 schOp BelieveMe [_,_,x] = pure x
 schOp Crash [_,msg] = pure $ "(blodwen-error-quit (string-append \"ERROR: \" " ++ msg ++ "))"
+schOp Write _ = ?writeNotSupportedOnScheme
+schOp Read _ = ?readNotSupportedOnScheme
 
 ||| Extended primitives for the scheme backend, outside the standard set of primFn
 public export

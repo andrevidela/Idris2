@@ -725,6 +725,8 @@ opName DoubleCeiling = prim "doubleCeiling"
 opName (Cast x y) = prim $ "cast_" ++ show x ++ show y
 opName BelieveMe = prim $ "believe_me"
 opName Crash = prim $ "crash"
+opName Read = prim "read"
+opName Write = prim "write"
 
 integralTypes : List Constant
 integralTypes = [ IntType

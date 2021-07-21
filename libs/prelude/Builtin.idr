@@ -274,3 +274,4 @@ FromDouble Double where
 public export
 defaultDouble : FromDouble Double
 defaultDouble = %search
+

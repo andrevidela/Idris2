@@ -357,6 +357,11 @@ data PrimFn : Nat -> Type where
      BelieveMe : PrimFn 3
      Crash : PrimFn 2
 
+     ||| Write a region of memory
+     Write : PrimFn 2
+     ||| Read a region of memory
+     Read : PrimFn 2
+
 export
 Show (PrimFn arity) where
   show (Add ty) = "+" ++ show ty
@@ -398,6 +403,8 @@ Show (PrimFn arity) where
   show (Cast x y) = "cast-" ++ show x ++ "-" ++ show y
   show BelieveMe = "believe_me"
   show Crash = "crash"
+  show Read = "read"
+  show Write = "write"
 
 public export
 data PiInfo t = Implicit | Explicit | AutoImplicit | DefImplicit t
