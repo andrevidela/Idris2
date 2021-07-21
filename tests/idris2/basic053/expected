@@ -23,3 +23,8 @@ version: "bar"
 bzs: \#\'a\n\t\\'
 """
 "contains\NULcharacter"
+Main> Imported module Language.Reflection
+Main> IApp (MkFC (Virtual Interactive) (0, 3) (0, 9)) (IApp (MkFC (Virtual Interactive) (0, 11) (0, 18)) (IVar (MkFC (Virtual Interactive) (0, 11) (0, 18)) (UN "++")) (IPrimVal (MkFC (Virtual Interactive) (0, 3) (0, 9)) (Str "hello "))) (IApp (MkFC (Virtual Interactive) (0, 11) (0, 18)) (IApp (MkFC (Virtual Interactive) (0, 19) (0, 30)) (IVar (MkFC (Virtual Interactive) (0, 19) (0, 30)) (UN "++")) (IApp (MkFC (Virtual Interactive) (0, 11) (0, 18)) (IVar (MkFC (Virtual Interactive) (0, 11) (0, 18)) (UN "fromString")) (IPrimVal (MkFC (Virtual Interactive) (0, 12) (0, 17)) (Str "world")))) (IApp (MkFC (Virtual Interactive) (0, 19) (0, 30)) (IApp (MkFC (Virtual Interactive) (0, 32) (0, 39)) (IVar (MkFC (Virtual Interactive) (0, 32) (0, 39)) (UN "++")) (IPrimVal (MkFC (Virtual Interactive) (0, 19) (0, 30)) (Str " ! This is "))) (IApp (MkFC (Virtual Interactive) (0, 32) (0, 39)) (IApp (MkFC (Virtual Interactive) (0, 40) (0, 42)) (IVar (MkFC (Virtual Interactive) (0, 40) (0, 42)) (UN "++")) (IApp (MkFC (Virtual Interactive) (0, 32) (0, 39)) (IVar (MkFC (Virtual Interactive) (0, 32) (0, 39)) (UN "fromString")) (IPrimVal (MkFC (Virtual Interactive) (0, 33) (0, 38)) (Str "idris")))) (IPrimVal (MkFC (Virtual Interactive) (0, 40) (0, 42)) (Str " !")))))
+Main> IApp (MkFC (Virtual Interactive) (0, 2) (0, 4)) (IVar (MkFC (Virtual Interactive) (0, 2) (0, 4)) (UN "fromString")) (IPrimVal (MkFC (Virtual Interactive) (0, 2) (0, 4)) (Str ""))
+Main> 
+Bye for now!
