@@ -184,7 +184,7 @@ bindUnqs ((qvar, fc, esctm) :: qs) rig elabinfo nest env tm
                                 (Just (gnf env (Ref fc (TyCon 0 0)
                                            (Resolved idx))))
          sc <- bindUnqs qs rig elabinfo nest env tm
-         pure (Bind fc qvar (Let fc (rigMult top rig) escv !(getTerm escty))
+         pure (Bind fc qvar (Let fc (top |*| rig) escv !(getTerm escty))
                     (refToLocal qvar qvar sc))
 
 onLHS : ElabMode -> Bool

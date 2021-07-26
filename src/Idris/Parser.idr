@@ -530,13 +530,27 @@ mutual
            (lvl, e) <- pure b.val
            pure (PUnifyLog (boundToFC fname b) lvl e)
 
-  multiplicity : OriginDesc -> EmptyRule RigCount
-  multiplicity fname
-      = case !(optional $ decorate fname Keyword intLit) of
-          (Just 0) => pure erased
-          (Just 1) => pure linear
-          Nothing => pure top
-          _ => fail "Invalid multiplicity (must be 0 or 1)"
+  stage : OriginDesc -> Rule Stage
+
+  staging : OriginDesc -> Rule RigCount
+  staging fname = do decoratedSymbol fname "<"
+                     commit
+                     qty <- quantity fname
+                     decoratedSymbol fname ","
+                     stg <- stage fname
+                     decoratedSymbol fname ">"
+                     pure (qty, stg)
+
+  quantity : OriginDesc -> Rule ZeroOneOmega
+  quantity fname
+      = mustWork (decoratedKeyword fname "w" *> pure top <|>
+        case !(decorate fname Keyword intLit) of
+          0 => pure erased
+          1 => pure linear
+          _ => fail "Invalid multiplicity (must be 0, 1 or w)")
+
+  multiplicity : OriginDesc -> Rule RigCount
+  multiplicity fname = (, linear) <$> quantity fname
 
   pibindAll : OriginDesc -> PiInfo PTerm ->
               List (RigCount, WithBounds (Maybe Name), PTerm) ->

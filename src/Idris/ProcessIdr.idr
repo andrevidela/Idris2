@@ -311,7 +311,8 @@ processMod sourceFileName ttcFileName msg sourcecode origin
            else -- needs rebuilding
              do iputStrLn msg
                 Right (decor, mod) <- logTime ("++ Parsing " ++ sourceFileName) $
-                            pure (runParser (PhysicalIdrSrc origin) (isLitFile sourceFileName) sourcecode (do p <- prog (PhysicalIdrSrc origin); eoi; pure p))
+                            pure (runParser (PhysicalIdrSrc origin) (isLitFile sourceFileName) sourcecode
+                                            (prog (PhysicalIdrSrc origin) <* eoi))
                       | Left err => pure (Just [err])
                 addSemanticDecorations decor
                 initHash

@@ -638,7 +638,7 @@ mutual
   -- Same for default
   checkAppWith' rig elabinfo nest env fc tm ty@(NBind tfc x (Pi _ rigb (DefImplicit aval) aty) sc)
                argdata [] [] [] kr (Just expty_in)
-      = do let argRig = rigMult rig rigb
+      = do let argRig = rig |*| rigb
            expty <- getNF expty_in
            defs <- get Ctxt
            case expty of
@@ -677,7 +677,7 @@ mutual
   -- Check next default argument
   checkAppWith' rig elabinfo nest env fc tm (NBind tfc x (Pi _ rigb (DefImplicit arg) aty) sc)
                argdata expargs autoargs namedargs kr expty
-      = let argRig = rigMult rig rigb in
+      = let argRig = rig |*| rigb in
             case findNamed x namedargs of
                Nothing => makeDefImplicit rig argRig elabinfo nest env fc tm
                                           x arg aty sc argdata expargs autoargs namedargs kr expty

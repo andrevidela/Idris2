@@ -222,7 +222,7 @@ checkLet rigc_in elabinfo nest env fc lhsFC rigl n nTy nVal scope expty {vars}
                                      (do c <- check (rigl |*| rigc)
                                                   elabinfo -- without preciseInf
                                                   nest env nVal (Just (gnf env tyv))
-                                         pure (fst c, snd c, rigMult rigl rigc))
+                                         pure (fst c, snd c, rigl |*| rigc))
                                      r
                             _ => do c <- check (rigl |*| rigc)
                                                elabinfo -- without preciseInf

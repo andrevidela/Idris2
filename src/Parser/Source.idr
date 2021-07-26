@@ -11,16 +11,22 @@ import Core.FC
 
 import System.File
 
+import Debug.Trace
+
 %default total
 
 export
 runParserTo : {e : _} ->
               (origin : OriginDesc) ->
-              Maybe LiterateStyle -> Lexer ->
-              String -> Grammar SemanticDecorations Token e ty -> Either Error (SemanticDecorations, ty)
+              (lit : Maybe LiterateStyle) ->
+              Lexer ->
+              (input : String) ->
+              Grammar SemanticDecorations Token e ty ->
+              Either Error (SemanticDecorations, ty)
 runParserTo origin lit reject str p
     = do str    <- mapFst (fromLitError origin) $ unlit lit str
          toks   <- mapFst (fromLexError origin) $ lexTo reject str
+         trace (show toks) (pure ())
          (decs, (parsed, _)) <- mapFst (fromParsingErrors origin) $ parseWith p toks
          Right (decs, parsed)
 
