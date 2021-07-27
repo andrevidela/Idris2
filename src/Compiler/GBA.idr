@@ -32,6 +32,7 @@ namespace CDSL
 
   public export
   data Expr = FCall String (List Expr)
+            | Ret Expr
             | BoolLit Bool
             | IntLit Int
             | While Expr (List Expr)
@@ -66,6 +67,7 @@ renderTy (Ptr x) = renderTy x <+> star
 
 renderExpr : Expr -> Doc String
 renderExpr (FCall x xs) = pretty x <+> tupled (map renderExpr xs)
+renderExpr (Ret x) = pretty "return" <++> renderExpr x
 renderExpr (Var x) = pretty x
 renderExpr (VarAssign x y) = pretty x <++> equals <++> renderExpr y
 renderExpr (Deref x) = star <+> parens (renderExpr x)
@@ -120,11 +122,41 @@ compileVMCode : Ref Ctxt Defs => Name -> VMDef -> Core TopDef
 compileVMCode nm code = do
   nm <- toFullNames nm
   corePutStrLn "printing function \{show nm} with code \{show code}"
-  ?whut
+  ?vmCode
   -- pure (FnDef (Plain "int") "main"  [] [])
 
 var : Int -> String
 var i = "var_\{show i}"
+
+convertConst : Constant -> Expr
+convertConst (I x) = IntLit x
+convertConst (I8 x) = ?convertConst_rhs_2
+convertConst (I16 x) = ?convertConst_rhs_3
+convertConst (I32 x) = ?convertConst_rhs_4
+convertConst (I64 x) = ?convertConst_rhs_5
+convertConst (BI x) = ?convertConst_rhs_6
+convertConst (B8 x) = ?convertConst_rhs_7
+convertConst (B16 x) = ?convertConst_rhs_8
+convertConst (B32 x) = ?convertConst_rhs_9
+convertConst (B64 x) = ?convertConst_rhs_10
+convertConst (Str x) = ?convertConst_rhs_11
+convertConst (Ch x) = ?convertConst_rhs_12
+convertConst (Db x) = ?convertConst_rhs_13
+convertConst WorldVal = ?convertConst_rhs_14
+convertConst IntType = ?convertConst_rhs_15
+convertConst Int8Type = ?convertConst_rhs_16
+convertConst Int16Type = ?convertConst_rhs_17
+convertConst Int32Type = ?convertConst_rhs_18
+convertConst Int64Type = ?convertConst_rhs_19
+convertConst IntegerType = ?convertConst_rhs_20
+convertConst Bits8Type = ?convertConst_rhs_21
+convertConst Bits16Type = ?convertConst_rhs_22
+convertConst Bits32Type = ?convertConst_rhs_23
+convertConst Bits64Type = ?convertConst_rhs_24
+convertConst StringType = ?convertConst_rhs_25
+convertConst CharType = ?convertConst_rhs_26
+convertConst DoubleType = ?convertConst_rhs_27
+convertConst WorldType = ?convertConst_rhs_28
 
 convertInstruction : VMInst -> List Expr
 convertInstruction (DECLARE RVal) = []
@@ -136,8 +168,14 @@ convertInstruction (ASSIGN Discard y) = []
 convertInstruction (ASSIGN RVal y) = []
 convertInstruction (MKCON x tag args) = ?convertInstruction_rhs_4
 convertInstruction (MKCLOSURE x y missing args) = ?convertInstruction_rhs_5
-convertInstruction (MKCONSTANT x y) = ?convertInstruction_rhs_6
+convertInstruction (MKCONSTANT RVal y) = pure $ Ret (convertConst y)
+convertInstruction (MKCONSTANT (Loc x) y) = ?whut_2
+convertInstruction (MKCONSTANT Discard y) = ?whut_3
 convertInstruction (APPLY (Loc x) (Loc f) a) = [VarAssign (var x) (FCall (var f) ?wsdhu)]
+convertInstruction (APPLY (Loc _) RVal _) = ?appLocRVal
+convertInstruction (APPLY (Loc _) Discard _) = ?appLocDiscard
+convertInstruction (APPLY RVal _ _) = ?appRVal
+convertInstruction (APPLY Discard _ _) = ?appDiscard
 convertInstruction (CALL x tailpos y args) = ?convertInstruction_rhs_8
 convertInstruction (OP x y xs) = ?convertInstruction_rhs_9
 convertInstruction (EXTPRIM x y xs) = ?convertInstruction_rhs_10
@@ -149,16 +187,27 @@ convertInstruction (ERROR x) = ?convertInstruction_rhs_15
 
 compileBody : List (Name, VMDef) -> VMDef -> Core (List Expr)
 compileBody xs (MkVMFun args []) = pure []
-compileBody xs (MkVMFun args (x :: ys)) = ?compileBody_rhs_4
+compileBody xs (MkVMFun args (x :: ys)) =
+  do corePutStrLn "compile function"
+     corePutStrLn "args \{show args}"
+     corePutStrLn "body: \{show (x :: ys)}"
+     let inst = concat $ map convertInstruction (x :: ys)
+     pure inst
 compileBody xs (MkVMError ys) = ?compileBody_rhs_2
+compileBody xs (MkVMForeign _ _ _) = ?compileBody_rhs_3
 
+
+findOut : (a -> Bool) -> List (a, b) -> Maybe b
+findOut f [] = Nothing
+findOut f ((a, b) :: xs) = if f a then Just b else findOut f xs
 
 compileGBA : Ref Ctxt Defs -> (tmpDir : String) -> (outputDir : String)
           -> ClosedTerm -> (outfile : String) -> Core (Maybe String)
 compileGBA c tmpDir outputDir tm outfile = do
   cdata <- getCompileData False VMCode tm
   let code = cdata.vmcode
-  let Just main = lookup (UN "Main.main")  code
+  corePutStrLn (Data.String.unlines (map show code))
+  let Just main = findOut (("Main.main" ==) . show ) code
     | Nothing => throw (InternalError "cannot find main")
   mainBody <- compileBody code main
   let finalProgram  = FnDef (Plain "int") "main" [] mainBody
@@ -166,6 +215,8 @@ compileGBA c tmpDir outputDir tm outfile = do
   -- coreLift $ putStrLn (String.unlines (map (\(x, y) => "\{show x}: \{show y}") cdata.vmcode))
   -- topDef <- traverse (\(n, code) => compileVMCode n code) code
   -- corePrint (vsep $ map render topDef)
+  corePutStrLn "compiled the following program"
+  corePrint (render finalProgram)
   throw (InternalError "GBA Backend unfinished")
 
 export

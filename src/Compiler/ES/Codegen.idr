@@ -439,6 +439,8 @@ jsOp (Cast ty StringType) [x] = pure $ jsAnyToString x
 jsOp (Cast ty ty2) [x]        = castInt ty ty2 x
 jsOp BelieveMe [_,_,x] = pure x
 jsOp (Crash) [_, msg] = pure $ jsCrashExp msg
+jsOp Write _ = throw (InternalError "mem write not supported in JS backend")
+jsOp Read _ = throw (InternalError "mem read not supported in JS backend")
 
 --------------------------------------------------------------------------------
 --          FFI
