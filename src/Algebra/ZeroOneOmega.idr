@@ -66,6 +66,6 @@ Semiring ZeroOneOmega where
 export
 Top ZeroOneOmega where
   top = RigW
-  topAbs {x = Rig0} = Refl
-  topAbs {x = Rig1} = Refl
-  topAbs {x = RigW} = Refl
+  -- topAbs {x = Rig0} = Refl
+  -- topAbs {x = Rig1} = Refl
+  -- topAbs {x = RigW} = Refl

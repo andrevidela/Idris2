@@ -28,4 +28,4 @@ public export
 public export
 interface Preorder a => Top a where
   top : a
-  topAbs : {x : a} -> x <= top = True
+  -- topAbs : {x : a} -> x <= top = True

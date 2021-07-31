@@ -18,6 +18,8 @@ import Libraries.Utils.String
 
 import Idris.Parser.Let
 
+import Debug.Trace
+
 %default covering
 
 decorate : OriginDesc -> Decoration -> Rule a -> Rule a
@@ -531,26 +533,33 @@ mutual
            pure (PUnifyLog (boundToFC fname b) lvl e)
 
   stage : OriginDesc -> Rule Stage
+  stage fname = decoratedKeyword fname "runtime" *> pure linear
+            <|> decoratedKeyword fname "compiletime" *> pure top
 
-  staging : OriginDesc -> Rule RigCount
-  staging fname = do decoratedSymbol fname "<"
-                     commit
-                     qty <- quantity fname
-                     decoratedSymbol fname ","
-                     stg <- stage fname
-                     decoratedSymbol fname ">"
-                     pure (qty, stg)
+  numberQuantity : OriginDesc -> Rule ZeroOneOmega
+  numberQuantity fname =
+    decorate fname Keyword intLit `seq` \i =>
+        case i of
+             0 => pure erased
+             1 => pure linear
+             n => fail "Invalid multiplicity (must be 0, 1 or w)"
+
+  unrestrictedQuantity : OriginDesc -> Rule ZeroOneOmega
+  unrestrictedQuantity fname = decoratedKeyword fname "omega" *> pure top
 
   quantity : OriginDesc -> Rule ZeroOneOmega
-  quantity fname
-      = mustWork (decoratedKeyword fname "w" *> pure top <|>
-        case !(decorate fname Keyword intLit) of
-          0 => pure erased
-          1 => pure linear
-          _ => fail "Invalid multiplicity (must be 0, 1 or w)")
+  quantity fname =
+      (decoratedSymbol fname "<" *>
+       (unrestrictedQuantity fname <|> numberQuantity fname) <*
+       decoratedSymbol fname ">")
+      <|> numberQuantity fname
 
-  multiplicity : OriginDesc -> Rule RigCount
-  multiplicity fname = (, linear) <$> quantity fname
+  multiplicity : OriginDesc -> EmptyRule RigCount
+  multiplicity fname = do qty <- the (EmptyRule (Maybe ZeroOneOmega)) (optional $
+                              quantity fname
+                              )
+                          let qty = fromMaybe top qty
+                          pure (qty )
 
   pibindAll : OriginDesc -> PiInfo PTerm ->
               List (RigCount, WithBounds (Maybe Name), PTerm) ->

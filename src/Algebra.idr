@@ -10,8 +10,8 @@ import public Algebra.SkewLeft
 
 public export
 RigCount : Type
-RigCount = Pair ZeroOneOmega Stage
+RigCount = ZeroOneOmega
 
 export
 showCount : RigCount -> String
-showCount = show
+showCount = elimSemi "0 " "1 " (const "")

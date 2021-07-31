@@ -21,4 +21,3 @@ Semiring a => Semiring b => Semiring (Pair a b) where
 export
 Preorder (Pair a b) => Top a => Top b => Top (Pair a b) where
   top = (top {a}, top {a=b})
-  topAbs = ?prfTop

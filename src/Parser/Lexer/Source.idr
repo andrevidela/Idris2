@@ -209,7 +209,7 @@ keywords = ["data", "module", "where", "let", "in", "do", "record",
             "using", "interface", "implementation", "open", "import",
             "public", "export", "private",
             "infixl", "infixr", "infix", "prefix",
-            "total", "partial", "covering", "w", "eval", "runtime"]
+            "total", "partial", "covering", "omega", "compile", "runtime"]
 
 -- Reserved words for internal syntax
 special : List String
@@ -350,8 +350,9 @@ mutual
       <|> match symbol Unrecognised
     where
       parseIdent : String -> Token
-      parseIdent x = if x `elem` keywords then Keyword x
-                     else Ident x
+      parseIdent x =
+        if x `elem` keywords then Keyword x
+                             else Ident x
 
       parseNamespace : String -> Token
       parseNamespace ns = case mkNamespacedIdent ns of

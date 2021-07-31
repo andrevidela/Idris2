@@ -352,24 +352,47 @@ mutual
 
   public export
   data PDecl : Type where
-       PClaim : FC -> RigCount -> Visibility -> List PFnOpt -> PTypeDecl -> PDecl
-       PDef : FC -> List PClause -> PDecl
-       PData : FC -> (doc : String) -> Visibility -> PDataDecl -> PDecl
-       PParameters : FC -> List (Name, RigCount, PiInfo PTerm, PTerm) -> List PDecl -> PDecl
-       PUsing : FC -> List (Maybe Name, PTerm) -> List PDecl -> PDecl
-       PReflect : FC -> PTerm -> PDecl
-       PInterface : FC ->
-                    Visibility ->
+
+       PClaim : (fc : FC)
+             -> (resource : RigCount)
+             -> (visibility : Visibility)
+             -> (fnOptions : List PFnOpt)
+             -> (type : PTypeDecl)
+             -> PDecl
+
+       PDef : (fc : FC)
+           -> (clauses : List PClause)
+           -> PDecl
+
+       PData : (fc : FC)
+            -> (doc : String)
+            -> (visibility : Visibility)
+            -> (decl : PDataDecl)
+            -> PDecl
+
+       PParameters : (fc : FC)
+                  -> (args : List (Name, RigCount, PiInfo PTerm, PTerm))
+                  -> (decls : List PDecl)
+                  -> PDecl
+       PUsing : (fc : FC)
+             -> (aliases : List (Maybe Name, PTerm))
+             -> (decls : List PDecl)
+             -> PDecl
+       PReflect : (fc : FC) -> (term : PTerm) -> PDecl
+       PInterface : (fc : FC) ->
+                    (visibility : Visibility) ->
                     (constraints : List (Maybe Name, PTerm)) ->
-                    Name ->
+                    (nm : Name) ->
                     (doc : String) ->
                     (params : List (Name, (RigCount, PTerm))) ->
                     (det : List Name) ->
                     (conName : Maybe Name) ->
-                    List PDecl ->
+                    (decls : List PDecl) ->
                     PDecl
-       PImplementation : FC ->
-                         Visibility -> List PFnOpt -> Pass ->
+       PImplementation : (fc : FC) ->
+                         (visibility : Visibility) ->
+                         (fnOptions : List PFnOpt) ->
+                         Pass ->
                          (implicits : List (Name, RigCount, PTerm)) ->
                          (constraints : List (Maybe Name, PTerm)) ->
                          Name ->
