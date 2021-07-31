@@ -59,7 +59,7 @@ public export
 Semiring Stage where
   (|+|) = meet
   (|*|) = mult
-  plusNeutral = Zero
+  plusNeutral = Compile
   timesNeutral = Runtime
 
 export

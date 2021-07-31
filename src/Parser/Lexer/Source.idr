@@ -209,7 +209,7 @@ keywords = ["data", "module", "where", "let", "in", "do", "record",
             "using", "interface", "implementation", "open", "import",
             "public", "export", "private",
             "infixl", "infixr", "infix", "prefix",
-            "total", "partial", "covering", "omega", "compile", "runtime"]
+            "total", "partial", "covering", "omega", "constexpr", "runtime"]
 
 -- Reserved words for internal syntax
 special : List String

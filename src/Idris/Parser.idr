@@ -534,7 +534,7 @@ mutual
 
   stage : OriginDesc -> Rule Stage
   stage fname = decoratedKeyword fname "runtime" *> pure linear
-            <|> decoratedKeyword fname "compiletime" *> pure top
+            <|> decoratedKeyword fname "constexpr" *> pure top
 
   numberQuantity : OriginDesc -> Rule ZeroOneOmega
   numberQuantity fname =
@@ -547,19 +547,26 @@ mutual
   unrestrictedQuantity : OriginDesc -> Rule ZeroOneOmega
   unrestrictedQuantity fname = decoratedKeyword fname "omega" *> pure top
 
-  quantity : OriginDesc -> Rule ZeroOneOmega
+  ||| A quantity has grammar:
+  ||| number := 0, 1
+  ||| stage := runtime, constexpr
+  ||| unrestricted := omega
+  ||| quantity = number | "<" number | unrestricted ">" | "<" (number | unrestricted) "," stage ">"
+  quantity : OriginDesc -> Rule RigCount
   quantity fname =
-      (decoratedSymbol fname "<" *>
-       (unrestrictedQuantity fname <|> numberQuantity fname) <*
-       decoratedSymbol fname ">")
-      <|> numberQuantity fname
+      (do decoratedSymbol fname "<"
+          qty <- unrestrictedQuantity fname <|> numberQuantity fname
+          stg <- optional $ decoratedSymbol fname "," *> stage fname
+          let stg = fromMaybe top stg
+          decoratedSymbol fname ">"
+          pure (qty <&& stg))
+      <|> ((<&& top) <$> numberQuantity fname)
 
   multiplicity : OriginDesc -> EmptyRule RigCount
-  multiplicity fname = do qty <- the (EmptyRule (Maybe ZeroOneOmega)) (optional $
+  multiplicity fname = do qty <- the (EmptyRule (Maybe RigCount)) (optional $
                               quantity fname
                               )
-                          let qty = fromMaybe top qty
-                          pure (qty )
+                          pure $ fromMaybe top qty
 
   pibindAll : OriginDesc -> PiInfo PTerm ->
               List (RigCount, WithBounds (Maybe Name), PTerm) ->

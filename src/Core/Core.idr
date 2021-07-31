@@ -232,8 +232,7 @@ Show Error where
   show (LinearUsed fc count n)
       = show fc ++ ":There are " ++ show count ++ " uses of linear name " ++ show n
   show (LinearMisuse fc n exp ctx)
-      = show fc ++ ":Trying to use " ++ showRig exp ++ " name " ++ show n ++
-                   " in " ++ showRel ctx ++ " context"
+      =  "\{show fc}: \{show n} has grade \{show exp} which is incompatible with \{show ctx}"
      where
        showRig : RigCount -> String
        showRig = elimSemi

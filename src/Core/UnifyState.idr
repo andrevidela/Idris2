@@ -680,7 +680,7 @@ checkUserHolesAfter base now
          traverse_ (checkValidHole base) gs
          hs_map <- getCurrentHoles
          let hs = toList hs_map
-         let hs' = if any isUserName (map (snd . snd) hs)
+         let hs' = if any isUserName (map (Builtin.snd . Builtin.snd) hs)
                       then [] else hs
          when (now && not (isNil hs')) $
               throw (UnsolvedHoles (map snd (nubBy nameEq hs)))

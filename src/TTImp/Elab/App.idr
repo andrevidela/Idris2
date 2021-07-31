@@ -91,8 +91,8 @@ getNameType rigc env fc x
                  pure (Ref fc nt (Resolved i), gnf env (embed (type def)))
   where
     rigSafe : RigCount -> RigCount -> Core ()
-    rigSafe lhs rhs = when (lhs < rhs)
-                           (throw (LinearMisuse fc !(getFullName x) lhs rhs))
+    rigSafe a b = when (a < b)
+                       (throw (LinearMisuse fc !(getFullName x) a b))
 
 -- Get the type of a variable, looking it up in the nested names first.
 getVarType : {vars : _} ->

@@ -269,8 +269,8 @@ perror (LinearMisuse fc n exp ctx)
     = if isErased exp
          then pure $ errorDesc (code (pretty n) <++> reflow "is not accessible in this context.")
                 <+> line <+> !(ploc fc)
-         else pure $ errorDesc (reflow "Trying to use" <++> prettyRig exp <++> "name"
-                <++> code (pretty (sugarName n)) <++> "in" <++> prettyRel ctx <++> "context.")
+         else pure $ errorDesc (code (pretty (sugarName n)) <++> "has grade" <++> (pretty (show exp))
+                <++> "which is incompatible with" <++>  pretty (show ctx) <+> dot)
                 <+> line <+> !(ploc fc)
   where
     prettyRig : RigCount -> Doc ann

@@ -21,6 +21,10 @@ data Usage : List Name -> Type where
      Nil : Usage vars
      (::) : Var vars -> Usage vars -> Usage vars
 
+rigSafe : FC -> Name -> RigCount -> RigCount -> Core ()
+rigSafe fc n a b = when (a < b)
+                        (throw (LinearMisuse fc n a b))
+
 Show (Usage vars) where
   show xs = "[" ++ showAll xs ++ "]"
     where
@@ -185,16 +189,12 @@ mutual
       = let b = getBinder prf env
             rigb = multiplicity b
             ty = binderType b in
-            do when (not erase) $ rigSafe rigb rig
+            do when (not erase) $ rigSafe fc (getName vars prf) rigb rig
                pure (Local fc x idx prf, gnf env ty, used rig)
     where
       getName : {idx : _} -> (vs : List Name) -> (0 p : IsVar n idx vs) -> Name
       getName (x :: _) First = x
       getName (x :: xs) (Later p) = getName xs p
-
-      rigSafe : RigCount -> RigCount -> Core ()
-      rigSafe l r = when (l < r)
-                         (throw (LinearMisuse fc (getName vars prf) l r))
 
       -- count the usage if we're in a linear context. If not, the usage doesn't
       -- matter
@@ -592,7 +592,7 @@ mutual
                 | Nothing => undefinedName fc n
            Just def <- lookupCtxtExact (Resolved idx) (gamma defs)
                 | Nothing => undefinedName fc n
-           rigSafe (multiplicity def) rig
+           rigSafe fc !(getFullName n) (multiplicity def) rig
            if linearChecked def
               then pure (type def)
               else case definition def of
@@ -622,9 +622,6 @@ mutual
                 Bind bfc n (Pi fc c' e ty) sc'
       updateUsage _ ty = ty
 
-      rigSafe : RigCount -> RigCount -> Core ()
-      rigSafe a b = when (a < b)
-                         (throw (LinearMisuse fc !(getFullName n) a b))
 
   expandMeta : {vars : _} ->
                {auto c : Ref Ctxt Defs} ->
