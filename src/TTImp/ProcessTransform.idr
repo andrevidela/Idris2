@@ -13,8 +13,8 @@ import Idris.Syntax
 
 import TTImp.Elab
 import TTImp.Elab.Check
-import TTImp.ProcessDef -- for checking LHS
 import TTImp.TTImp
+import TTImp.CheckLHS
 
 %default covering
 
