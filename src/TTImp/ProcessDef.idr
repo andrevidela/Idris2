@@ -308,7 +308,7 @@ checkClause {vars} mult vis totreq hashit n opts nest env (PatClause fc lhs_in r
 checkClause {vars} mult vis totreq hashit n opts nest env
     (WithClause ifc lhs_in rig wval_raw mprf flags cs)
     = processWith {vars} mult vis totreq hashit n opts nest env
-        ifc lhs_in rig wval_raw mprf flags cs
+                  ifc lhs_in rig wval_raw mprf flags cs
 
 nameListEq : (xs : List Name) -> (ys : List Name) -> Maybe (xs = ys)
 nameListEq [] [] = Just Refl
@@ -542,6 +542,10 @@ lookupOrAddAlias _ _ _ fc n _
   = do defs <- get Ctxt
        lookupCtxtExact n (gamma defs)
 
+||| Process a top-level definition
+||| @ fc the position of the definition
+||| @ n_in the name of the definition
+||| @ cs_in the list of clauses associated with the definition
 export
 processDef : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->

@@ -1374,6 +1374,7 @@ export
 setCtxt : {auto c : Ref Ctxt Defs} -> Context -> Core ()
 setCtxt gam = update Ctxt { gamma := gam }
 
+||| Obtain index of name in context as an Int
 export
 resolveName : {auto c : Ref Ctxt Defs} ->
             Name -> Core Int

@@ -410,8 +410,9 @@ mutual
   data ImpClause' : Type -> Type where
        PatClause : FC -> (lhs : RawImp' nm) -> (rhs : RawImp' nm) -> ImpClause' nm
        WithClause : FC -> (lhs : RawImp' nm) ->
-                    (rig : RigCount) -> (wval : RawImp' nm) -> -- with'd expression (& quantity)
-                    (prf : Maybe Name) -> -- optional name for the proof
+                    (rig : RigCount) ->    -- quantity associated with the `with` expression
+                    (wval : RawImp' nm) -> -- the with expression itself
+                    (prf : Maybe Name) ->  -- optional name for the proof
                     (flags : List WithFlag) ->
                     List (ImpClause' nm) -> ImpClause' nm
        ImpossibleClause : FC -> (lhs : RawImp' nm) -> ImpClause' nm

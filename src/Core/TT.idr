@@ -605,6 +605,7 @@ setMultiplicity (PVar fc _ p ty) c = PVar fc c p ty
 setMultiplicity (PLet fc _ val ty) c = PLet fc c val ty
 setMultiplicity (PVTy fc _ ty) c = PVTy fc c ty
 
+export
 Show ty => Show (Binder ty) where
   show (Lam _ c _ t) = "\\" ++ showCount c ++ show t
   show (Pi _ c _ t) = "Pi " ++ showCount c ++ show t
@@ -1470,11 +1471,18 @@ export
 renameTop : (m : Name) -> Term (n :: vars) -> Term (m :: vars)
 renameTop m tm = renameVars (CompatExt CompatPre) tm
 
+||| A thinning of context
 public export
 data SubVars : List Name -> List Name -> Type where
      SubRefl  : SubVars xs xs
      DropCons : SubVars xs ys -> SubVars xs (y :: ys)
      KeepCons : SubVars xs ys -> SubVars (x :: xs) (x :: ys)
+
+export
+render : {ms : _} -> SubVars ns ms -> List (Name, Bool)
+render SubRefl = map (, True) ms
+render {ms = m :: ms} (DropCons x) = (m, False) :: render x
+render {ms = m :: ms} (KeepCons x) = (m, True) :: render x
 
 export
 subElem : {idx : Nat} -> (0 p : IsVar name idx xs) ->
@@ -1565,6 +1573,28 @@ varEmbedSub (KeepCons prf) First = MkVar First
 varEmbedSub (KeepCons prf) (Later p)
     = let MkVar p' = varEmbedSub prf p in
           MkVar (Later p')
+
+||| Union of two subcontexts, if a variable appears in
+||| either, it will appear in the resulting list of names
+export
+union : {0 vs1, vs2: _} -> {vs : List Name} ->
+        (env1 : SubVars vs1 vs) ->
+        (env2 : SubVars vs2 vs) ->
+        (vsu : List Name ** SubVars vsu vs)
+union {vs} SubRefl p = (vs ** SubRefl)
+union {vs} p SubRefl = (vs ** SubRefl)
+union (DropCons p) (DropCons p')
+    = let (xs ** rest) = union p p' in
+          (xs ** DropCons rest)
+union (DropCons p) (KeepCons {x} p')
+    = let (xs ** rest) = union p p' in
+          (x :: xs ** KeepCons rest)
+union (KeepCons {x} p) (DropCons p')
+    = let (xs ** rest) = union p p' in
+          (x :: xs ** KeepCons rest)
+union (KeepCons {x} p) (KeepCons {x} p')
+    = let (xs ** rest) = union p p' in
+          (x :: xs ** KeepCons rest)
 
 export
 embedSub : SubVars small vars -> Term small -> Term vars

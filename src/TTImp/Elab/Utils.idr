@@ -11,6 +11,8 @@ import Core.Value
 import TTImp.Elab.Check
 import TTImp.TTImp
 
+import Debug.Trace
+
 %default covering
 
 detagSafe : {auto c : Ref Ctxt Defs} ->
@@ -100,12 +102,15 @@ bindNotReq {vs = n :: _} fc i (b :: env) (DropCons p) ns tm
        (Bind fc _ (Pi (binderLoc b) (multiplicity b) Explicit (binderType b)) tm)
 
 export
-bindReq : {vs : _} ->
-          FC -> Env Term vs -> (sub : SubVars pre vs) ->
-          List (PiInfo RawImp, Name) ->
-          Term pre -> Maybe (List (PiInfo RawImp, Name), List Name, ClosedTerm)
+bindReq : {pre, vs : List Name} ->
+          (fc : FC) ->
+          (env : Env Term vs) ->
+          (sub : SubVars pre vs) ->
+          (ns : List (PiInfo RawImp, Name)) ->
+          (tm : Term pre) ->
+          Maybe (List (PiInfo RawImp, Name), List Name, ClosedTerm)
 bindReq {vs} fc env SubRefl ns tm
-    = pure (ns, notLets [] _ env, abstractEnvType fc env tm)
+    = trace "bindReqSubRefl" $ pure (ns, notLets [] _ env, abstractEnvType fc env tm)
   where
     notLets : List Name -> (vars : List Name) -> Env Term vars -> List Name
     notLets acc [] _ = acc
@@ -113,10 +118,15 @@ bindReq {vs} fc env SubRefl ns tm
                                        else notLets (v :: acc) vs env
 bindReq {vs = n :: _} fc (b :: env) (KeepCons p) ns tm
     = do b' <- shrinkBinder b p
+         trace """
+             BindReq KeepCons: name \{show tm}
+                               binder \{the String (show b) }
+                               multiplicity \{show $ multiplicity b}
+             """ $
          bindReq fc env p ((plicit b, n) :: ns)
             (Bind fc _ (Pi (binderLoc b) (multiplicity b) Explicit (binderType b')) tm)
 bindReq fc (b :: env) (DropCons p) ns tm
-    = bindReq fc env p ns tm
+    = trace "BindReq DropCons" $ bindReq fc env p ns tm
 
 -- This machinery is to calculate whether any top level argument is used
 -- more than once in a case block, in which case inlining wouldn't be safe

@@ -11,6 +11,8 @@ import Core.TT
 import Core.UnifyState
 import Core.Value
 
+import Debug.Trace
+
 import Idris.REPL.Opts
 import Idris.Syntax
 
@@ -33,6 +35,10 @@ applyEnv env withname
                   \fc, nt => applyTo fc
                          (Ref fc nt (Resolved n')) env))
 
+-- If it's 'KeepCons/SubRefl' in 'outprf', that means it was in the outer
+-- environment so we need to keep it in the same place in the 'with'
+-- function. Hence, turn it to KeepCons whatever
+
 export
 processWith :
       {vars : List Name}
@@ -41,48 +47,64 @@ processWith :
    -> {auto u : Ref UST UState}
    -> {auto m : Ref MD Metadata}
    -> {auto c : Ref Ctxt Defs}
-   -> (mult : ZeroOneOmega)
-   -> (vis : Visibility)
-   -> (totreq : TotalReq)
+   -> (mult : ZeroOneOmega)  -- Multiplicity of the definition
+   -> (vis : Visibility)     -- Visibility of the definition
+   -> (totreq : TotalReq)    -- Is the definition total
    -> (hashit : Bool)
-   -> (n : Int)
+   -> (n : Int)              -- index of the definition as an Int
    -> (opts : List ElabOpt)
    -> (nest : NestedNames vars)
    -> (env : Env Term vars)
    -> (ifc : FC)
    -> (lhs_in : RawImp' Name)
-   -> (rig : ZeroOneOmega)
+   -> (with_rig : ZeroOneOmega) -- Multiplicity for the with expression
    -> (wval_raw : RawImp' Name)
    -> (mprf : Maybe Name)
    -> (flags : List WithFlag)
    -> (cs : List (ImpClause' Name))
    -> Core (Either (RawImp' Name) Clause)
 processWith {vars} mult vis totreq hashit n opts nest env
-    ifc lhs_in rig wval_raw mprf flags cs
+    ifc lhs_in with_rig with_val_raw mprf flags cs
     = do (lhs, (vars'  ** (sub', env', nest', lhspat, reqty))) <-
              checkLHS False mult n opts nest env ifc lhs_in
-         let wmode
-               = if isErased mult || isErased rig then InType else InExpr
+         let wmode = if isErased mult || isErased with_rig
+                        then InType
+                        else InExpr
 
-         (wval, gwvalTy) <- wrapErrorC opts (InRHS ifc !(getFullName (Resolved n))) $
-                elabTermSub n wmode opts nest' env' env sub' wval_raw Nothing
+         (with_val, gwvalTy) <- wrapErrorC opts (InRHS ifc !(getFullName (Resolved n)))
+              $ elabTermSub n wmode opts nest' env' env sub' with_val_raw Nothing
+
          clearHoleLHS
 
-         logTerm "declare.def.clause.with" 5 "With value (at quantity \{show rig})" wval
+         logTerm "declare.def.clause.with" 5 "With value (at quantity \{show with_rig})" with_val
          logTerm "declare.def.clause.with" 3 "Required type" reqty
          wvalTy <- getTerm gwvalTy
          defs <- get Ctxt
-         wval <- normaliseHoles defs env' wval
+         with_val <- normaliseHoles defs env' with_val
          wvalTy <- normaliseHoles defs env' wvalTy
 
-         let (wevars ** withSub) = keepOldEnv sub' (snd (findSubEnv env' wval))
+         -- the subenvironement in which `with` operates
+         let (val ** v') = findSubEnv env' with_val
+
+         -- sub' is the subcontext on the lhs
+         -- v' is the subcontext on the rhs
+         let (wevars ** withSub) = union sub' v'
+
+         coreLift $ putStrLn "original context"
+         coreLift $ putStrLn (show !(traverse toFullNames vars'))
+         coreLift $ putStrLn "sub context"
+         coreLift $ putStrLn (show !(traverse toFullNames val))
+
          logTerm "declare.def.clause.with" 5 "With value type" wvalTy
+
+         -- wevars is the list of arguments used by the with expression
          log "declare.def.clause.with" 5 $ "Using vars " ++ show wevars
 
-         let Just wval = shrinkTerm wval withSub
+         let Just with_val = shrinkTerm with_val withSub
              | Nothing => throw (InternalError "Impossible happened: With abstraction failure #1")
          let Just wvalTy = shrinkTerm wvalTy withSub
              | Nothing => throw (InternalError "Impossible happened: With abstraction failure #2")
+
          -- Should the env be normalised too? If the following 'impossible'
          -- error is ever thrown, that might be the cause!
          let Just wvalEnv = shrinkEnv env' withSub
@@ -90,7 +112,7 @@ processWith {vars} mult vis totreq hashit n opts nest env
 
          -- Abstracting over 'wval' in the scope of bNotReq in order
          -- to get the 'magic with' behaviour
-         (wargs ** (scenv, var, binder)) <- bindWithArgs rig wvalTy ((,wval) <$> mprf) wvalEnv
+         (wargs ** (scenv, var, binder)) <- bindWithArgs with_rig wvalTy ((,with_val) <$> mprf) wvalEnv
 
          let bnr = bindNotReq vfc 0 env' withSub [] reqty
          let notreqns = fst bnr
@@ -99,19 +121,30 @@ processWith {vars} mult vis totreq hashit n opts nest env
          rdefs <- if Syntactic `elem` flags
                      then clearDefs defs
                      else pure defs
-         wtyScope <- replace rdefs scenv !(nf rdefs scenv (weakenNs (mkSizeOf wargs) wval))
+         wtyScope <- replace rdefs scenv !(nf rdefs scenv (weakenNs (mkSizeOf wargs) with_val))
                             var
                             !(nf rdefs scenv
                                  (weakenNs (mkSizeOf wargs) notreqty))
          let bNotReq = binder wtyScope
 
+         fn <- toFullNames bNotReq
+         coreLift $ putStrLn (show fn)
+
+         coreLift $ putStrLn ("all vars before: " ++ (show $ allVars env'))
          -- The environment has some implicit and some explcit args, potentially,
          -- which is inconvenient since we have to know which is which when
          -- elaborating the application of the rhs function. So it's easier
          -- if we just make them all explicit - this type isn't visible to
          -- users anyway!
          let env' = mkExplicit env'
+         coreLift $ putStrLn ("all vars after: " ++ (show $ allVars env'))
 
+         -- vfc is the location of the expression, it's a virtual location since
+         -- it does not exist in the source
+         -- wtype is the type of the function into which `with` desugars
+         -- env' is the environement at the left-hand-side
+         -- withSub
+         -- bNotRequ
          let Just (reqns, envns, wtype) = bindReq vfc env' withSub [] bNotReq
              | Nothing => throw (InternalError "Impossible happened: With abstraction failure #4")
 
@@ -132,13 +165,13 @@ processWith {vars} mult vis totreq hashit n opts nest env
 
          let toWarg : Maybe (PiInfo RawImp, Name) -> List (Maybe Name, RawImp)
                := flip maybe (\pn => [(Nothing, IVar vfc (snd pn))]) $
-                    (Nothing, wval_raw) ::
+                    (Nothing, with_val_raw) ::
                     case mprf of
                       Nothing => []
                       Just _  =>
                        let fc = emptyFC in
                        let refl = IVar fc (NS builtinNS (UN $ Basic "Refl")) in
-                       [(mprf, INamedApp fc refl (UN $ Basic "x") wval_raw)]
+                       [(mprf, INamedApp fc refl (UN $ Basic "x") with_val_raw)]
 
          let rhs_in = gapply (IVar vfc wname)
                     $ map (\ nm => (Nothing, IVar vfc nm)) envns
@@ -231,26 +264,6 @@ processWith {vars} mult vis totreq hashit n opts nest env
 
       pure (wargs ** (scenv, var, binder))
 
-    -- If it's 'KeepCons/SubRefl' in 'outprf', that means it was in the outer
-    -- environment so we need to keep it in the same place in the 'with'
-    -- function. Hence, turn it to KeepCons whatever
-    keepOldEnv : {0 outer : _} -> {vs : _} ->
-                 (outprf : SubVars outer vs) -> SubVars vs' vs ->
-                 (vs'' : List Name ** SubVars vs'' vs)
-    keepOldEnv {vs} SubRefl p = (vs ** SubRefl)
-    keepOldEnv {vs} p SubRefl = (vs ** SubRefl)
-    keepOldEnv (DropCons p) (DropCons p')
-        = let (_ ** rest) = keepOldEnv p p' in
-              (_ ** DropCons rest)
-    keepOldEnv (DropCons p) (KeepCons p')
-        = let (_ ** rest) = keepOldEnv p p' in
-              (_ ** KeepCons rest)
-    keepOldEnv (KeepCons p) (DropCons p')
-        = let (_ ** rest) = keepOldEnv p p' in
-              (_ ** KeepCons rest)
-    keepOldEnv (KeepCons p) (KeepCons p')
-        = let (_ ** rest) = keepOldEnv p p' in
-              (_ ** KeepCons rest)
 
     -- Rewrite the clauses in the block to use an updated LHS.
     -- 'drop' is the number of additional with arguments we expect
