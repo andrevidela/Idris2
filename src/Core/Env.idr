@@ -325,3 +325,9 @@ allVarsNoLet : {vars : _} -> Env Term vars -> List (Var vars)
 allVarsNoLet [] = []
 allVarsNoLet (Let _ _ _ _ :: vs) = map weaken (allVars vs)
 allVarsNoLet (v :: vs) = MkVar First :: map weaken (allVars vs)
+
+export
+mapEnv : (f : forall vs. Binder (Term vs) -> Binder (Term vs)) -> Env Term ns -> Env Term ns
+mapEnv f [] = []
+mapEnv f (bd :: rho) = f bd :: mapEnv f rho
+

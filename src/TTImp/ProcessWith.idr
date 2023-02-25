@@ -39,6 +39,20 @@ applyEnv env withname
 -- environment so we need to keep it in the same place in the 'with'
 -- function. Hence, turn it to KeepCons whatever
 
+subtractSelf : Binder (Term ns) -> Binder (Term ns)
+subtractSelf bd = setMultiplicity bd (multiplicity bd `minus` multiplicity bd)
+
+subtractContext : Env Term ns -> Env Term ns
+subtractContext [] = []
+subtractContext (bd :: rho) = subtractSelf bd :: subtractContext rho
+
+-- subtract the multiplicity of selected variables by themselves
+mapSubvariables : (f : forall ns. Binder (Term ns) -> Binder (Term ns)) ->
+                  Env Term ns -> SubVars vars ns -> Env Term ns
+mapSubvariables f rho SubRefl = mapEnv f rho
+mapSubvariables f (bd :: rho) (DropCons x) = bd :: mapSubvariables f rho x
+mapSubvariables f (bd :: rho) (KeepCons x) = f bd :: mapSubvariables f rho x
+
 export
 processWith :
       {vars : List Name}
@@ -85,15 +99,9 @@ processWith {vars} mult vis totreq hashit n opts nest env
 
          -- the subenvironement in which `with` operates
          let (val ** v') = findSubEnv env' with_val
-
          -- sub' is the subcontext on the lhs
          -- v' is the subcontext on the rhs
          let (wevars ** withSub) = union sub' v'
-
-         coreLift $ putStrLn "original context"
-         coreLift $ putStrLn (show !(traverse toFullNames vars'))
-         coreLift $ putStrLn "sub context"
-         coreLift $ putStrLn (show !(traverse toFullNames val))
 
          logTerm "declare.def.clause.with" 5 "With value type" wvalTy
 
@@ -130,14 +138,13 @@ processWith {vars} mult vis totreq hashit n opts nest env
          fn <- toFullNames bNotReq
          coreLift $ putStrLn (show fn)
 
-         coreLift $ putStrLn ("all vars before: " ++ (show $ allVars env'))
+         let env' = mapSubvariables subtractSelf env' withSub
          -- The environment has some implicit and some explcit args, potentially,
          -- which is inconvenient since we have to know which is which when
          -- elaborating the application of the rhs function. So it's easier
          -- if we just make them all explicit - this type isn't visible to
          -- users anyway!
          let env' = mkExplicit env'
-         coreLift $ putStrLn ("all vars after: " ++ (show $ allVars env'))
 
          -- vfc is the location of the expression, it's a virtual location since
          -- it does not exist in the source

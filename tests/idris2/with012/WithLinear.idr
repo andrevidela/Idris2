@@ -10,6 +10,7 @@ viewList : (1 ls : LinearList a) -> LinearListView ls
 viewList [] = IsNil
 viewList (x :: xs) = IsCons
 
+%logging "declare.def.clause.with" 5
 checkView : (1 ls : LinearList a) -> LinearList a
 checkView ls with 1 (viewList ls)
   checkView [] | IsNil = ?rhs1

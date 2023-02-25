@@ -8,6 +8,19 @@ import Algebra.Preorder
 export
 data ZeroOneOmega = Rig0 | Rig1 | RigW
 
+-- subtraction of usage:
+-- 0 - _ = 0
+-- 1 - 0 = 1
+-- 1 - 1 = 0
+-- 1 - ω = 0
+-- w - _ = ω
+export
+minus : ZeroOneOmega -> ZeroOneOmega -> ZeroOneOmega
+minus Rig0 rig1 = Rig0
+minus Rig1 Rig0 = Rig1
+minus Rig1 _    = Rig0
+minus RigW rig1 = RigW
+
 %name ZeroOneOmega rig
 
 export
