@@ -14,6 +14,11 @@ comment
   <+> many (is '-') <+> reject (is '}')  -- not a closing delimiter
   <+> many (isNot '\n')                  -- till the end of line
 
+||| Allowed unicode operators
+export
+unicode : List Char
+unicode = ['•','×','⊗','⊕','∈','∋','○','≡','¬','⊃','⊂','√','∫']
+
 -- Identifier Lexer
 -- There are multiple variants.
 
@@ -22,14 +27,14 @@ data Flavour = AllowDashes | Capitalised | Normal
 
 isIdentStart : Flavour -> Char -> Bool
 isIdentStart _           '_' = True
-isIdentStart Capitalised  x  = isUpper x || x > chr 160
-isIdentStart _            x  = isAlpha x || x > chr 160
+isIdentStart Capitalised  x  = isUpper x || (x > chr 160 && not (x `elem` unicode))
+isIdentStart _            x  = isAlpha x || (x > chr 160 && not (x `elem` unicode))
 
 isIdentTrailing : Flavour -> Char -> Bool
 isIdentTrailing AllowDashes '-'  = True
 isIdentTrailing _           '\'' = True
 isIdentTrailing _           '_'  = True
-isIdentTrailing _            x   = isAlphaNum x || x > chr 160
+isIdentTrailing _            x   = isAlphaNum x || (x > chr 160 && not (x `elem` unicode))
 
 export %inline
 isIdent : Flavour -> String -> Bool
