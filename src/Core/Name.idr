@@ -7,9 +7,9 @@ import Libraries.Data.String.Extra
 import Libraries.Text.PrettyPrint.Prettyprinter
 import Libraries.Text.PrettyPrint.Prettyprinter.Util
 import Libraries.Utils.String
-
 import Libraries.Text.Distance.Levenshtein as Distance
 
+import Parser.Lexer.Common
 import public Core.Name.Namespace
 
 %default total
@@ -85,7 +85,8 @@ userNameRoot _ = Nothing
 
 export
 isOpChar : Char -> Bool
-isOpChar c = c `elem` (unpack ":!#$%&*+./<=>?@\\^|-~")
+isOpChar c = c `elem` (unpack ":!#$%&*+./<=>?@\\^|-~" ++ unicode)
+
 
 export
 ||| Test whether a user name begins with an operator symbol.
