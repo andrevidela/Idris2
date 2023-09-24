@@ -17,6 +17,7 @@ import Libraries.Utils.Octal
 import Libraries.Utils.String
 
 import Core.Name
+import Debug.Trace
 
 %default total
 
