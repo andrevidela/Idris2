@@ -11,6 +11,7 @@ import Data.Vect
 import Libraries.Data.IMaybe
 import Libraries.Text.PrettyPrint.Prettyprinter
 import Libraries.Text.PrettyPrint.Prettyprinter.Util
+import Libraries.Text.PrettyPrint.Prettyprinter.Doc
 import Libraries.Data.Tap
 
 import public Data.IORef
@@ -158,6 +159,9 @@ data Error : Type where
                   FC -> Env Term vars -> Term vars -> (description : String) -> Error
      RunElabFail : Error -> Error
      GenericMsg : FC -> String -> Error
+     OperatorBindingMismatch : {a : Type} -> {print : a -> Doc ()} ->
+         FC -> (expectedFixity : Maybe FixityInfo) -> (use_site : OperatorLHSInfo a) ->
+         (opName : Name) -> (rhs : a) -> Error
      TTCError : TTCErrorMsg -> Error
      FileErr : String -> FileError -> Error
      CantFindPackage : String -> Error
@@ -385,10 +389,13 @@ Show Error where
          show err
 
   show (MaybeMisspelling err ns)
-     = show err ++ "\nDid you mean" ++ case ns of
-         (n ::: []) => ": " ++ n ++ "?"
-         _ => " any of: " ++ showSep ", " (map show (forget ns)) ++ "?"
+       = show err ++ "\nDid you mean" ++ case ns of
+           (n ::: []) => ": " ++ n ++ "?"
+           _ => " any of: " ++ showSep ", " (map show (forget ns)) ++ "?"
   show (WarningAsError w) = show w
+  show (OperatorBindingMismatch fc expected actual opName rhs)
+       = show fc ++ ": Operator " ++ show opName ++ " is " ++ show expected
+       ++ " but used as a " ++ show actual ++ " operator"
 
 export
 getWarningLoc : Warning -> FC
@@ -477,6 +484,7 @@ getErrorLoc (InLHS _ _ err) = getErrorLoc err
 getErrorLoc (InRHS _ _ err) = getErrorLoc err
 getErrorLoc (MaybeMisspelling err _) = getErrorLoc err
 getErrorLoc (WarningAsError warn) = Just (getWarningLoc warn)
+getErrorLoc (OperatorBindingMismatch fc _ _ _ _) = Just fc
 
 export
 killWarningLoc : Warning -> Warning
@@ -564,6 +572,9 @@ killErrorLoc (InLHS fc x err) = InLHS emptyFC x (killErrorLoc err)
 killErrorLoc (InRHS fc x err) = InRHS emptyFC x (killErrorLoc err)
 killErrorLoc (MaybeMisspelling err xs) = MaybeMisspelling (killErrorLoc err) xs
 killErrorLoc (WarningAsError wrn) = WarningAsError (killWarningLoc wrn)
+killErrorLoc (OperatorBindingMismatch {print} fc expected actual opName rhs)
+             = OperatorBindingMismatch {print} emptyFC expected actual opName rhs
+
 
 -- Core is a wrapper around IO that is specialised for efficiency.
 export
