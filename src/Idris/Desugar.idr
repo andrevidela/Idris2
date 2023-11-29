@@ -131,7 +131,7 @@ checkConflictingFixities isPrefix exprFC opn
                 -- in the prefix case, remove conflicts with infix (-)
                 let extraFixities = pre ++ (filter (\(nm, _) => not $ nameRoot nm == "-") inf)
                 unless (isCompatible fx extraFixities) $ warnConflict fxName extraFixities
-                pure (mkPrec fx.fix fx.precedence, Just fx)
+                pure (mkPrec fx.fix fx.precedence.natPrec, Just fx)
             -- Could not find any prefix operator fixities, there may still be conflicts with
             -- the infix ones.
             (True, [] , _) => throw (GenericMsg exprFC $ "'\{op}' is not a prefix operator")
@@ -140,7 +140,7 @@ checkConflictingFixities isPrefix exprFC opn
                 -- In the infix case, remove conflicts with prefix (-)
                 let extraFixities = (filter (\(nm, _) => not $ nm == UN (Basic "-")) pre) ++ inf
                 unless (isCompatible fx extraFixities) $ warnConflict fxName extraFixities
-                pure (mkPrec fx.fix fx.precedence, Just fx)
+                pure (mkPrec fx.fix fx.precedence.natPrec, Just fx)
             -- Could not find any infix operator fixities, there may be prefix ones
             (False, _, []) => throw (GenericMsg exprFC $ "'\{op}' is not an infix operator")
   where
@@ -1165,7 +1165,7 @@ mutual
            let updatedNS = NS (mkNestedNamespace (Just ctx.currentNS) (show fix))
                               (UN $ Basic $ nameRoot opName)
 
-           update Syn { fixities $= addName updatedNS (MkFixityInfo fc vis binding fix prec) }
+           update Syn { fixities $= addName updatedNS (MkFixityInfo fc vis binding fix (UserPrec prec)) }
            pure []
   desugarDecl ps d@(PFail fc mmsg ds)
       = do -- save the state: the content of a failing block should be discarded

@@ -93,6 +93,16 @@ TTC BindingModifier where
              2 => pure Autobind
              _ => corrupt "binding"
 
+TTC Precedence where
+  toBuf b prec = toBuf b prec.natPrec
+  fromBuf b = do nat <- fromBuf b
+                 pure (natToPrec nat)
+      where
+        natToPrec : Nat -> Precedence
+        natToPrec 0 = EqSymbolPrec
+        natToPrec 1 = ArrowPrec
+        natToPrec (S (S n)) = UserPrec n
+
 export
 TTC FixityInfo where
   toBuf b fx

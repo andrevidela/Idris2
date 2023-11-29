@@ -1154,6 +1154,43 @@ Show BindingModifier where
   show Typebind = "typebind"
   show Autobind = "autobind"
 
+public export
+data Precedence
+  = EqSymbolPrec -- Lowest precedence, used for `=` when parsing expressions between `->`
+  | ArrowPrec -- Lower precedence than user-definable precedences
+  | UserPrec Nat -- User-defined precedence
+
+export
+(.natPrec) : Precedence -> Nat
+(.natPrec) EqSymbolPrec = 0
+(.natPrec) ArrowPrec = 1
+(.natPrec) (UserPrec n) = n + 2
+
+export
+Eq Precedence where
+  EqSymbolPrec == EqSymbolPrec = True
+  ArrowPrec == ArrowPrec = True
+  UserPrec n == UserPrec m = n == m
+  _ == _ = False
+
+export
+Ord Precedence where
+  compare EqSymbolPrec EqSymbolPrec = EQ
+  compare EqSymbolPrec n = LT
+  compare ArrowPrec EqSymbolPrec = GT
+  compare ArrowPrec ArrowPrec = EQ
+  compare ArrowPrec _ = LT
+  compare (UserPrec n) (UserPrec m) = compare n m
+  compare (UserPrec n) _ = GT
+
+-- We give the illusion that there are negative precedence levels
+-- This gives the hint that they are compiler-builtins
+export
+Show Precedence where
+  show EqSymbolPrec = "-2"
+  show ArrowPrec = "-1"
+  show (UserPrec n) = show n
+
 -- A record to hold all the information about a fixity
 public export
 record FixityInfo where
@@ -1162,7 +1199,7 @@ record FixityInfo where
   vis : Visibility
   bindingInfo : BindingModifier
   fix : Fixity
-  precedence : Nat
+  precedence : Precedence
 
 export
 Show FixityInfo where

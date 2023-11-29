@@ -1,10 +1,9 @@
-Main> Couldn't parse any alternatives:
-1: Expected name.
+Main> Expected name.
 
 (Interactive):1:5--1:6
  1 | :t (3 : Nat)
          ^
-... (54 others)
+
 Main> Expected string begin.
 
 (Interactive):1:5--1:7

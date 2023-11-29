@@ -898,15 +898,15 @@ record SyntaxInfo where
   holeNames : List String -- hole names in the file
 
 export
-prefixes : SyntaxInfo -> ANameMap (FC, Nat)
+prefixes : SyntaxInfo -> ANameMap (FC, Precedence)
 prefixes = fromList
-    . map (\(name, fx)=> (name, fx.fc, fx.precedence))
+    . map (\(name, fx) => (name, fx.fc, fx.precedence))
     . filter ((== Prefix) . fix . snd)
     . toList
     . fixities
 
 export
-infixes : SyntaxInfo -> ANameMap (FC, Fixity, Nat)
+infixes : SyntaxInfo -> ANameMap (FC, Fixity, Precedence)
 infixes = fromList
     . map (\(nm, fx) => (nm, fx.fc, fx.fix, fx.precedence))
     . filter ((/= Prefix) . fix . snd)
@@ -970,9 +970,13 @@ initSyntax
 
     initFixities : ANameMap FixityInfo
     initFixities = fromList
-      [ (UN $ Basic "-", MkFixityInfo EmptyFC Export NotBinding Prefix 10)
-      , (UN $ Basic "negate", MkFixityInfo EmptyFC Export NotBinding Prefix 10) -- for documentation purposes
-      , (UN $ Basic "=", MkFixityInfo EmptyFC Export NotBinding Infix 0)
+      [ (UN $ Basic "-", MkFixityInfo EmptyFC Export NotBinding Prefix (UserPrec 10))
+      , (UN $ Basic "negate", MkFixityInfo EmptyFC Export NotBinding Prefix (UserPrec 10)) -- for documentation purposes
+      , (UN $ Basic "=", MkFixityInfo EmptyFC Export NotBinding Infix EqSymbolPrec)
+      , (UN $ Basic "->", MkFixityInfo EmptyFC Export Typebind Infix ArrowPrec)
+      , (UN $ Basic "->", MkFixityInfo EmptyFC Export NotBinding Infix ArrowPrec)
+      , (UN $ Basic "=>", MkFixityInfo EmptyFC Export NotBinding Infix ArrowPrec)
+      , (UN $ Basic "=>", MkFixityInfo EmptyFC Export Typebind Infix ArrowPrec)
       ]
 
     initDocStrings : ANameMap String

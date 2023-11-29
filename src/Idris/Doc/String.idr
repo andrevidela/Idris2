@@ -318,7 +318,7 @@ getDocsForName fc n config
         = let names = lookupName (UN $ Basic $ nameRoot n) (infixes !(get Syn))
           in pure $ map printName names
         where
-          printName : (Name, FC, Fixity, Nat) -> (Doc IdrisDocAnn)
+          printName : (Name, FC, Fixity, Precedence) -> (Doc IdrisDocAnn)
           printName (name,  loc, fixity, assoc) =
             -- todo,  change display as "infix operator (++)
              hsep
@@ -333,7 +333,7 @@ getDocsForName fc n config
         = let names = lookupName (UN $ Basic $ nameRoot n) (prefixes !(get Syn))
           in pure $ map printPrefixName names
           where
-            printPrefixName : (Name, FC, Nat) -> Doc IdrisDocAnn
+            printPrefixName : (Name, FC, Precedence) -> Doc IdrisDocAnn
             printPrefixName (_, _, assoc) = "prefix operator, level" <++> pretty0 (show assoc)
 
     getFixityDoc : Name -> Core (List (Doc IdrisDocAnn))

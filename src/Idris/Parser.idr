@@ -350,7 +350,8 @@ mutual
   autobindOp q fname indents
       = do binder <- bounds $ parens fname (opBinder fname indents)
            continue indents
-           op <- bounds iOperator
+           op <- mustWorkBecause binder.bounds "Unexpected binder"
+                   (bounds (iOperator <|> piBindSymbol fname))
            e <- bounds (expr q fname indents)
            pure (POp (boundToFC fname $ mergeBounds binder e)
                      (boundToFC fname op)
@@ -698,6 +699,11 @@ mutual
   pibindList fname indents
     = do params <- pibindListName fname indents
          pure $ map (\(rig, n, ty) => (rig, map Just n, ty)) params
+
+  piBindSymbol : OriginDesc -> Rule Name
+  piBindSymbol fname
+      = (decoratedSymbol fname "->" *> pure (UN (Basic "->")))
+    <|> (decoratedSymbol fname "=>" *> pure (UN (Basic "=>")))
 
   bindSymbol : OriginDesc -> Rule (PiInfo PTerm)
   bindSymbol fname
