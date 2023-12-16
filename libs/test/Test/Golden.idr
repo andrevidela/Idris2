@@ -218,14 +218,14 @@ normalize str =
 
 ||| The result of a test run
 ||| `Left` corresponds to a failure, and `Right` to a success
-Result : Type
-Result = Either String String
+Result : Type -> Type
+Result = Either String
 
 ||| Run the specified Golden test with the supplied options.
 ||| See the module documentation for more information.
 ||| @testPath the directory that contains the test.
 export
-runTest : Options -> (testPath : String) -> IO Result
+runTest : Options -> (testPath : String) -> IO (Result String)
 runTest opts testPath = do
   start <- clockTime UTC
   let cg = maybe "" (" --cg " ++) (codegen opts)
@@ -459,19 +459,19 @@ filterTests opts = case onlyNames opts of
 
 ||| The summary of a test pool run
 public export
-record Summary where
+record Summary (result : Type) (error : Type) where
   constructor MkSummary
-  success : List String
-  failure : List String
+  success : List result
+  failure : List error
 
 ||| A new, blank summary
 export
-initSummary : Summary
+initSummary : Summary r e
 initSummary = MkSummary [] []
 
 ||| Update the summary to contain the given result
 export
-updateSummary : (newRes : Result) -> Summary -> Summary
+updateSummary : (newRes : Either e a) -> Summary a e -> Summary a e
 updateSummary newRes =
   case newRes of
        Left l  => { failure $= (l ::) }
@@ -479,7 +479,7 @@ updateSummary newRes =
 
 ||| Update the summary to contain the given results
 export
-bulkUpdateSummary : (newRess : List Result) -> Summary -> Summary
+bulkUpdateSummary : (newRess : List (Result a)) -> Summary a String-> Summary a String
 bulkUpdateSummary newRess =
   let (ls, ws) = partitionEithers newRess in
   { success $= (ws ++)
@@ -487,21 +487,21 @@ bulkUpdateSummary newRess =
   }
 
 export
-Semigroup Summary where
+Semigroup (Summary a e) where
   MkSummary ws1 ls1 <+> MkSummary ws2 ls2
     = MkSummary (ws1 ++ ws2) (ls1 ++ ls2)
 
 export
-Monoid Summary where
+Monoid (Summary a e) where
   neutral = initSummary
 
 ||| An instruction to a thread which runs tests
 public export
-data ThreadInstruction : Type where
+data ThreadInstruction : Type -> Type where
   ||| A test to run
-  Run : (test : String) -> ThreadInstruction
+  Run : (identifier : i) -> ThreadInstruction i
   ||| An indication for the thread to stop
-  Stop : ThreadInstruction
+  Stop : ThreadInstruction i
 
 ||| Sends the given tests on the given @Channel@, then sends `nThreads` many
 ||| 'Stop' @ThreadInstruction@s to stop the threads running the tests.
@@ -510,8 +510,8 @@ data ThreadInstruction : Type where
 ||| @nThreads The number of threads being used to run the tests.
 ||| @tests The list of tests to send to the runners/threads.
 export
-testSender : (testChan : Channel ThreadInstruction) -> (nThreads : Nat)
-           -> (tests : List String) -> IO ()
+testSender : (testChan : Channel (ThreadInstruction a)) -> (nThreads : Nat)
+           -> (tests : List a) -> IO ()
 testSender testChan 0 [] = pure ()
 testSender testChan (S k) [] =
   -- out of tests, so the next thing for all the threads is to stop
@@ -523,11 +523,11 @@ testSender testChan nThreads (test :: tests) =
 
 ||| A result from a test-runner/thread
 public export
-data ThreadResult : Type where
+data ThreadResult : a -> err -> Type where
   ||| The result of running a test
-  Res : (res : Result) -> ThreadResult
+  Res : (value : Either err a) -> ThreadResult a err
   ||| An indication that the thread was told to stop
-  Done : ThreadResult
+  Done : ThreadResult a err
 
 ||| Receives results on the given @Channel@, accumulating them as a @Summary@.
 ||| When all results have been received (i.e. @nThreads@ many 'Done'
@@ -540,8 +540,8 @@ data ThreadResult : Type where
 ||| @accChan The Channel to send the final Summary over.
 ||| @nThreads The number of threads being used to run the tests.
 export
-testReceiver : (resChan : Channel ThreadResult) -> (acc : Summary)
-             -> (accChan : Channel Summary) -> (nThreads : Nat) -> IO ()
+testReceiver : (resChan : Channel (ThreadResult a err)) -> (acc : Summary a err)
+             -> (accChan : Channel (Summary a err)) -> (nThreads : Nat) -> IO ()
 testReceiver resChan acc accChan 0 = channelPut accChan acc
 testReceiver resChan acc accChan nThreads@(S k) =
   do (Res res) <- channelGet resChan
@@ -553,14 +553,32 @@ testReceiver resChan acc accChan nThreads@(S k) =
 ||| @opts The options to run the threads under.
 ||| @testChan The Channel to receive tests on.
 ||| @resChan The Channel to send results over.
-testThread : (opts : Options) -> (testChan : Channel ThreadInstruction)
-              -> (resChan : Channel ThreadResult) -> IO ()
-testThread opts testChan resChan =
+testThread : (run : arg -> IO (Either err res)) -> (testChan : Channel (ThreadInstruction arg))
+              -> (resChan : Channel (ThreadResult res err)) -> IO ()
+testThread run testChan resChan =
   do (Run test) <- channelGet testChan
         | Stop => channelPut resChan Done
-     res <- runTest opts test
+     res <- run test
      channelPut resChan (Res res)
-     testThread opts testChan resChan
+     testThread run testChan resChan
+
+runParallel : {0 input : Type} -> (input -> IO (Either err res)) -> List input -> (threads : Nat) -> IO (Summary res err)
+runParallel exec inputs threads = do
+       -- set up the channels
+       accChan <- makeChannel
+       resChan <- makeChannel
+       testChan <- makeChannel
+
+       -- and then run all the tests
+
+       for_ (replicate threads 0) $ \_ =>
+         fork (testThread exec testChan resChan)
+       -- start sending tests
+       senderTID <- fork $ testSender testChan threads inputs
+       -- start receiving results
+       receiverTID <- fork $ testReceiver resChan initSummary accChan threads
+       -- wait until things are done, i.e. until we receive the final acc
+       channelGet accChan
 
 ||| A runner for a test pool. If there are tests in the @TestPool@ that we want
 ||| to run, spawns `opts.threads` many runners and sends them the tests,
@@ -569,7 +587,7 @@ testThread opts testChan resChan =
 ||| @opts The options for the TestPool.
 ||| @pool The TestPool to run.
 export
-poolRunner : Options -> TestPool -> IO Summary
+poolRunner : Options -> TestPool -> IO (Summary String String)
 poolRunner opts pool
   = do -- check that we indeed want to run some of these tests
        let tests = filterTests opts (testCases pool)
@@ -595,22 +613,7 @@ poolRunner opts pool
                     Just cg => { codegen := Just (show @{CG} cg) } opts
                     Default => opts
 
-       -- set up the channels
-       accChan <- makeChannel
-       resChan <- makeChannel
-       testChan <- makeChannel
-
-       -- and then run all the tests
-
-       for_ (replicate opts.threads 0) $ \_ =>
-         fork (testThread opts testChan resChan)
-       -- start sending tests
-       senderTID <- fork $ testSender testChan opts.threads tests
-       -- start receiving results
-       receiverTID <- fork $ testReceiver resChan initSummary accChan opts.threads
-       -- wait until things are done, i.e. until we receive the final acc
-       acc <- channelGet accChan
-       pure acc
+       runParallel (runTest opts) tests opts.threads
 
   where
 

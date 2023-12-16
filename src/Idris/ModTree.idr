@@ -24,6 +24,7 @@ import System.Directory
 
 import Libraries.Data.StringMap
 import Libraries.Data.String.Extra as Extra
+import Libraries.System.Concurrency.Parallel
 
 %default covering
 
@@ -275,11 +276,23 @@ buildMods : {auto c : Ref Ctxt Defs} ->
             {auto o : Ref ROpts REPLOpts} ->
             FC -> Nat -> Nat -> List BuildMod ->
             Core (List Error)
-buildMods fc num len [] = pure []
-buildMods fc num len (m :: ms)
-    = case !(buildMod fc num len m) of
-           [] => buildMods fc (1 + num) len ms
-           errs => pure errs
+buildMods fc num len mods = do
+  result <- coreLift $ runParallel runMod (zip [0 .. len] mods) 16
+  pure (concat (result.failure))
+  where
+    runMod : (Nat, BuildMod) -> IO (Either (List Error) ())
+    runMod (n, mod) = coreRun (buildMod fc (num + n) len mod)
+                              (\err => do -- putStrLn "exception, we should abort"
+                                          -- printLn err
+                                          pure (Right ()))
+                              (\case [] => pure (Right ())
+                                     xs => pure (Left xs))
+
+-- buildMods fc num len [] = pure []
+-- buildMods fc num len (m :: ms)
+--     = case !(buildMod fc num len m) of
+--            [] => buildMods fc (1 + num) len ms
+--            errs => pure errs
 
 export
 buildDeps : {auto c : Ref Ctxt Defs} ->
