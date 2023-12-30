@@ -259,8 +259,7 @@ mutual
        Totality : TotalReq -> FnOpt' nm
        Macro : FnOpt' nm
        SpecArgs : List Name -> FnOpt' nm
-       Typebind : FnOpt' nm
-       Autobind : FnOpt' nm
+       Binding : BindingModifier -> FnOpt' nm
   %name FnOpt' fopt
 
   public export
@@ -287,8 +286,7 @@ mutual
     show (Totality PartialOK) = "partial"
     show Macro = "%macro"
     show (SpecArgs ns) = "%spec " ++ showSep " " (map show ns)
-    show Typebind = "typebind"
-    show Autobind = "autobind"
+    show (Binding b) = show b
 
   export
   Eq FnOpt where
@@ -305,8 +303,7 @@ mutual
     (Totality tot_lhs) == (Totality tot_rhs) = tot_lhs == tot_rhs
     Macro == Macro = True
     (SpecArgs ns) == (SpecArgs ns') = ns == ns'
-    Typebind == Typebind = True
-    Autobind == Autobind = True
+    (Binding b) == (Binding b') = b == b'
     _ == _ = False
 
   public export
