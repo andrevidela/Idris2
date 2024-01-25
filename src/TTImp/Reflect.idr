@@ -655,6 +655,11 @@ mutual
     reflect fc defs lhs env (UniqueDefault x)
         = do x' <- reflect fc defs lhs env x
              appCon fc defs (reflectionttimp "UniqueDefault") [x']
+  export
+  Reflect BindingModifier where
+    reflect fc defs lhs env Autobind = getCon fc defs (reflectionttimp "Autobind")
+    reflect fc defs lhs env Typebind = getCon fc defs (reflectionttimp "Typebind")
+    reflect fc defs lhs env NotBinding = getCon fc defs (reflectionttimp "NotBinding")
 
   export
   Reflect FnOpt where
@@ -681,8 +686,9 @@ mutual
         = do r' <- reflect fc defs lhs env r
              appCon fc defs (reflectionttimp "Totality") [r']
     reflect fc defs lhs env Macro = getCon fc defs (reflectionttimp "Macro")
-    reflect fc defs lhs env Typebind = getCon fc defs (reflectionttimp "Typebind")
-    reflect fc defs lhs env Autobind = getCon fc defs (reflectionttimp "Autobind")
+    reflect fc defs lhs env (Binding x)
+        = do x' <- reflect fc defs lhs env x
+             appCon fc defs (reflectionttimp "Binding") [x']
     reflect fc defs lhs env (SpecArgs r)
         = do r' <- reflect fc defs lhs env r
              appCon fc defs (reflectionttimp "SpecArgs") [r']

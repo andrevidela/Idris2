@@ -352,8 +352,7 @@ mutual
     toBuf b Unsafe = tag 13
     toBuf b Deprecate = tag 14
     toBuf b (ForeignExport cs) = do tag 15; toBuf b cs
-    toBuf b Typebind = tag 16
-    toBuf b Autobind = tag 17
+    toBuf b (Binding x) = do tag 16 ; toBuf b x
 
     fromBuf b
         = case !getTag of
@@ -373,8 +372,7 @@ mutual
                13 => pure Unsafe
                14 => pure Deprecate
                15 => do cs <- fromBuf b; pure (ForeignExport cs)
-               16 => pure Typebind
-               17 => pure Autobind
+               16 => do arg <- fromBuf b ; pure (Binding arg)
                _ => corrupt "FnOpt"
 
   export

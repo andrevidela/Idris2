@@ -1181,3 +1181,14 @@ Core.Context.decode gam idx update (Coded ns bin)
          when update $ coreLift $ writeArray arr idx (Decoded def')
          pure def'
 Core.Context.decode gam idx update (Decoded def) = pure def
+
+export
+TTC BindingModifier where
+  toBuf b Autobind = tag 0
+  toBuf b Typebind = tag 1
+  toBuf b NotBinding = tag 2
+  fromBuf b = case !getTag of
+                   0 => pure Autobind
+                   1 => pure Typebind
+                   2 => pure NotBinding
+                   _ => corrupt "BindingModifier"

@@ -43,8 +43,7 @@ parameters (f : RawImp' nm -> RawImp' nm)
   mapFnOpt Invertible = Invertible
   mapFnOpt (Totality treq) = Totality treq
   mapFnOpt Macro = Macro
-  mapFnOpt Typebind = Typebind
-  mapFnOpt Autobind = Autobind
+  mapFnOpt (Binding x) = Binding x
   mapFnOpt (SpecArgs ns) = SpecArgs ns
 
   export

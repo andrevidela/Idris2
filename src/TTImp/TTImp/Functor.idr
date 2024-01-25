@@ -128,8 +128,7 @@ mutual
     map f (Totality tot) = Totality tot
     map f Macro = Macro
     map f (SpecArgs ns) = SpecArgs ns
-    map f Autobind = Autobind
-    map f Typebind = Typebind
+    map f (Binding x) = Binding x
 
   export
   Functor ImpTy' where
