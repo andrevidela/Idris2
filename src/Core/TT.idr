@@ -176,6 +176,11 @@ Eq FixityInfo where
 public export
 data BacktickOrOperatorFixity = Backticked | DeclaredFixity FixityInfo
 
+export
+Show BacktickOrOperatorFixity where
+  show Backticked = "undefined fixity"
+  show (DeclaredFixity i) = show i
+
 -- Left-hand-side information for operators, carries autobind information
 -- an operator can either be
 -- - not autobind, a regular operator

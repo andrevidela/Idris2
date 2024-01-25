@@ -91,6 +91,7 @@ knownTopics = [
     ("desugar.failing", Just "Log result of desugaring a `failing' block"),
     ("desugar.fixity", Just "Log result of desugaring a fixity declaration"),
     ("desugar.lhs", Just "Log result of desugaring a left hand side"),
+    ("desugar.binding", Just "Log result of desugaring binding operators"),
     ("doc.data", Nothing),
     ("doc.implementation", Nothing),
     ("doc.record", Nothing),

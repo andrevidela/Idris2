@@ -176,8 +176,10 @@ checkConflictingBinding : Ref Ctxt Defs =>
 checkConflictingBinding fc opName foundFixity use_site rhs
     = if isCompatible foundFixity use_site
          then pure ()
-         else throw $ OperatorBindingMismatch
-             {print = byShow} fc foundFixity use_site opName rhs !candidates
+         else do log "desugar.binding" 10 "\{show foundFixity} is incompatible with usage: \{show use_site}"
+                 -- coreLift $ putStrLn "\{show foundFixity} is incompatible with usage: \{show use_site}"
+                 throw $ OperatorBindingMismatch
+                     {print = byShow} fc foundFixity use_site opName rhs !candidates
     where
       isCompatible : BacktickOrOperatorFixity -> OperatorLHSInfo PTerm -> Bool
       isCompatible Backticked (NoBinder lhs) = True
