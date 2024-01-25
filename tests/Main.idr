@@ -113,7 +113,7 @@ idrisTestsWith : IO TestPool
 idrisTestsWith = testsInDir "idris2/with" "With abstraction"
 
 idrisTestsOperators : IO TestPool
-idrisTestsOperators = testsInDir "idris2/operators" "Operator and fixities"
+idrisTestsOperators = testsInDir "idris2/binding" "Customizable binders"
 
 idrisTestsIPKG : IO TestPool
 idrisTestsIPKG = testsInDir "idris2/pkg" "Package and .ipkg files"
