@@ -13,6 +13,7 @@ import Libraries.Data.List.Extra
 import Libraries.Data.StringMap
 import Libraries.Data.ANameMap
 import Libraries.Data.SortedMap
+import Libraries.Data.WithDefault
 
 import Idris.Doc.String
 import Idris.Error
@@ -177,7 +178,6 @@ checkConflictingBinding fc opName foundFixity use_site rhs
     = if isCompatible foundFixity use_site
          then pure ()
          else do log "desugar.binding" 10 "\{show foundFixity} is incompatible with usage: \{show use_site}"
-                 -- coreLift $ putStrLn "\{show foundFixity} is incompatible with usage: \{show use_site}"
                  throw $ OperatorBindingMismatch
                      {print = byShow} fc foundFixity use_site opName rhs !candidates
     where
@@ -1226,7 +1226,7 @@ mutual
            let updatedNS = NS (mkNestedNamespace (Just ctx.currentNS) (show fix))
                               (UN $ Basic $ nameRoot opName)
 
-           update Syn { fixities $= addName updatedNS (MkFixityInfo fc vis binding fix prec) }
+           update Syn { fixities $= addName updatedNS (MkFixityInfo fc (collapseDefault vis) binding fix prec) }
            pure []
   desugarDecl ps d@(PFail fc mmsg ds)
       = do -- save the state: the content of a failing block should be discarded

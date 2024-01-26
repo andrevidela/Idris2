@@ -59,6 +59,11 @@ isSpecified : WithDefault a def -> Bool
 isSpecified DefaultedValue = False
 isSpecified _              = True
 
+export
+fromMaybe : Maybe a -> WithDefault a def
+fromMaybe Nothing = defaulted
+fromMaybe (Just x) = specified x
+
 public export
 Eq a => Eq (WithDefault a def) where
   DefaultedValue   == DefaultedValue   = True

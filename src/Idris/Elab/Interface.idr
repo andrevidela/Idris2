@@ -120,7 +120,7 @@ mkIfaceData {vars} ifc def_vis env constraints n conName ps dets meths
           con = MkImpTy vfc EmptyFC conName !(bindTypeNames ifc [] (pNames ++ map fst meths ++ vars) conty)
           bound = pNames ++ map fst meths ++ vars in
 
-          pure $ IData vfc def_vis Nothing {- ?? -}
+          pure $ IData vfc def_vis defaulted {- ?? -}
                $ MkImpData vfc n
                    (Just !(bindTypeNames ifc [] bound (mkDataTy vfc ps)))
                    opts [con]

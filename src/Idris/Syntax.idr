@@ -395,8 +395,10 @@ mutual
   data PDecl' : Type -> Type where
        PClaim : FC -> RigCount -> Visibility -> List (PFnOpt' nm) -> PTypeDecl' nm -> PDecl' nm
        PDef : FC -> List (PClause' nm) -> PDecl' nm
-       PData : FC -> (doc : String) -> WithDefault Visibility Private ->
-               Maybe TotalReq -> PDataDecl' nm -> PDecl' nm
+       PData : FC -> (doc : String) ->
+               WithDefault Visibility Private ->
+               WithDefault TotalReq CoveringOnly ->
+               PDataDecl' nm -> PDecl' nm
        PParameters : FC ->
                      List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm) ->
                      List (PDecl' nm) -> PDecl' nm
@@ -425,7 +427,7 @@ mutual
        PRecord : FC ->
                  (doc : String) ->
                  WithDefault Visibility Private ->
-                 Maybe TotalReq ->
+                 WithDefault TotalReq CoveringOnly ->
                  PRecordDecl' nm ->
                  PDecl' nm
 
@@ -436,7 +438,7 @@ mutual
        PFail : FC -> Maybe String -> List (PDecl' nm) -> PDecl' nm
 
        PMutual : FC -> List (PDecl' nm) -> PDecl' nm
-       PFixity : FC -> Visibility -> BindingModifier -> Fixity -> Nat -> OpStr -> PDecl' nm
+       PFixity : FC -> WithDefault Visibility Export -> BindingModifier -> Fixity -> Nat -> OpStr -> PDecl' nm
        PNamespace : FC -> Namespace -> List (PDecl' nm) -> PDecl' nm
        PTransform : FC -> String -> PTerm' nm -> PTerm' nm -> PDecl' nm
        PRunElabDecl : FC -> PTerm' nm -> PDecl' nm

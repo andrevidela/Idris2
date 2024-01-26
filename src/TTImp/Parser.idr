@@ -91,11 +91,11 @@ totalityOpt
   <|> do keyword "covering"
          pure CoveringOnly
 
-dataVisOpt : EmptyRule (WithDefault Visibility Private, Maybe TotalReq)
+dataVisOpt : EmptyRule (WithDefault Visibility Private, WithDefault TotalReq CoveringOnly)
 dataVisOpt
-    = do { vis <- visOption   ; mbtot <- optional totalityOpt ; pure (specified vis, mbtot) }
-  <|> do { tot <- totalityOpt ; vis <- visibility ; pure (vis, Just tot) }
-  <|> pure (defaulted, Nothing)
+    = do { vis <- visOption   ; mbtot <- optional totalityOpt ; pure (specified vis, fromMaybe mbtot) }
+  <|> do { tot <- totalityOpt ; vis <- visibility ; pure (vis, specified tot) }
+  <|> pure (defaulted, defaulted)
 
 fnOpt : Rule FnOpt
 fnOpt = do x <- totalityOpt

@@ -463,8 +463,10 @@ mutual
   data ImpDecl' : Type -> Type where
        IClaim : FC -> RigCount -> Visibility -> List (FnOpt' nm) ->
                 ImpTy' nm -> ImpDecl' nm
-       IData : FC -> WithDefault Visibility Private ->
-               Maybe TotalReq -> ImpData' nm -> ImpDecl' nm
+       IData : FC ->
+               WithDefault Visibility Private ->
+               WithDefault TotalReq CoveringOnly ->
+               ImpData' nm -> ImpDecl' nm
        IDef : FC -> Name -> List (ImpClause' nm) -> ImpDecl' nm
        IParameters : FC ->
                      List (ImpParameter' nm) ->
@@ -472,7 +474,7 @@ mutual
        IRecord : FC ->
                  Maybe String -> -- nested namespace
                  WithDefault Visibility Private ->
-                 Maybe TotalReq ->
+                 WithDefault TotalReq CoveringOnly ->
                  ImpRecord' nm -> ImpDecl' nm
        IFail : FC -> Maybe String -> List (ImpDecl' nm) -> ImpDecl' nm
        INamespace : FC -> Namespace -> List (ImpDecl' nm) -> ImpDecl' nm

@@ -70,6 +70,10 @@ reflectionttimp : String -> Name
 reflectionttimp n = NS reflectionTTImpNS (UN $ Basic n)
 
 export
+reflectionWithDefault : String -> Name
+reflectionWithDefault n = NS reflectionWithDefaultNS (UN $ Basic n)
+
+export
 cantReify : Ref Ctxt Defs => {vars : _} -> NF vars -> String -> Core a
 cantReify val ty = do
   logNF "reflection.reify" 10 "Can't reify as \{ty}" (mkEnv emptyFC vars) val
@@ -330,9 +334,9 @@ export
 Reflect a => Reflect (WithDefault a def) where
   reflect fc defs lhs env def
     = onWithDefault
-        (appCon fc defs (reflectionttimp "DefaultedValue") [Erased fc Placeholder, Erased fc Placeholder])
+        (appCon fc defs (reflectionWithDefault "DefaultedValue") [Erased fc Placeholder, Erased fc Placeholder])
         (\x => do x' <- reflect fc defs lhs env x
-                  appCon fc defs (reflectionttimp "SpecifiedValue") [Erased fc Placeholder, Erased fc Placeholder, x'])
+                  appCon fc defs (reflectionWithDefault "SpecifiedValue") [Erased fc Placeholder, Erased fc Placeholder, x'])
         def
 
 export

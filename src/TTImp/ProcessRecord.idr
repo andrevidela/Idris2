@@ -46,7 +46,7 @@ elabRecord : {vars : _} ->
              List ElabOpt -> FC -> Env Term vars ->
              NestedNames vars -> Maybe String ->
              WithDefault Visibility Private ->
-             Maybe TotalReq -> Name ->
+             WithDefault TotalReq CoveringOnly -> Name ->
              (params : List (Name, RigCount, PiInfo RawImp, RawImp)) ->
              (opts : List DataOpt) ->
              (conName : Name) ->
@@ -64,9 +64,9 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
              | Nothing => throw (InternalError ("Adding " ++ show tn ++ "failed"))
 
          -- #1404
-         whenJust mbtot $ \tot => do
+         when (isSpecified mbtot) $ do
            log "declare.record" 5 $ "setting totality flag for " ++ show tn
-           setFlag fc tn (SetTotal tot)
+           setFlag fc tn (SetTotal $ collapseDefault mbtot)
 
          -- Go into new namespace, if there is one, for getters
          case newns of
@@ -342,7 +342,8 @@ processRecord : {vars : _} ->
                 {auto o : Ref ROpts REPLOpts} ->
                 List ElabOpt -> NestedNames vars ->
                 Env Term vars -> Maybe String ->
-                WithDefault Visibility Private -> Maybe TotalReq ->
+                WithDefault Visibility Private ->
+                WithDefault TotalReq CoveringOnly ->
                 ImpRecord -> Core ()
 processRecord eopts nest env newns def_vis mbtot (MkImpRecord fc n ps opts cons fs)
     = do elabRecord eopts fc env nest newns def_vis mbtot n ps opts cons fs

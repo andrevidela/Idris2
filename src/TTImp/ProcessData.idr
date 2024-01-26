@@ -401,7 +401,8 @@ processData : {vars : _} ->
               {auto o : Ref ROpts REPLOpts} ->
               List ElabOpt -> NestedNames vars ->
               Env Term vars -> FC ->
-              WithDefault Visibility Private -> Maybe TotalReq ->
+              WithDefault Visibility Private ->
+              WithDefault TotalReq CoveringOnly ->
               ImpData -> Core ()
 processData {vars} eopts nest env fc def_vis mbtot (MkImpLater dfc n_in ty_raw)
     = do n <- inCurrentNS n_in
@@ -545,6 +546,6 @@ processData {vars} eopts nest env fc def_vis mbtot (MkImpData dfc n_in mty_raw o
          traverse_ updateErasable (Resolved tidx :: connames)
 
          -- #1404
-         whenJust mbtot $ \ tot => do
+         when (isSpecified mbtot) $ do
              log "declare.data" 5 $ "setting totality flag for " ++ show n ++ " and its constructors"
-             for_ (n :: map name cons) $ \ n => setFlag fc n (SetTotal tot)
+             for_ (n :: map name cons) $ \ n => setFlag fc n (SetTotal $ collapseDefault mbtot)

@@ -298,6 +298,10 @@ reflectionTTImpNS : Namespace
 reflectionTTImpNS = mkNamespace "Language.Reflection.TTImp"
 
 export
+reflectionWithDefaultNS : Namespace
+reflectionWithDefaultNS = mkNamespace "Language.Reflection.WithDefault"
+
+export
 dpairNS : Namespace
 dpairNS = mkNamespace "Builtin.DPair"
 

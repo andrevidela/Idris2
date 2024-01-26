@@ -2,6 +2,7 @@ module Language.Reflection
 
 import public Language.Reflection.TT
 import public Language.Reflection.TTImp
+import public Language.Reflection.WithDefault
 
 import public Control.Monad.Trans
 

@@ -2,6 +2,7 @@ module Language.Reflection.TT
 
 import public Data.List
 import public Data.String
+import public Language.Reflection.WithDefault
 
 import Decidable.Equality
 
@@ -263,9 +264,10 @@ Show TotalReq where
   show PartialOK = "partial"
 
 export
-showTotalReq : Maybe TotalReq -> String -> String
-showTotalReq Nothing s = s
-showTotalReq (Just treq) s = unwords [show treq, s]
+showTotalReq : WithDefault TotalReq CoveringOnly -> String -> String
+showTotalReq tot s = if isDefaulted tot
+                        then s
+                        else unwords [show (collapseDefault tot), s]
 
 public export
 data Visibility = Private | Export | Public
