@@ -1054,8 +1054,8 @@ mutual
       toIDef nm (ImpossibleClause fc lhs)
           = pure $ IDef fc nm [ImpossibleClause fc lhs]
 
-  desugarDecl ps (PData fc doc vis mbtot ddecl)
-      = pure [IData fc vis mbtot !(desugarData ps doc ddecl)]
+  desugarDecl ps (PData fc doc header ddecl)
+      = pure [IData fc header !(desugarData ps doc ddecl)]
 
   desugarDecl ps (PParameters fc params pds)
       = do pds' <- traverse (desugarDecl (ps ++ map fst params)) pds
@@ -1164,13 +1164,13 @@ mutual
       isNamed Nothing = False
       isNamed (Just _) = True
 
-  desugarDecl ps (PRecord fc doc vis mbtot (MkPRecordLater tn params))
-      = desugarDecl ps (PData fc doc vis mbtot (MkPLater fc tn (mkRecType params)))
+  desugarDecl ps (PRecord fc doc header (MkPRecordLater tn params))
+      = desugarDecl ps (PData fc doc header (MkPLater fc tn (mkRecType params)))
     where
       mkRecType : List (Name, RigCount, PiInfo PTerm, PTerm) -> PTerm
       mkRecType [] = PType fc
       mkRecType ((n, c, p, t) :: ts) = PPi fc c p (Just n) t (mkRecType ts)
-  desugarDecl ps (PRecord fc doc vis mbtot (MkPRecord tn params opts conname_in fields))
+  desugarDecl ps (PRecord fc doc header (MkPRecord tn params opts conname_in fields))
       = do addDocString tn doc
            params' <- traverse (\ (n,c,p,tm) =>
                           do tm' <- desugar AnyExpr ps tm
@@ -1200,7 +1200,7 @@ mutual
            whenJust (fst <$> conname_in) (addDocString conname)
            let _ = the Name conname
            pure [IRecord fc (Just recName)
-                         vis mbtot (MkImpRecord fc tn paramsb opts conname fields')]
+                         header (MkImpRecord fc tn paramsb opts conname fields')]
     where
       fname : PField -> Name
       fname (MkField _ _ _ _ n _) = n

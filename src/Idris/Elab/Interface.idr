@@ -61,7 +61,7 @@ getSig (IClaim _ c _ opts (MkImpTy fc nameFC n ty))
                          , isData   = False
                          , type     = namePis 0 ty
                          }
-getSig (IData _ _ _ (MkImpLater fc n ty))
+getSig (IData _ _ (MkImpLater fc n ty))
     = Just $ MkSignature { location = fc
                          , count    = erased
                          , flags    = [Invertible]
@@ -120,7 +120,7 @@ mkIfaceData {vars} ifc def_vis env constraints n conName ps dets meths
           con = MkImpTy vfc EmptyFC conName !(bindTypeNames ifc [] (pNames ++ map fst meths ++ vars) conty)
           bound = pNames ++ map fst meths ++ vars in
 
-          pure $ IData vfc def_vis defaulted {- ?? -}
+          pure $ IData vfc (MkDataHeader def_vis defaulted defaulted) {- ?? -}
                $ MkImpData vfc n
                    (Just !(bindTypeNames ifc [] bound (mkDataTy vfc ps)))
                    opts [con]

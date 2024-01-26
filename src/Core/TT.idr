@@ -17,6 +17,7 @@ import Libraries.Text.PrettyPrint.Prettyprinter
 import Libraries.Text.PrettyPrint.Prettyprinter.Util
 import Libraries.Text.Bounded
 import Libraries.Data.String.Extra
+import Libraries.Data.WithDefault
 
 import Libraries.Data.SnocList.SizeOf
 
@@ -384,6 +385,19 @@ isTotal = MkTotality Unchecked IsCovering
 export
 notCovering : Totality
 notCovering = MkTotality Unchecked (MissingCases [])
+
+||| Header for data declarations, both `record` and `data`
+public export
+record DataHeader where
+  constructor MkDataHeader
+  visibility : WithDefault Visibility Private
+  binding : WithDefault BindingModifier NotBinding
+  totality : WithDefault TotalReq CoveringOnly
+
+export
+Eq DataHeader where
+  (MkDataHeader a b c) == (MkDataHeader a' b' c')
+    = a == a' && b == b' && c == c'
 
 namespace Bounds
   public export

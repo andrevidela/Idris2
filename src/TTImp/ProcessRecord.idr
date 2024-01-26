@@ -45,14 +45,14 @@ elabRecord : {vars : _} ->
              {auto o : Ref ROpts REPLOpts} ->
              List ElabOpt -> FC -> Env Term vars ->
              NestedNames vars -> Maybe String ->
-             WithDefault Visibility Private ->
-             WithDefault TotalReq CoveringOnly -> Name ->
+             DataHeader ->
+             Name ->
              (params : List (Name, RigCount, PiInfo RawImp, RawImp)) ->
              (opts : List DataOpt) ->
              (conName : Name) ->
              List IField ->
              Core ()
-elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conName_in fields
+elabRecord {vars} eopts fc env nest newns header tn_in params0 opts conName_in fields
     = do tn <- inCurrentNS tn_in
          conName <- inCurrentNS conName_in
          params <- preElabAsData tn
@@ -64,9 +64,9 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
              | Nothing => throw (InternalError ("Adding " ++ show tn ++ "failed"))
 
          -- #1404
-         when (isSpecified mbtot) $ do
+         when (isSpecified header.totality) $ do
            log "declare.record" 5 $ "setting totality flag for " ++ show tn
-           setFlag fc tn (SetTotal $ collapseDefault mbtot)
+           setFlag fc tn (SetTotal $ collapseDefault header.totality)
 
          -- Go into new namespace, if there is one, for getters
          case newns of
@@ -148,7 +148,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
              -- we don't use MkImpLater because users may have already declared the record ahead of time
              let dt = MkImpData fc tn (Just dataTy) opts []
              log "declare.record" 10 $ "Pre-declare record data type: \{show dt}"
-             processDecl [] nest env (IData fc def_vis mbtot dt)
+             processDecl [] nest env (IData fc header dt)
              defs <- get Ctxt
              Just ty <- lookupTyExact tn (gamma defs)
                | Nothing => throw (InternalError "Missing data type \{show tn}, despite having just declared it!")
@@ -224,7 +224,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
                        !(bindTypeNames fc [] boundNames conty)
              let dt = MkImpData fc tn Nothing opts [con]
              log "declare.record" 5 $ "Record data type " ++ show dt
-             processDecl [] nest env (IData fc def_vis mbtot dt)
+             processDecl [] nest env (IData fc header dt)
 
     countExp : Term vs -> Nat
     countExp (Bind _ _ (Pi _ _ Explicit _) sc) = S (countExp sc)
@@ -248,7 +248,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
                   Core ()
     elabGetters tn con params done upds tyenv (Bind bfc n b@(Pi _ rc imp ty_chk) sc)
         = let rig = if isErased rc then erased else top
-              isVis = projVis (collapseDefault def_vis)
+              isVis = projVis (collapseDefault header.visibility)
           in if (n `elem` map fst params) || (n `elem` vars)
              then elabGetters tn con params
                               (if imp == Explicit && not (n `elem` vars)
@@ -342,8 +342,7 @@ processRecord : {vars : _} ->
                 {auto o : Ref ROpts REPLOpts} ->
                 List ElabOpt -> NestedNames vars ->
                 Env Term vars -> Maybe String ->
-                WithDefault Visibility Private ->
-                WithDefault TotalReq CoveringOnly ->
+                DataHeader ->
                 ImpRecord -> Core ()
-processRecord eopts nest env newns def_vis mbtot (MkImpRecord fc n ps opts cons fs)
-    = do elabRecord eopts fc env nest newns def_vis mbtot n ps opts cons fs
+processRecord eopts nest env newns header (MkImpRecord fc n ps opts cons fs)
+    = do elabRecord eopts fc env nest newns header n ps opts cons fs

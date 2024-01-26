@@ -401,10 +401,9 @@ processData : {vars : _} ->
               {auto o : Ref ROpts REPLOpts} ->
               List ElabOpt -> NestedNames vars ->
               Env Term vars -> FC ->
-              WithDefault Visibility Private ->
-              WithDefault TotalReq CoveringOnly ->
+              DataHeader ->
               ImpData -> Core ()
-processData {vars} eopts nest env fc def_vis mbtot (MkImpLater dfc n_in ty_raw)
+processData {vars} eopts nest env fc header (MkImpLater dfc n_in ty_raw)
     = do n <- inCurrentNS n_in
          ty_raw <- bindTypeNames fc [] vars ty_raw
 
@@ -426,7 +425,7 @@ processData {vars} eopts nest env fc def_vis mbtot (MkImpLater dfc n_in ty_raw)
          arity <- getArity defs [] fullty
 
          -- Add the type constructor as a placeholder
-         tidx <- addDef n (newDef fc n linear vars fullty def_vis
+         tidx <- addDef n (newDef fc n linear vars fullty header.visibility
                           (TCon 0 arity [] [] defaultFlags [] [] Nothing))
          addMutData (Resolved tidx)
          defs <- get Ctxt
@@ -436,13 +435,13 @@ processData {vars} eopts nest env fc def_vis mbtot (MkImpLater dfc n_in ty_raw)
          addToSave n
          log "declare.data" 10 $ "Saving from " ++ show n ++ ": " ++ show (keys (getMetas ty))
 
-         case collapseDefault def_vis of
+         case collapseDefault header.visibility of
               Private => pure ()
               _ => do addHashWithNames n
                       addHashWithNames fullty
                       log "module.hash" 15 "Adding hash for data declaration with name \{show n}"
 
-processData {vars} eopts nest env fc def_vis mbtot (MkImpData dfc n_in mty_raw opts cons_raw)
+processData {vars} eopts nest env fc header (MkImpData dfc n_in mty_raw opts cons_raw)
     = do n <- inCurrentNS n_in
 
          log "declare.data" 1 $ "Processing " ++ show n
@@ -472,9 +471,9 @@ processData {vars} eopts nest env fc def_vis mbtot (MkImpData dfc n_in mty_raw o
          (mw, vis, fullty) <- the (Core (List Name, Visibility, ClosedTerm)) $ case ndefm of
                   Nothing => case mfullty of
                     Nothing => throw (GenericMsg fc "Missing telescope for data definition \{show n_in}")
-                    Just fullty => pure ([], collapseDefault def_vis, fullty)
+                    Just fullty => pure ([], collapseDefault header.visibility, fullty)
                   Just ndef => do
-                    vis <- the (Core Visibility) $ case collapseDefaults ndef.visibility def_vis of
+                    vis <- the (Core Visibility) $ case collapseDefaults ndef.visibility header.visibility of
                       Right finalVis => pure finalVis
                       Left (oldVis, newVis) => do
                         -- TODO : In a later release, at least after 0.7.0, replace this with an error.
@@ -546,6 +545,6 @@ processData {vars} eopts nest env fc def_vis mbtot (MkImpData dfc n_in mty_raw o
          traverse_ updateErasable (Resolved tidx :: connames)
 
          -- #1404
-         when (isSpecified mbtot) $ do
+         when (isSpecified header.totality) $ do
              log "declare.data" 5 $ "setting totality flag for " ++ show n ++ " and its constructors"
-             for_ (n :: map name cons) $ \ n => setFlag fc n (SetTotal $ collapseDefault mbtot)
+             for_ (n :: map name cons) $ \ n => setFlag fc n (SetTotal $ collapseDefault header.totality)

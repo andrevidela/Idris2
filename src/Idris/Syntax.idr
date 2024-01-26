@@ -396,8 +396,7 @@ mutual
        PClaim : FC -> RigCount -> Visibility -> List (PFnOpt' nm) -> PTypeDecl' nm -> PDecl' nm
        PDef : FC -> List (PClause' nm) -> PDecl' nm
        PData : FC -> (doc : String) ->
-               WithDefault Visibility Private ->
-               WithDefault TotalReq CoveringOnly ->
+               DataHeader ->
                PDataDecl' nm -> PDecl' nm
        PParameters : FC ->
                      List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm) ->
@@ -426,8 +425,7 @@ mutual
                          PDecl' nm
        PRecord : FC ->
                  (doc : String) ->
-                 WithDefault Visibility Private ->
-                 WithDefault TotalReq CoveringOnly ->
+                 DataHeader ->
                  PRecordDecl' nm ->
                  PDecl' nm
 
@@ -449,12 +447,12 @@ mutual
   getPDeclLoc : PDecl' nm -> FC
   getPDeclLoc (PClaim fc _ _ _ _) = fc
   getPDeclLoc (PDef fc _) = fc
-  getPDeclLoc (PData fc _ _ _ _) = fc
+  getPDeclLoc (PData fc _ _ _) = fc
   getPDeclLoc (PParameters fc _ _) = fc
   getPDeclLoc (PUsing fc _ _) = fc
   getPDeclLoc (PInterface fc _ _ _ _ _ _ _ _) = fc
   getPDeclLoc (PImplementation fc _ _ _ _ _ _ _ _ _ _) = fc
-  getPDeclLoc (PRecord fc _ _ _ _) = fc
+  getPDeclLoc (PRecord fc _ _ _) = fc
   getPDeclLoc (PMutual fc _) = fc
   getPDeclLoc (PFail fc _ _) = fc
   getPDeclLoc (PFixity fc _ _ _ _ _) = fc
@@ -491,7 +489,7 @@ export
 definedIn : List PDecl -> List Name
 definedIn [] = []
 definedIn (PClaim _ _ _ _ (MkPTy _ _ n _ _) :: ds) = n :: definedIn ds
-definedIn (PData _ _ _ _ d :: ds) = definedInData d ++ definedIn ds
+definedIn (PData _ _ _ d :: ds) = definedInData d ++ definedIn ds
 definedIn (PParameters _ _ pds :: ds) = definedIn pds ++ definedIn ds
 definedIn (PUsing _ _ pds :: ds) = definedIn pds ++ definedIn ds
 definedIn (PNamespace _ _ ns :: ds) = definedIn ns ++ definedIn ds

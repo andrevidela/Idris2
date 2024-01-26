@@ -8,6 +8,29 @@ import public Language.Reflection.WithDefault
 
 %default total
 
+public export
+data BindingModifier = NotBinding | Autobind | Typebind
+
+export
+Eq BindingModifier where
+  NotBinding == NotBinding = True
+  Autobind == Autobind = True
+  Typebind == Typebind = True
+  _ == _ = False
+
+||| Header for data declarations, both `record` and `data`
+public export
+record DataHeader where
+  constructor MkDataHeader
+  visibility : WithDefault Visibility Private
+  binding : WithDefault BindingModifier NotBinding
+  totality : WithDefault TotalReq CoveringOnly
+
+export
+Eq DataHeader where
+  (MkDataHeader a b c) == (MkDataHeader a' b' c')
+    = a == a' && b == b' && c == c'
+
 -- Unchecked terms and declarations in the intermediate language
 mutual
   public export
@@ -183,16 +206,16 @@ mutual
   data Decl : Type where
        IClaim : FC -> Count -> Visibility -> List FnOpt ->
                 ITy -> Decl
-       IData : FC -> WithDefault Visibility Private ->
-               WithDefault TotalReq CoveringOnly ->
+       IData : FC ->
+               DataHeader ->
                Data -> Decl
        IDef : FC -> Name -> (cls : List Clause) -> Decl
        IParameters : FC -> (params : List (Name, Count, PiInfo TTImp, TTImp)) ->
                      (decls : List Decl) -> Decl
        IRecord : FC ->
                  Maybe String -> -- nested namespace
-                 WithDefault Visibility Private ->
-                 WithDefault TotalReq CoveringOnly -> Record -> Decl
+                 DataHeader ->
+                 Record -> Decl
        INamespace : FC -> Namespace -> (decls : List Decl) -> Decl
        ITransform : FC -> Name -> TTImp -> TTImp -> Decl
        IRunElabDecl : FC -> TTImp -> Decl
@@ -380,14 +403,14 @@ parameters {auto eqTTImp : Eq TTImp}
   Eq Decl where
     IClaim _ c v fos t == IClaim _ c' v' fos' t' =
       c == c' && v == v' && fos == fos' && t == t'
-    IData _ v t d == IData _ v' t' d' =
-      v == v' && t == t' && d == d'
+    IData _ t d == IData _ t' d' =
+      t == t' && d == d'
     IDef _ n cs == IDef _ n' cs' =
       n == n' && cs == cs'
     IParameters _ ps ds == IParameters _ ps' ds' =
       ps == ps' && (assert_total $ ds == ds')
-    IRecord _ ns v tr r == IRecord _ ns' v' tr' r' =
-      ns == ns' && v == v' && tr == tr' && r == r'
+    IRecord _ ns hd r == IRecord _ ns' hd' r' =
+      ns == ns' && hd == hd' && r == r'
     INamespace _ ns ds == INamespace _ ns' ds' =
       ns == ns' && (assert_total $ ds == ds')
     ITransform _ n f t == ITransform _ n' f' t' =
@@ -496,9 +519,9 @@ mutual
     show (IClaim fc rig vis xs sig)
       = unwords [ show vis
                 , showCount rig (show sig) ]
-    show (IData fc vis treq dt)
-      = unwords [ show vis
-                , showTotalReq treq (show dt)
+    show (IData fc header dt)
+      = unwords [ show header.visibility
+                , showTotalReq header.totality (show dt)
                 ]
     show (IDef fc nm xs) = joinBy "; " (map (showClause InDecl) xs)
     show (IParameters fc params decls)
@@ -511,8 +534,8 @@ mutual
       , joinBy "; " (assert_total $ map show decls)
       , "}"
       ]
-    show (IRecord fc x vis treq rec)
-      = unwords [ show vis, showTotalReq treq (show rec) ]
+    show (IRecord fc x header rec)
+      = unwords [ show header.visibility, showTotalReq header.totality (show rec) ]
     show (INamespace fc ns decls)
       = unwords
       [ "namespace", show ns
@@ -759,10 +782,10 @@ parameters (f : TTImp -> TTImp)
   mapDecl : Decl -> Decl
   mapDecl (IClaim fc rig vis opts ty)
     = IClaim fc rig vis (map mapFnOpt opts) (mapITy ty)
-  mapDecl (IData fc vis mtreq dat) = IData fc vis mtreq (mapData dat)
+  mapDecl (IData fc header dat) = IData fc header (mapData dat)
   mapDecl (IDef fc n cls) = IDef fc n (map mapClause cls)
   mapDecl (IParameters fc params xs) = IParameters fc params (assert_total $ map mapDecl xs)
-  mapDecl (IRecord fc mstr x y rec) = IRecord fc mstr x y (mapRecord rec)
+  mapDecl (IRecord fc mstr header rec) = IRecord fc mstr header (mapRecord rec)
   mapDecl (INamespace fc mi xs) = INamespace fc mi (assert_total $ map mapDecl xs)
   mapDecl (ITransform fc n t u) = ITransform fc n (mapTTImp t) (mapTTImp u)
   mapDecl (IRunElabDecl fc t) = IRunElabDecl fc (mapTTImp t)
@@ -885,10 +908,10 @@ parameters {0 m : Type -> Type} {auto apl : Applicative m} (f : m TTImp -> m TTI
   mapMDecl : Decl -> m Decl
   mapMDecl (IClaim fc rig vis opts ty)
     = IClaim fc rig vis <$> traverse mapMFnOpt opts <*> mapMITy ty
-  mapMDecl (IData fc vis mtreq dat) = IData fc vis mtreq <$> mapMData dat
+  mapMDecl (IData fc header dat) = IData fc header <$> mapMData dat
   mapMDecl (IDef fc n cls) = IDef fc n <$> traverse mapMClause cls
   mapMDecl (IParameters fc params xs) = IParameters fc params <$> assert_total (traverse mapMDecl xs)
-  mapMDecl (IRecord fc mstr x y rec) = IRecord fc mstr x y <$> mapMRecord rec
+  mapMDecl (IRecord fc mstr header rec) = IRecord fc mstr header <$> mapMRecord rec
   mapMDecl (INamespace fc mi xs) = INamespace fc mi <$> assert_total (traverse mapMDecl xs)
   mapMDecl (ITransform fc n t u) = ITransform fc n <$> mapATTImp t <*> mapATTImp u
   mapMDecl (IRunElabDecl fc t) = IRunElabDecl fc <$> mapATTImp t

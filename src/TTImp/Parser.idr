@@ -662,7 +662,7 @@ recordDecl fname indents
          flds <- assert_total (blockAfter col (fieldDecl fname))
          end <- location
          pure (let fc = MkFC fname start end in
-                   IRecord fc Nothing vis mbtot
+                   IRecord fc Nothing (MkDataHeader vis defaulted mbtot)
                            (MkImpRecord fc n params opts dc (concat flds)))
 
 namespaceDecl : Rule Namespace
@@ -716,10 +716,10 @@ directive fname indents
 -- topDecl : OriginDesc -> IndentInfo -> Rule ImpDecl
 topDecl fname indents
     = do start <- location
-         (vis,mbtot) <- dataVisOpt
+         (vis, mbtot) <- dataVisOpt
          dat <- dataDecl fname indents
          end <- location
-         pure (IData (MkFC fname start end) vis mbtot dat)
+         pure (IData (MkFC fname start end) (MkDataHeader vis defaulted mbtot) dat)
   <|> do start <- location
          ns <- namespaceDecl
          ds <- assert_total (nonEmptyBlock (topDecl fname))

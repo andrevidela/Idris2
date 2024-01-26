@@ -463,9 +463,7 @@ mutual
   data ImpDecl' : Type -> Type where
        IClaim : FC -> RigCount -> Visibility -> List (FnOpt' nm) ->
                 ImpTy' nm -> ImpDecl' nm
-       IData : FC ->
-               WithDefault Visibility Private ->
-               WithDefault TotalReq CoveringOnly ->
+       IData : FC -> DataHeader ->
                ImpData' nm -> ImpDecl' nm
        IDef : FC -> Name -> List (ImpClause' nm) -> ImpDecl' nm
        IParameters : FC ->
@@ -473,8 +471,7 @@ mutual
                      List (ImpDecl' nm) -> ImpDecl' nm
        IRecord : FC ->
                  Maybe String -> -- nested namespace
-                 WithDefault Visibility Private ->
-                 WithDefault TotalReq CoveringOnly ->
+                 DataHeader ->
                  ImpRecord' nm -> ImpDecl' nm
        IFail : FC -> Maybe String -> List (ImpDecl' nm) -> ImpDecl' nm
        INamespace : FC -> Namespace -> List (ImpDecl' nm) -> ImpDecl' nm
@@ -495,12 +492,12 @@ mutual
   covering
   Show nm => Show (ImpDecl' nm) where
     show (IClaim _ c _ opts ty) = show opts ++ " " ++ show c ++ " " ++ show ty
-    show (IData _ _ _ d) = show d
+    show (IData _ _ d) = show d
     show (IDef _ n cs) = "(%def " ++ show n ++ " " ++ show cs ++ ")"
     show (IParameters _ ps ds)
         = "parameters " ++ show ps ++ "\n\t" ++
           showSep "\n\t" (assert_total $ map show ds)
-    show (IRecord _ _ _ _ d) = show d
+    show (IRecord _ _ _ d) = show d
     show (IFail _ msg decls)
         = "fail" ++ maybe "" ((" " ++) . show) msg ++ "\n" ++
           showSep "\n" (assert_total $ map (("  " ++) . show) decls)
@@ -817,13 +814,13 @@ definedInBlock ns decls =
     defName : Namespace -> SortedSet Name -> ImpDecl -> SortedSet Name
     defName ns acc (IClaim _ _ _ _ ty) = insert (expandNS ns (getName ty)) acc
     defName ns acc (IDef _ nm _) = insert (expandNS ns nm) acc
-    defName ns acc (IData _ _ _ (MkImpData _ n _ _ cons))
+    defName ns acc (IData _ _ (MkImpData _ n _ _ cons))
         = foldl (flip insert) acc $ expandNS ns n :: map (expandNS ns . getName) cons
-    defName ns acc (IData _ _ _ (MkImpLater _ n _)) = insert (expandNS ns n) acc
+    defName ns acc (IData _ _ (MkImpLater _ n _)) = insert (expandNS ns n) acc
     defName ns acc (IParameters _ _ pds) = foldl (defName ns) acc pds
     defName ns acc (IFail _ _ nds) = foldl (defName ns) acc nds
     defName ns acc (INamespace _ n nds) = foldl (defName (ns <.> n)) acc nds
-    defName ns acc (IRecord _ fldns _ _ (MkImpRecord _ n _ opts con flds))
+    defName ns acc (IRecord _ fldns _ (MkImpRecord _ n _ opts con flds))
         = foldl (flip insert) acc $ expandNS ns con :: all
       where
         fldns' : Namespace
@@ -905,10 +902,10 @@ namespace ImpDecl
   public export
   getFC : ImpDecl' nm -> FC
   getFC (IClaim fc _ _ _ _) = fc
-  getFC (IData fc _ _ _) = fc
+  getFC (IData fc _ _) = fc
   getFC (IDef fc _ _) = fc
   getFC (IParameters fc _ _) = fc
-  getFC (IRecord fc _ _ _ _) = fc
+  getFC (IRecord fc _ _ _) = fc
   getFC (IFail fc _ _) = fc
   getFC (INamespace fc _ _) = fc
   getFC (ITransform fc _ _ _) = fc

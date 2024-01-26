@@ -22,7 +22,7 @@ declareRecordFromSimpleText lk textPath dataName consName = do
   fs <- for fs $ \line => case words line of
           [name, type] => pure (name, type)
           _ => fail "Expected two strings in line in \{!errDesc}"
-  let dataDecl : Decl = IRecord EmptyFC Nothing (specified Public) defaulted $
+  let dataDecl : Decl = IRecord EmptyFC Nothing (MkDataHeader (specified Public) defaulted defaulted) $
                           MkRecord EmptyFC dataName [] [] consName $
                             fs <&> \(name, type) => do
                               let (ns, n) = unsnoc $ split (== '.') type

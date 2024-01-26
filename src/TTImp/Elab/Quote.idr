@@ -150,8 +150,8 @@ mutual
                    Core ImpDecl
   getUnquoteDecl (IClaim fc c v opts ty)
       = pure $ IClaim fc c v opts !(getUnquoteTy ty)
-  getUnquoteDecl (IData fc v mbt d)
-      = pure $ IData fc v mbt !(getUnquoteData d)
+  getUnquoteDecl (IData fc header d)
+      = pure $ IData fc header !(getUnquoteData d)
   getUnquoteDecl (IDef fc v d)
       = pure $ IDef fc v !(traverse getUnquoteClause d)
   getUnquoteDecl (IParameters fc ps ds)
@@ -161,8 +161,8 @@ mutual
     where
       unqTuple : (Name, RigCount, PiInfo RawImp, RawImp) -> Core (Name, RigCount, PiInfo RawImp, RawImp)
       unqTuple (n, rig, i, t) = pure (n, rig, i, !(getUnquote t))
-  getUnquoteDecl (IRecord fc ns v mbt d)
-      = pure $ IRecord fc ns v mbt !(getUnquoteRecord d)
+  getUnquoteDecl (IRecord fc ns header d)
+      = pure $ IRecord fc ns header !(getUnquoteRecord d)
   getUnquoteDecl (INamespace fc ns ds)
       = pure $ INamespace fc ns !(traverse getUnquoteDecl ds)
   getUnquoteDecl (ITransform fc n l r)

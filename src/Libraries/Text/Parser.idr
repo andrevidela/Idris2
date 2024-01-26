@@ -230,3 +230,17 @@ public export
 %inline
 unless : Bool -> Lazy (Grammar state token False ()) -> Grammar state token False ()
 unless = when . not
+
+-- if you have a better way to do this, please feel free to chime in
+export
+permutation : Grammar state token False a ->
+              Grammar state token False b ->
+              Grammar state token False c ->
+              (a -> b -> c -> d) -> Grammar state token False d
+permutation a b c f =
+      do va <- a ; vb <- b ; vc <- c ; pure (f va vb vc)
+  <|> do va <- a ; vc <- c ; vb <- b ; pure (f va vb vc)
+  <|> do vb <- b ; va <- a ; vc <- c ; pure (f va vb vc)
+  <|> do vb <- b ; vc <- c ; va <- a ; pure (f va vb vc)
+  <|> do vc <- c ; va <- a ; vb <- b ; pure (f va vb vc)
+  <|> do vc <- c ; vb <- b ; va <- a ; pure (f va vb vc)

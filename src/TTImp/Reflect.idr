@@ -414,6 +414,30 @@ mutual
                           pure (ImpossibleClause x' y')
                _ => cantReify val "Clause"
     reify defs val = cantReify val "Clause"
+  export
+  Reify BindingModifier where
+    reify defs val@(NDCon _ n _ _ args)
+        = case (dropAllNS !(full (gamma defs) n), map snd args) of
+               (UN (Basic "NotBinding"), [])
+                    => pure NotBinding
+               (UN (Basic "Autobind"), [])
+                    => pure Autobind
+               (UN (Basic "Typebind"), [])
+                    => pure Typebind
+               _ => cantReify val "BindingModifier"
+    reify _ val = cantReify val "BindingModifier"
+
+  export
+  Reify DataHeader where
+    reify defs val@(NDCon _ n _ _ args)
+        = case (dropAllNS !(full (gamma defs) n), map snd args) of
+               (UN (Basic "MkDataHeader"), [x, y, z])
+                    => do v' <- reify defs !(evalClosure defs x)
+                          w' <- reify defs !(evalClosure defs y)
+                          x' <- reify defs !(evalClosure defs z)
+                          pure (MkDataHeader v' w' x')
+               _ => cantReify val "DataHeader"
+    reify _ val = cantReify val "DataHeader"
 
   export
   Reify ImpDecl where
@@ -426,12 +450,11 @@ mutual
                           y' <- reify defs !(evalClosure defs y)
                           z' <- reify defs !(evalClosure defs z)
                           pure (IClaim v' w' x' y' z')
-               (UN (Basic "IData"), [x,y,z,w])
+               (UN (Basic "IData"), [x,y,z])
                     => do x' <- reify defs !(evalClosure defs x)
                           y' <- reify defs !(evalClosure defs y)
                           z' <- reify defs !(evalClosure defs z)
-                          w' <- reify defs !(evalClosure defs w)
-                          pure (IData x' y' z' w')
+                          pure (IData x' y' z')
                (UN (Basic "IDef"), [x,y,z])
                     => do x' <- reify defs !(evalClosure defs x)
                           y' <- reify defs !(evalClosure defs y)
@@ -442,13 +465,12 @@ mutual
                           y' <- reify defs !(evalClosure defs y)
                           z' <- reify defs !(evalClosure defs z)
                           pure (IParameters x' y' z')
-               (UN (Basic "IRecord"), [w,x,y,z,u])
+               (UN (Basic "IRecord"), [w,x,y,z])
                     => do w' <- reify defs !(evalClosure defs w)
                           x' <- reify defs !(evalClosure defs x)
                           y' <- reify defs !(evalClosure defs y)
                           z' <- reify defs !(evalClosure defs z)
-                          u' <- reify defs !(evalClosure defs u)
-                          pure (IRecord w' x' y' z' u')
+                          pure (IRecord w' x' y' z')
                (UN (Basic "IFail"), [w,x,y])
                     => do w' <- reify defs !(evalClosure defs w)
                           x' <- reify defs !(evalClosure defs x)
@@ -773,7 +795,13 @@ mutual
         = do x' <- reflect fc defs lhs env x
              y' <- reflect fc defs lhs env y
              appCon fc defs (reflectionttimp "ImpossibleClause") [x', y']
-
+  export
+  Reflect DataHeader where
+    reflect fc defs lhs env (MkDataHeader vis bind tot)
+        = do vis' <- reflect fc defs lhs env vis
+             bind' <- reflect fc defs lhs env bind
+             tot' <- reflect fc defs lhs env bind
+             appCon fc defs (reflectionttimp "MkDataHeader") [vis', bind', tot']
   export
   Reflect ImpDecl where
     reflect fc defs lhs env (IClaim v w x y z)
@@ -783,12 +811,11 @@ mutual
              y' <- reflect fc defs lhs env y
              z' <- reflect fc defs lhs env z
              appCon fc defs (reflectionttimp "IClaim") [v', w', x', y', z']
-    reflect fc defs lhs env (IData x y z w)
+    reflect fc defs lhs env (IData x y z)
         = do x' <- reflect fc defs lhs env x
              y' <- reflect fc defs lhs env y
              z' <- reflect fc defs lhs env z
-             w' <- reflect fc defs lhs env w
-             appCon fc defs (reflectionttimp "IData") [x', y', z', w']
+             appCon fc defs (reflectionttimp "IData") [x', y', z']
     reflect fc defs lhs env (IDef x y z)
         = do x' <- reflect fc defs lhs env x
              y' <- reflect fc defs lhs env y
@@ -799,13 +826,12 @@ mutual
              y' <- reflect fc defs lhs env y
              z' <- reflect fc defs lhs env z
              appCon fc defs (reflectionttimp "IParameters") [x', y', z']
-    reflect fc defs lhs env (IRecord w x y z u)
+    reflect fc defs lhs env (IRecord w x y z)
         = do w' <- reflect fc defs lhs env w
              x' <- reflect fc defs lhs env x
              y' <- reflect fc defs lhs env y
              z' <- reflect fc defs lhs env z
-             u' <- reflect fc defs lhs env u
-             appCon fc defs (reflectionttimp "IRecord") [w', x', y', z', u']
+             appCon fc defs (reflectionttimp "IRecord") [w', x', y', z']
     reflect fc defs lhs env (IFail x y z)
         = do x' <- reflect fc defs lhs env x
              y' <- reflect fc defs lhs env y

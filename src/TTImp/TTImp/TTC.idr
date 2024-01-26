@@ -376,17 +376,28 @@ mutual
                _ => corrupt "FnOpt"
 
   export
+  TTC DataHeader where
+    toBuf b (MkDataHeader visibility binding totality)
+        = do toBuf b visibility
+             toBuf b binding
+             toBuf b totality
+    fromBuf b = do vis <- fromBuf b
+                   bin <- fromBuf b
+                   tot <- fromBuf b
+                   pure (MkDataHeader vis bin tot)
+
+  export
   TTC ImpDecl where
     toBuf b (IClaim fc c vis xs d)
         = do tag 0; toBuf b fc; toBuf b c; toBuf b vis; toBuf b xs; toBuf b d
-    toBuf b (IData fc vis mbtot d)
-        = do tag 1; toBuf b fc; toBuf b vis; toBuf b mbtot; toBuf b d
+    toBuf b (IData fc header d)
+        = do tag 1; toBuf b fc; toBuf b header; toBuf b d
     toBuf b (IDef fc n xs)
         = do tag 2; toBuf b fc; toBuf b n; toBuf b xs
     toBuf b (IParameters fc vis d)
         = do tag 3; toBuf b fc; toBuf b vis; toBuf b d
-    toBuf b (IRecord fc ns vis mbtot r)
-        = do tag 4; toBuf b fc; toBuf b ns; toBuf b vis; toBuf b mbtot; toBuf b r
+    toBuf b (IRecord fc ns header r)
+        = do tag 4; toBuf b fc; toBuf b ns; toBuf b header; toBuf b r
     toBuf b (INamespace fc xs ds)
         = do tag 5; toBuf b fc; toBuf b xs; toBuf b ds
     toBuf b (ITransform fc n lhs rhs)
@@ -407,9 +418,10 @@ mutual
                        vis <- fromBuf b;
                        xs <- fromBuf b; d <- fromBuf b
                        pure (IClaim fc c vis xs d)
-               1 => do fc <- fromBuf b; vis <- fromBuf b
-                       mbtot <- fromBuf b; d <- fromBuf b
-                       pure (IData fc vis mbtot d)
+               1 => do fc <- fromBuf b;
+                       header <- fromBuf b;
+                       d <- fromBuf b
+                       pure (IData fc header d)
                2 => do fc <- fromBuf b; n <- fromBuf b
                        xs <- fromBuf b
                        pure (IDef fc n xs)
@@ -417,9 +429,9 @@ mutual
                        d <- fromBuf b
                        pure (IParameters fc vis d)
                4 => do fc <- fromBuf b; ns <- fromBuf b;
-                       vis <- fromBuf b; mbtot <- fromBuf b;
+                       header <- fromBuf b;
                        r <- fromBuf b
-                       pure (IRecord fc ns vis mbtot r)
+                       pure (IRecord fc ns header r)
                5 => do fc <- fromBuf b; xs <- fromBuf b
                        ds <- fromBuf b
                        pure (INamespace fc xs ds)

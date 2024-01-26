@@ -30,12 +30,12 @@ genUniqueStr xs x = if x `elem` xs then genUniqueStr xs (x ++ "'") else x
 rawImpFromDecl : ImpDecl -> List RawImp
 rawImpFromDecl decl = case decl of
     IClaim fc1 y z ys ty => [getFromTy ty]
-    IData fc1 y _ (MkImpData fc2 n tycon opts datacons)
+    IData fc1 y (MkImpData fc2 n tycon opts datacons)
         => maybe id (::) tycon $ map getFromTy datacons
-    IData fc1 y _ (MkImpLater fc2 n tycon) => [tycon]
+    IData fc1 y (MkImpLater fc2 n tycon) => [tycon]
     IDef fc1 y ys => getFromClause !ys
     IParameters fc1 ys zs => rawImpFromDecl !zs ++ map getParamTy ys
-    IRecord fc1 y z _ (MkImpRecord fc n params opts conName fields) => do
+    IRecord fc1 y _ (MkImpRecord fc n params opts conName fields) => do
         (a, b) <- map (snd . snd) params
         getFromPiInfo a ++ [b] ++ getFromIField !fields
     IFail fc1 msg zs => rawImpFromDecl !zs
@@ -397,8 +397,8 @@ mutual
       = IClaim fc r vis opts (substNamesTy' bvar bound ps td)
   substNamesDecl' bvar bound ps (IDef fc n cs)
       = IDef fc n (map (substNamesClause' bvar bound ps) cs)
-  substNamesDecl' bvar bound ps (IData fc vis mbtot d)
-      = IData fc vis mbtot (substNamesData' bvar bound ps d)
+  substNamesDecl' bvar bound ps (IData fc hd d)
+      = IData fc hd (substNamesData' bvar bound ps d)
   substNamesDecl' bvar bound ps (IFail fc msg ds)
       = IFail fc msg (map (substNamesDecl' bvar bound ps) ds)
   substNamesDecl' bvar bound ps (INamespace fc ns ds)
@@ -497,8 +497,8 @@ mutual
       = IClaim fc' r vis opts (substLocTy fc' td)
   substLocDecl fc' (IDef fc n cs)
       = IDef fc' n (map (substLocClause fc') cs)
-  substLocDecl fc' (IData fc vis mbtot d)
-      = IData fc' vis mbtot (substLocData fc' d)
+  substLocDecl fc' (IData fc hd d)
+      = IData fc' hd (substLocData fc' d)
   substLocDecl fc' (IFail fc msg ds)
       = IFail fc' msg (map (substLocDecl fc') ds)
   substLocDecl fc' (INamespace fc ns ds)

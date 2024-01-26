@@ -260,7 +260,7 @@ mapPTermM f = goPTerm where
       PClaim fc c v <$> goPFnOpts opts
                     <*> goPTypeDecl tdecl
     goPDecl (PDef fc cls) = PDef fc <$> goPClauses cls
-    goPDecl (PData fc doc v mbt d) = PData fc doc v mbt <$> goPDataDecl d
+    goPDecl (PData fc doc mbt d) = PData fc doc mbt <$> goPDataDecl d
     goPDecl (PParameters fc nts ps) =
       PParameters fc <$> go4TupledPTerms nts
                      <*> goPDecls ps
@@ -283,13 +283,13 @@ mapPTermM f = goPTerm where
                                   <*> pure mn
                                   <*> pure ns
                                   <*> goMPDecls mps
-    goPDecl (PRecord fc doc v tot (MkPRecord n nts opts mn fs)) =
-      pure $ PRecord fc doc v tot !(MkPRecord n <$> go4TupledPTerms nts
-                                                <*> pure opts
-                                                <*> pure mn
-                                                <*> goPFields fs)
-    goPDecl (PRecord fc doc v tot (MkPRecordLater n nts)) =
-      pure $ PRecord fc doc v tot (MkPRecordLater n !(go4TupledPTerms nts))
+    goPDecl (PRecord fc doc hd (MkPRecord n nts opts mn fs)) =
+      pure $ PRecord fc doc hd !(MkPRecord n <$> go4TupledPTerms nts
+                                             <*> pure opts
+                                             <*> pure mn
+                                             <*> goPFields fs)
+    goPDecl (PRecord fc doc hd (MkPRecordLater n nts)) =
+      pure $ PRecord fc doc hd (MkPRecordLater n !(go4TupledPTerms nts))
     goPDecl (PFail fc msg ps) = PFail fc msg <$> goPDecls ps
     goPDecl (PMutual fc ps) = PMutual fc <$> goPDecls ps
     goPDecl p@(PFixity _ _ _ _ _ _) = pure p
@@ -546,7 +546,7 @@ mapPTerm f = goPTerm where
     goPDecl (PClaim fc c v opts tdecl)
       = PClaim fc c v (goPFnOpt <$> opts) (goPTypeDecl tdecl)
     goPDecl (PDef fc cls) = PDef fc $ goPClause <$> cls
-    goPDecl (PData fc doc v mbt d) = PData fc doc v mbt $ goPDataDecl d
+    goPDecl (PData fc doc hd d) = PData fc doc hd $ goPDataDecl d
     goPDecl (PParameters fc nts ps)
       = PParameters fc (go4TupledPTerms nts) (goPDecl <$> ps)
     goPDecl (PUsing fc mnts ps)
@@ -556,10 +556,10 @@ mapPTerm f = goPTerm where
     goPDecl (PImplementation fc v opts p is cs n ts mn ns mps)
       = PImplementation fc v opts p (goImplicits is) (goPairedPTerms cs)
            n (goPTerm <$> ts) mn ns (map (goPDecl <$>) mps)
-    goPDecl (PRecord fc doc v tot (MkPRecord n nts opts mn fs))
-      = PRecord fc doc v tot (MkPRecord n (go4TupledPTerms nts) opts mn (goPField <$> fs))
-    goPDecl (PRecord fc doc v tot (MkPRecordLater n nts))
-      = PRecord fc doc v tot (MkPRecordLater n (go4TupledPTerms nts))
+    goPDecl (PRecord fc doc hd (MkPRecord n nts opts mn fs))
+      = PRecord fc doc hd (MkPRecord n (go4TupledPTerms nts) opts mn (goPField <$> fs))
+    goPDecl (PRecord fc doc hd (MkPRecordLater n nts))
+      = PRecord fc doc hd (MkPRecordLater n (go4TupledPTerms nts))
     goPDecl (PFail fc msg ps) = PFail fc msg $ goPDecl <$> ps
     goPDecl (PMutual fc ps) = PMutual fc $ goPDecl <$> ps
     goPDecl p@(PFixity _ _ _ _ _ _) = p

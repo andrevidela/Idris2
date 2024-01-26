@@ -1382,28 +1382,23 @@ dataDeclBody fname indents
          (col, n) <- pure b.val
          simpleData fname b n indents <|> gadtData fname col b n indents
 
-record DataHeader where
-  constructor MkDataHeader
-  visibility : WithDefault Visibility Private
-  binding : WithDefault BindingModifier NotBinding
-  totality : WithDefault TotalReq CoveringOnly
+optionalDefault : Rule a -> EmptyRule (WithDefault a da)
+optionalDefault p = specified <$> p <|> pure defaulted
 
 -- a data declaration can have a visibility and an optional totality (#1404)
-dataVisOpt : OriginDesc -> EmptyRule (WithDefault Visibility Private, WithDefault TotalReq CoveringOnly)
-dataVisOpt fname
-    = do { vis <- visOption   fname ; mbtot <- optional (totalityOpt fname)
-         ; pure (specified vis, fromMaybe mbtot) }
-  <|> do { tot <- totalityOpt fname ; vis <- visibility fname ; pure (vis, specified tot) }
-  <|> pure (defaulted, defaulted)
+dataVisOpt : OriginDesc -> EmptyRule DataHeader
+dataVisOpt fname = permutation (optionalDefault $ visOption fname)
+                               (optionalDefault $ bindingKeyword fname)
+                               (optionalDefault $ totalityOpt fname) MkDataHeader
 
 dataDecl : OriginDesc -> IndentInfo -> Rule PDecl
 dataDecl fname indents
-    = do b <- bounds (do doc         <- optDocumentation fname
-                         (vis,mbTot) <- dataVisOpt fname
-                         dat         <- dataDeclBody fname indents
-                         pure (doc, vis, mbTot, dat))
-         (doc, vis, mbTot, dat) <- pure b.val
-         pure (PData (boundToFC fname b) doc vis mbTot dat)
+    = do b <- bounds (do doc    <- optDocumentation fname
+                         dataHd <- dataVisOpt fname
+                         dat    <- dataDeclBody fname indents
+                         pure (doc, dataHd, dat))
+         (doc, datahd, dat) <- pure b.val
+         pure (PData (boundToFC fname b) doc datahd dat)
 
 stripBraces : String -> String
 stripBraces str = pack (drop '{' (reverse (drop '}' (reverse (unpack str)))))
@@ -1810,32 +1805,32 @@ recordParam fname indents
 
 -- A record without a where is a forward declaration
 recordBody : OriginDesc -> IndentInfo ->
-             String -> WithDefault Visibility Private ->
-             WithDefault TotalReq CoveringOnly ->
+             String ->
+             DataHeader ->
              Int ->
              Name ->
              List (Name, RigCount, PiInfo PTerm, PTerm) ->
              EmptyRule (FC -> PDecl)
-recordBody fname indents doc vis mbtot col n params
+recordBody fname indents doc header col n params
     = do atEndIndent indents
-         pure (\fc : FC => PRecord fc doc vis mbtot (MkPRecordLater n params))
+         pure (\fc : FC => PRecord fc doc header (MkPRecordLater n params))
   <|> do mustWork $ decoratedKeyword fname "where"
          opts <- dataOpts fname
          dcflds <- blockWithOptHeaderAfter col
                      (\ idt => recordConstructor fname <* atEnd idt)
                      (fieldDecl fname)
-         pure (\fc : FC => PRecord fc doc vis mbtot (MkPRecord n params opts (fst dcflds) (concat (snd dcflds))))
+         pure (\fc : FC => PRecord fc doc header (MkPRecord n params opts (fst dcflds) (concat (snd dcflds))))
 
 recordDecl : OriginDesc -> IndentInfo -> Rule PDecl
 recordDecl fname indents
     = do b <- bounds (do doc         <- optDocumentation fname
-                         (vis,mbtot) <- dataVisOpt fname
+                         hd <- dataVisOpt fname
                          col         <- column
                          decoratedKeyword fname "record"
                          n       <- mustWork (decoratedDataTypeName fname)
                          paramss <- many (continue indents >> recordParam fname indents)
                          let params = concat paramss
-                         recordBody fname indents doc vis mbtot col n params)
+                         recordBody fname indents doc hd col n params)
          pure (b.val (boundToFC fname b))
 
 paramDecls : OriginDesc -> IndentInfo -> Rule PDecl
