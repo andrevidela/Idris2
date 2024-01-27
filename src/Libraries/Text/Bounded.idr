@@ -28,6 +28,10 @@ endBounds : Bounds -> (Int, Int)
 endBounds b = (b.endLine, b.endCol)
 
 export
+fromLoc : (start, end : (Int, Int)) -> Bounds
+fromLoc (s1, s2) (e1, e2) = MkBounds s1 s2 e1 e2
+
+export
 Eq Bounds where
   (MkBounds sl sc el ec) == (MkBounds sl' sc' el' ec') =
       sl == sl'
@@ -93,3 +97,7 @@ mergeBounds b1 b2 =
 export
 joinBounds : WithBounds (WithBounds ty) -> WithBounds ty
 joinBounds b = mergeBounds b b.val
+
+export
+adjustStart : (Int, Int) -> WithBounds ty -> WithBounds ty
+adjustStart newStart (MkBounded val i bounds) = MkBounded val i (fromLoc newStart (endBounds bounds))

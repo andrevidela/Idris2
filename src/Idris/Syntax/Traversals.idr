@@ -140,10 +140,10 @@ mapPTermM f = goPTerm where
     goPTerm (PBracketed fc x) =
       PBracketed fc <$> goPTerm x
       >>= f
-    goPTerm (PBindingApp fc expr name bound body) =
+    goPTerm (PBindingApp fc binder pat bound body) =
      pure (PBindingApp fc)
-       <*> goPTerm expr
-       <*> pure name
+       <*> pure binder
+       <*> goPTerm pat
        <*> goPTerm bound
        <*> goPTerm body
        >>= f
@@ -473,8 +473,8 @@ mapPTerm f = goPTerm where
       = f $ PEq fc (goPTerm x) (goPTerm y)
     goPTerm (PBracketed fc x)
       = f $ PBracketed fc $ goPTerm x
-    goPTerm (PBindingApp fc expr name bound body)
-      = f $ PBindingApp fc (goPTerm expr) name (goPTerm bound) (goPTerm body)
+    goPTerm (PBindingApp fc binder pat bound body)
+      = f $ PBindingApp fc binder (goPTerm pat) (goPTerm bound) (goPTerm body)
     goPTerm (PString fc x ys)
       = f $ PString fc x $ goPStr <$> ys
     goPTerm (PMultiline fc x y zs)

@@ -313,14 +313,13 @@ mutual
 
   with_ : OriginDesc -> IndentInfo -> Rule PTerm
   with_ fname indents
-      = do b <- bounds (do decoratedKeyword fname "with"
-                           commit
-                           ns <- singleName <|> nameList
-                           end <- location
-                           rhs <- expr pdef fname indents
-                           pure (ns, rhs))
-           (ns, rhs) <- pure b.val
-           pure (PWithUnambigNames (boundToFC fname b) ns rhs)
+      = do start <- location
+           decoratedKeyword fname "with"
+           commit
+           ns <- singleName <|> nameList
+           rhs <- expr pdef fname indents
+           end <- endLocation
+           pure (PWithUnambigNames (locationToFC fname start end) ns rhs)
     where
       singleName : Rule (List (FC, Name))
       singleName = do
@@ -401,16 +400,17 @@ mutual
 
   dpairType : OriginDesc -> WithBounds t -> IndentInfo -> Rule PTerm
   dpairType fname start indents
-      = do loc <- bounds (do x <- UN . Basic <$> decoratedSimpleBinderName fname
-                             decoratedSymbol fname ":"
-                             ty <- typeExpr pdef fname indents
-                             pure (x, ty))
-           (x, ty) <- pure loc.val
+      = do startLoc <- location
+           x <- UN . Basic <$> decoratedSimpleBinderName fname
+           decoratedSymbol fname ":"
+           ty <- typeExpr pdef fname indents
+           endLoc <- endLocation
            op <- bounds (symbol "**")
-           rest <- bounds (nestedDpair fname loc indents <|> typeExpr pdef fname indents)
+           rest <- bounds (nestedDpair fname (MkBounded (x, ty) False (fromLoc startLoc endLoc)) indents
+               <|> typeExpr pdef fname indents)
            pure (PDPair (boundToFC fname (mergeBounds start rest))
                         (boundToFC fname op)
-                        (PRef (boundToFC fname loc) x)
+                        (PRef (locationToFC fname startLoc endLoc) x)
                         ty
                         rest.val)
 
@@ -583,14 +583,14 @@ mutual
   simpleExpr : OriginDesc -> IndentInfo -> Rule PTerm
   simpleExpr fname indents
     = do  -- x.y.z
-          b <- bounds (do root <- simplerExpr fname indents
-                          projs <- many (bounds postfixProj)
-                          pure (root, projs))
-          (root, projs) <- pure b.val
+          startLoc <- location
+          root <- simplerExpr fname indents
+          projs <- many (bounds postfixProj)
+          endLoc <- endLocation
           let projs = map (\ proj => (boundToFC fname proj, proj.val)) projs
           pure $ case projs of
             [] => root
-            _  => PPostfixApp (boundToFC fname b) root projs
+            _  => PPostfixApp (locationToFC fname startLoc endLoc) root projs
     <|> debugString fname
     <|> do b <- bounds (forget <$> some (bounds postfixProj))
            pure $ let projs = map (\ proj => (boundToFC fname proj, proj.val)) b.val in
@@ -598,13 +598,13 @@ mutual
 
   simplerExpr : OriginDesc -> IndentInfo -> Rule PTerm
   simplerExpr fname indents
-      = do b <- bounds (do x <- bounds (UN . Basic <$> decoratedSimpleBinderName fname)
-                           decoratedSymbol fname "@"
-                           commit
-                           expr <- simpleExpr fname indents
-                           pure (x, expr))
-           (x, expr) <- pure b.val
-           pure (PAs (boundToFC fname b) (boundToFC fname x) x.val expr)
+      = do startLoc <- location
+           x <- bounds (UN . Basic <$> decoratedSimpleBinderName fname)
+           decoratedSymbol fname "@"
+           commit
+           expr <- simpleExpr fname indents
+           endLoc <- endLocation
+           pure (PAs (locationToFC fname startLoc endLoc) (boundToFC fname x) x.val expr)
     <|> do b <- bounds $ do
                   mns <- decoratedNamespacedSymbol fname "[|"
                   t   <- expr pdef fname indents
@@ -615,31 +615,29 @@ mutual
     <|> record_ fname indents
     <|> singlelineStr pdef fname indents
     <|> multilineStr pdef fname indents
-    <|> do b <- bounds $ do
-                  decoratedSymbol fname ".("
-                  commit
-                  t <- typeExpr pdef fname indents
-                  decoratedSymbol fname ")"
-                  pure t
-           pure (PDotted (boundToFC fname b) b.val)
-    <|> do b <- bounds $ do
-                  decoratedSymbol fname "`("
-                  t <- typeExpr pdef fname indents
-                  decoratedSymbol fname ")"
-                  pure t
-           pure (PQuote (boundToFC fname b) b.val)
-    <|> do b <- bounds $ do
-                  decoratedSymbol fname "`{"
-                  t <- name
-                  decoratedSymbol fname "}"
-                  pure t
-           pure (PQuoteName (boundToFC fname b) b.val)
-    <|> do b <- bounds $ do
-                  decoratedSymbol fname "`["
-                  ts <- nonEmptyBlock (topDecl fname)
-                  decoratedSymbol fname "]"
-                  pure ts
-           pure (PQuoteDecl (boundToFC fname b) (collectDefs (concat b.val)))
+    <|> do start <- bounds $ decoratedSymbol fname ".("
+           commit
+           t <- typeExpr pdef fname indents
+           end <- bounds $ decoratedSymbol fname ")"
+           pure (PDotted (boundToFC fname (mergeBounds start end)) t)
+    <|> do startLoc <- location
+           decoratedSymbol fname "`("
+           t <- typeExpr pdef fname indents
+           decoratedSymbol fname ")"
+           endLoc <- endLocation
+           pure (PQuote (locationToFC fname startLoc endLoc) t)
+    <|> do startLoc <- location
+           decoratedSymbol fname "`{"
+           t <- name
+           decoratedSymbol fname "}"
+           endLoc <- endLocation
+           pure (PQuoteName (locationToFC fname startLoc endLoc) t)
+    <|> do startLoc <- location
+           decoratedSymbol fname "`["
+           ts <- nonEmptyBlock (topDecl fname)
+           decoratedSymbol fname "]"
+           endLoc <- endLocation
+           pure (PQuoteDecl (locationToFC fname startLoc endLoc) (collectDefs (concat ts)))
     <|> do b <- bounds (decoratedSymbol fname "~" *> simpleExpr fname indents)
            pure (PUnquote (boundToFC fname b) b.val)
     <|> do start <- bounds (symbol "(")
@@ -650,13 +648,14 @@ mutual
            listExpr fname start indents
     <|> do b <- bounds (decoratedSymbol fname "!" *> simpleExpr fname indents)
            pure (PBang (virtualiseFC $ boundToFC fname b) b.val)
-    <|> do b <- bounds $ do decoratedPragma fname "logging"
-                            topic <- optional (split (('.') ==) <$> simpleStr)
-                            lvl   <- intLit
-                            e     <- expr pdef fname indents
-                            pure (MkPair (mkLogLevel' topic (integerToNat lvl)) e)
-           (lvl, e) <- pure b.val
-           pure (PUnifyLog (boundToFC fname b) lvl e)
+    <|> do startLoc <- location
+           decoratedPragma fname "logging"
+           topic <- optional (split (('.') ==) <$> simpleStr)
+           lvl   <- intLit
+           e     <- expr pdef fname indents
+           endLoc <- endLocation
+           let lvl = mkLogLevel' topic (integerToNat lvl)
+           pure (PUnifyLog (locationToFC fname startLoc endLoc) lvl e)
     <|> withWarning "DEPRECATED: trailing lambda. Use a $ or parens"
         (lam fname indents)
 
@@ -848,13 +847,13 @@ mutual
   case_ : OriginDesc -> IndentInfo -> Rule PTerm
   case_ fname indents
       = do opts <- many (fnDirectOpt fname)
-           b <- bounds (do decoratedKeyword fname "case"
-                           scr <- expr pdef fname indents
-                           mustWork (commitKeyword fname indents "of")
-                           alts <- block (caseAlt fname)
-                           pure (scr, alts))
-           (scr, alts) <- pure b.val
-           pure (PCase (virtualiseFC $ boundToFC fname b) opts scr alts)
+           startLoc <- location
+           decoratedKeyword fname "case"
+           scr <- expr pdef fname indents
+           mustWork (commitKeyword fname indents "of")
+           alts <- block (caseAlt fname)
+           endLoc <- endLocation
+           pure (PCase (virtualiseFC $ locationToFC fname startLoc endLoc) opts scr alts)
 
 
   caseAlt : OriginDesc -> IndentInfo -> Rule PClause
@@ -878,17 +877,17 @@ mutual
 
   if_ : OriginDesc -> IndentInfo -> Rule PTerm
   if_ fname indents
-      = do b <- bounds (do decoratedKeyword fname "if"
-                           commit
-                           x <- expr pdef fname indents
-                           commitKeyword fname indents "then"
-                           t <- typeExpr pdef fname indents
-                           commitKeyword fname indents "else"
-                           e <- typeExpr pdef fname indents
-                           pure (x, t, e))
+      = do startLoc <- location
+           decoratedKeyword fname "if"
+           commit
+           x <- expr pdef fname indents
+           commitKeyword fname indents "then"
+           t <- typeExpr pdef fname indents
+           commitKeyword fname indents "else"
+           e <- typeExpr pdef fname indents
+           endLoc <- endLocation
            mustWork $ atEnd indents
-           (x, t, e) <- pure b.val
-           pure (PIfThenElse (boundToFC fname b) x t e)
+           pure (PIfThenElse (locationToFC fname startLoc endLoc) x t e)
 
   record_ : OriginDesc -> IndentInfo -> Rule PTerm
   record_ fname indents
@@ -1099,14 +1098,15 @@ mutual
   multilineStr : ParseOpts -> OriginDesc -> IndentInfo -> Rule PTerm
   multilineStr q fname idents
       = decorate fname Data $
-        do b <- bounds $ do hashtag <- multilineBegin
-                            commit
-                            xs <- many $ bounds $ (interpBlock q fname idents) <||> strLitLines
-                            endloc <- location
-                            strEnd
-                            pure (hashtag, endloc, toLines xs [<] [<])
-           pure $ let (hashtag, (_, col), xs) = b.val in
-                      PMultiline (boundToFC fname b) hashtag (fromInteger $ cast col) xs
+        do startLoc <- location
+           hashtag <- multilineBegin
+           commit
+           xs <- many $ bounds $ (interpBlock q fname idents) <||> strLitLines
+           col <- snd <$> location
+           strEnd
+           endLoc <- endLocation
+           let xs = toLines xs [<] [<]
+           pure $ PMultiline (locationToFC fname startLoc endLoc) hashtag (fromInteger $ cast col) xs
     where
       toLines : List (WithBounds $ Either PTerm (List1 String)) ->
                 SnocList PStr -> SnocList (List PStr) -> List (List PStr)
@@ -1220,9 +1220,9 @@ withProblem fname col indents
 
 mutual
   parseRHS : (withArgs : Nat) ->
-             OriginDesc -> WithBounds t -> Int ->
+             OriginDesc -> (Int, Int) ->
              IndentInfo -> (lhs : (PTerm, List (FC, PTerm))) -> Rule PClause
-  parseRHS withArgs fname start col indents lhs
+  parseRHS withArgs fname start@(_, col) indents lhs
        = do b <- bounds $ do
                    decoratedSymbol fname "="
                    mustWork $ do
@@ -1232,7 +1232,7 @@ mutual
             b' <- bounds peek
             mustWorkBecause b'.bounds "Not the end of a block entry, check indentation" $ atEnd indents
             (rhs, ws) <- pure b.val
-            let fc = boundToFC fname (mergeBounds start b)
+            let fc = boundToFC fname (adjustStart start b)
             pure (MkPatClause fc (uncurry applyArgs lhs) rhs ws)
      <|> do b <- bounds $ do
                    decoratedKeyword fname "with"
@@ -1243,31 +1243,29 @@ mutual
                                   $ clause (S (length wps.tail) + withArgs) (Just lhs) fname
                    pure (flags, wps, forget ws)
             (flags, wps, ws) <- pure b.val
-            let fc = boundToFC fname (mergeBounds start b)
+            let fc = boundToFC fname (adjustStart start b)
             pure (MkWithClause fc (uncurry applyArgs lhs) wps flags ws)
      <|> do end <- bounds (decoratedKeyword fname "impossible")
             atEnd indents
-            pure $ let fc = boundToFC fname (mergeBounds start end) in
+            pure $ let fc = boundToFC fname (adjustStart start end) in
                    MkImpossible fc (uncurry applyArgs lhs)
 
   clause : (withArgs : Nat) ->
            IMaybe (isSucc withArgs) (PTerm, List (FC, PTerm)) ->
            OriginDesc -> IndentInfo -> Rule PClause
   clause withArgs mlhs fname indents
-      = do b <- bounds (do col   <- column
-                           lhsws <- clauseLHS fname indents mlhs
-                           extra <- many parseWithArg
-                           pure (col, mapSnd (++ extra) lhsws))
-           let col = Builtin.fst b.val
-           let lhs = Builtin.snd b.val
-           let extra = Builtin.snd lhs
+      = do startLoc <- location
+           lhsws <- clauseLHS fname indents mlhs
+           extra <- many parseWithArg
+           let lhs = mapSnd (++ extra) lhsws
+           endLoc <- endLocation
            -- Can't have the dependent 'if' here since we won't be able
            -- to infer the termination status of the rule
-           ifThenElse (withArgs /= length extra)
+           ifThenElse (withArgs /= length (snd lhs))
               (fatalError $ "Wrong number of 'with' arguments:"
                          ++ " expected " ++ show withArgs
                          ++ " but got " ++ show (length extra))
-              (parseRHS withArgs fname b col indents lhs)
+              (parseRHS withArgs fname startLoc indents lhs)
     where
 
       clauseLHS : OriginDesc -> IndentInfo ->

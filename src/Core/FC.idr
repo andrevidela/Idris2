@@ -153,6 +153,11 @@ export
 boundToFC : OriginDesc -> WithBounds t -> FC
 boundToFC mbModIdent b = MkFC mbModIdent (start b) (end b)
 
+export
+locationToFC : OriginDesc -> (start, end : (Int, Int)) -> FC
+locationToFC ident = MkFC ident
+
+
 ------------------------------------------------------------------------
 -- Predicates
 

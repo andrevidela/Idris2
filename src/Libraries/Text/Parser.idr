@@ -8,6 +8,8 @@ import public Libraries.Text.Parser.Core
 import public Libraries.Text.Quantity
 import public Libraries.Text.Token
 
+import Data.List.Quantifiers
+
 %default total
 
 ||| Parse a terminal based on a kind of token.
