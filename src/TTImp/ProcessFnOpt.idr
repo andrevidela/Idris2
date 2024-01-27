@@ -10,8 +10,6 @@ import TTImp.TTImp
 
 import Libraries.Data.NameMap
 
-import Debug.Trace
-
 getRetTy : Defs -> NF [] -> Core Name
 getRetTy defs (NBind fc _ (Pi _ _ _ _) sc)
     = getRetTy defs !(sc defs (toClosure defaultOpts [] (Erased fc Placeholder)))

@@ -242,6 +242,7 @@ mutual
     <|> lazy fname indents
     <|> if_ fname indents
     <|> with_ fname indents
+    <|> bindingApp q fname indents
     <|> do b <- bounds (MkPair <$> simpleExpr fname indents <*> many (argExpr q fname indents))
            (f, args) <- pure b.val
            pure (applyExpImp (start b) (end b) f (concat args))
