@@ -54,6 +54,10 @@ Reflect UseSide where
       = getCon fc defs (reflectionttimp "UseRight")
 
 export
+Reflect v => Reflect (BinderInformation v) where
+  reflect fc defs lhs env x = ?hhh
+
+export
 Reify DotReason where
   reify defs val@(NDCon _ n _ _ args)
       = case (dropAllNS !(full (gamma defs) n), args) of
@@ -549,8 +553,12 @@ mutual
              f' <- reflect fc defs lhs env f
              a' <- reflect fc defs lhs env a
              appCon fc defs (reflectionttimp "IApp") [fc', f', a']
-    reflect fc defs lhs env (IBindingApp tfc expr nm bn scope)
-        = ?bindingReflect
+    reflect fc defs lhs env (IBindingApp tfc expr binderInfo scope)
+        = do fc' <- reflect fc defs lhs env tfc
+             expr' <- reflect fc defs lhs env expr
+             info' <- reflect fc defs lhs env binderInfo
+             scope' <- reflect fc defs lhs env scope
+             appCon fc defs (reflectionttimp "IBindingApp") [fc', expr', info', scope']
     reflect fc defs lhs env (IAutoApp tfc f a)
         = do fc' <- reflect fc defs lhs env tfc
              f' <- reflect fc defs lhs env f

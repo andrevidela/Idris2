@@ -170,6 +170,17 @@ mutual
       else Chara '`' <+> annotateM (kindAnn op) (pretty0 nm) <+> Chara '`'
 
   export
+  Pretty IdrisSyntax (OperatorLHSInfo IPTerm) where
+    prettyPrec d (NoBinder lhs) = prettyPrec d lhs
+    prettyPrec d (HasBinder bind) = prettyPrec d bind
+
+  export
+  Pretty IdrisSyntax (BinderInformation IPTerm) where
+    prettyPrec d (BindType name ty) = parens (pretty name <++> ":" <++> pretty ty)
+    prettyPrec d (BindExpr name expr) = parens (pretty name <++> ":" <++> pretty expr)
+    prettyPrec d (BindExplicitType name type expr) = parens (pretty name <++> ":" <++> pretty type <++> ":=" <++> pretty expr)
+
+  export
   Pretty IdrisSyntax IPTerm where
     prettyPrec d (PRef _ nm) = annotateM (kindAnn nm) $ cast $ prettyOp False nm.rawName
     prettyPrec d (PPi _ rig Explicit Nothing arg ret) =
@@ -332,16 +343,8 @@ mutual
     prettyPrec d (PDotted _ p) = dot <+> prettyPrec d p
     prettyPrec d (PImplicit _) = "_"
     prettyPrec d (PInfer _) = annotate Hole $ "?"
-    prettyPrec d (POp _ _ (BindType nm left) op right) =
-        group $ parens (prettyPrec d nm <++> ":" <++> pretty left)
-           <++> prettyOp op
-           <++> pretty right
-    prettyPrec d (POp _ _ (BindExpr nm left) op right) =
-        group $ parens (prettyPrec d nm <++> ":=" <++> pretty left)
-           <++> prettyOp op
-           <++> pretty right
-    prettyPrec d (POp _ _ (BindExplicitType nm ty left) op right) =
-        group $ parens (prettyPrec d nm <++> ":" <++> pretty ty <++> ":=" <++> pretty left)
+    prettyPrec d (POp _ _ (HasBinder bindInfo) op right) =
+        group $ pretty bindInfo
            <++> prettyOp op
            <++> pretty right
     prettyPrec d (POp _ _ (NoBinder x) op y) =
@@ -354,9 +357,9 @@ mutual
     prettyPrec d (PSectionR _ _ x op) = parens (pretty x <++> prettyOp op)
     prettyPrec d (PEq fc l r) = parenthesise (d > startPrec) $ prettyPrec Equal l <++> equals <++> prettyPrec Equal r
     prettyPrec d (PBracketed _ tm) = parens (pretty tm)
-    prettyPrec d (PBindingApp _ name pat bound body)
-      = parenthesise (d > startPrec) $ prettyBinder name <++>
-        parens (pretty pat <++> ":" <++> pretty bound) <++>  "|" <++> prettyPrec d body
+    prettyPrec d (PBindingApp _ name bound body)
+      = parenthesise (d > startPrec)
+      $ prettyBinder name <++> pretty bound <++>  "|" <++> pretty body
     prettyPrec d (PString _ _ xs) = parenthesise (d > startPrec) $ hsep $ punctuate "++" (prettyPStr <$> xs)
     prettyPrec d (PMultiline _ _ indent xs) =
       "multiline" <++>

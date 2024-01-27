@@ -185,9 +185,9 @@ checkConflictingBinding fc opName foundFixity use_site rhs
       isCompatible Backticked (NoBinder lhs) = True
       isCompatible Backticked _ = False
       isCompatible (DeclaredFixity fixInfo) (NoBinder lhs) = fixInfo.bindingInfo == NotBinding
-      isCompatible (DeclaredFixity fixInfo) (BindType name ty) = fixInfo.bindingInfo == Typebind
-      isCompatible (DeclaredFixity fixInfo) (BindExpr name expr) = fixInfo.bindingInfo == Autobind
-      isCompatible (DeclaredFixity fixInfo) (BindExplicitType name type expr)
+      isCompatible (DeclaredFixity fixInfo) (HasBinder $ BindType name ty) = fixInfo.bindingInfo == Typebind
+      isCompatible (DeclaredFixity fixInfo) (HasBinder $ BindExpr name expr) = fixInfo.bindingInfo == Autobind
+      isCompatible (DeclaredFixity fixInfo) (HasBinder $ BindExplicitType name type expr)
           = fixInfo.bindingInfo == Autobind
 
       keepCompatibleBinding : BindingModifier -> (Name, GlobalDef) -> Core Bool
@@ -466,10 +466,9 @@ mutual
   desugarB side ps (PMultiline fc hashtag indent lines)
       = pure $ maybeIApp fc !fromStringName !(expandString side ps fc hashtag !(trimMultiline fc indent lines))
 
-  desugarB side ps (PBindingApp fc binder pat bound scope)
+  desugarB side ps (PBindingApp fc binder binderInfo scope)
       = pure $ IBindingApp fc binder
-           !(desugarB side ps pat)
-           !(desugarB side ps bound)
+           !(traverse (desugarB side ps) binderInfo)
            !(desugarB side ps scope)
   -- We only add `fromString` if we are looking at a plain string literal.
   -- Interpolated string literals don't have a `fromString` call since they
@@ -818,20 +817,20 @@ mutual
            r' <- desugarTree side ps r
            pure (PApp loc (PApp loc (PRef opFC op) l') r')
   -- (x : ty) =@ f x ==>> (=@) ty (\x : ty => f x)
-  desugarTree side ps (Infix loc opFC (op, Just (BindType pat lhs)) l r)
+  desugarTree side ps (Infix loc opFC (op, Just (HasBinder $ BindType pat lhs)) l r)
       = do l' <- desugarTree side ps l
            body <- desugarTree side ps r
            pure $ PApp loc (PApp loc (PRef opFC op) l')
                       (PLam loc top Explicit pat l' body)
   -- (x := exp) =@ f x ==>> (=@) exp (\x : ? => f x)
-  desugarTree side ps (Infix loc opFC (op, Just (BindExpr pat lhs)) l r)
+  desugarTree side ps (Infix loc opFC (op, Just (HasBinder $ BindExpr pat lhs)) l r)
       = do l' <- desugarTree side ps l
            body <- desugarTree side ps r
            pure $ PApp loc (PApp loc (PRef opFC op) l')
                       (PLam loc top Explicit pat (PInfer opFC) body)
 
   -- (x : ty := exp) =@ f x ==>> (=@) exp (\x : ty => f x)
-  desugarTree side ps (Infix loc opFC (op, Just (BindExplicitType pat ty expr)) l r)
+  desugarTree side ps (Infix loc opFC (op, Just (HasBinder $ BindExplicitType pat ty expr)) l r)
       = do l' <- desugarTree side ps l
            body <- desugarTree side ps r
            pure $ PApp loc (PApp loc (PRef opFC op) l')

@@ -96,7 +96,8 @@ mutual
        -- 2. We can reconstruct the intended expression in error messages if it's incorrectly used.
        -- 3. A function name can be overloaded and one of them could be binding while the other isn't
        IBindingApp : FC -> (binder  : Name) ->
-                     (pat, bound, body : RawImp' nm) -> RawImp' nm
+                     (binderInfo : BinderInformation (RawImp' nm)) ->
+                     (body : RawImp' nm) -> RawImp' nm
        IAutoApp : FC -> RawImp' nm -> RawImp' nm -> RawImp' nm
        INamedApp : FC -> RawImp' nm -> Name -> RawImp' nm -> RawImp' nm
        IWithApp : FC -> RawImp' nm -> RawImp' nm -> RawImp' nm
@@ -191,8 +192,8 @@ mutual
          = "(" ++ show f ++ " " ++ show a ++ ")"
       show (INamedApp fc f n a)
          = "(" ++ show f ++ " [" ++ show n ++ " = " ++ show a ++ "])"
-      show (IBindingApp fc binder pat bound body)
-         = show binder ++ " (" ++ show pat ++ " : " ++ show bound ++ ") | " ++ show body
+      show (IBindingApp fc binder binderInfo body)
+         = show binder ++ show binderInfo ++ "| " ++ show body
       show (IAutoApp fc f a)
          = "(" ++ show f ++ " [" ++ show a ++ "])"
       show (IWithApp fc f a)
@@ -871,7 +872,7 @@ getFC (ICaseLocal x _ _ _ _) = x
 getFC (IUpdate x _ _) = x
 getFC (IApp x _ _) = x
 getFC (INamedApp x _ _ _) = x
-getFC (IBindingApp x _ _ _ _) = x
+getFC (IBindingApp x _ _ _) = x
 getFC (IAutoApp x _ _) = x
 getFC (IWithApp x _ _) = x
 getFC (ISearch x _) = x

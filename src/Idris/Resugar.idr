@@ -349,10 +349,9 @@ mutual
       = do arg' <- toPTerm argPrec arg
            app <- toPTermApp fn [(fc, Nothing, arg')]
            bracket p appPrec app
-  toPTerm p (IBindingApp fc nm pat bound scope)
+  toPTerm p (IBindingApp fc nm bindInfo scope)
       = pure $ PBindingApp fc nm
-          !(toPTerm p pat)
-          !(toPTerm p bound)
+          ?ahgg
           !(toPTerm p scope)
   toPTerm p (IAutoApp fc fn arg)
       = do arg' <- toPTerm argPrec arg
@@ -448,6 +447,8 @@ mutual
       = do fn' <- toPTerm appPrec fn
            mkApp fn' args
 
+
+  -- toPBinding : IBindingApp
   toPFieldUpdate : {auto c : Ref Ctxt Defs} ->
                    {auto s : Ref Syn SyntaxInfo} ->
                    IFieldUpdate' KindedName -> Core (PFieldUpdate' KindedName)

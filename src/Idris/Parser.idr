@@ -264,6 +264,16 @@ mutual
       applyExpImp start end f (WithArg exp :: args)
           = applyExpImp start end (PWithApp (MkFC fname start end) f exp) args
 
+  bindingApp : ParseOpts -> OriginDesc -> IndentInfo -> Rule PTerm
+  bindingApp p fname indents
+      = do startLoc <- location
+           binder <- UN . Basic <$> decoratedSimpleBinderName fname
+           binderInfo <- nameBinderAtom fname indents
+           decoratedSymbol fname "|"
+           rest <- expr p fname indents
+           endLoc <- endLocation
+           pure $ PBindingApp (locationToFC fname startLoc endLoc) binder binderInfo rest
+
   argExpr : ParseOpts -> OriginDesc -> IndentInfo -> Rule (List ArgType)
   argExpr q fname indents
       = do continue indents
@@ -336,7 +346,7 @@ mutual
 
   -- The different kinds of operator bindings `x : ty` for typebind
   -- x := e and x : ty := e for autobind
-  opBinderTypes : OriginDesc -> IndentInfo -> WithBounds PTerm -> Rule (OperatorLHSInfo PTerm)
+  opBinderTypes : OriginDesc -> IndentInfo -> WithBounds PTerm -> Rule (BinderInformation PTerm)
   opBinderTypes fname indents boundName =
            do decoratedSymbol fname ":"
               ty <- typeExpr pdef fname indents
@@ -350,21 +360,22 @@ mutual
               ty <- typeExpr pdef fname indents
               pure (BindType boundName.val ty)
 
-  opBinder : OriginDesc -> IndentInfo -> Rule (OperatorLHSInfo PTerm)
-  opBinder fname indents
-      = do boundName <- bounds (expr plhs fname indents)
-           opBinderTypes fname indents boundName
+  nameBinderAtom : OriginDesc -> IndentInfo -> Rule (BinderInformation PTerm)
+  nameBinderAtom fname indents
+      = parens fname $ do
+            boundName <- bounds (expr plhs fname indents)
+            opBinderTypes fname indents boundName
 
   autobindOp : ParseOpts -> OriginDesc -> IndentInfo -> Rule PTerm
   autobindOp q fname indents
-      = do binder <- bounds $ parens fname (opBinder fname indents)
+      = do binder <- bounds (nameBinderAtom fname indents)
            continue indents
            op <- bounds iOperator
            commit
            e <- bounds (expr q fname indents)
            pure (POp (boundToFC fname $ mergeBounds binder e)
                      (boundToFC fname op)
-                     binder.val
+                     (HasBinder binder.val)
                      op.val
                      e.val)
 

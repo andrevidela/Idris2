@@ -182,61 +182,75 @@ Show BacktickOrOperatorFixity where
   show Backticked = "undefined fixity"
   show (DeclaredFixity i) = show i
 
--- Left-hand-side information for operators, carries autobind information
--- an operator can either be
--- - not autobind, a regular operator
 -- - binding types, such that `(nm : ty) =@ fn nm` desugars into `(=@) ty (\(nm : ty) => fn nm)`
 -- - binding expressing with an inferred type such that
 --   `(nm := exp) =@ fn nm` desugars into `(=@) exp (\(nm : ?) => fn nm)`
 -- - binding both types and expression such that
 --   `(nm : ty := exp) =@ fn nm` desugars into `(=@) exp (\(nm : ty) => fn nm)`
 public export
-data OperatorLHSInfo : tm -> Type where
-  -- Traditional operator wihtout binding, carries the lhs
-  NoBinder : (lhs : tm) -> OperatorLHSInfo tm
-  -- (nm : ty) =@ fn x
-  BindType : (name : tm) -> (ty : tm) -> OperatorLHSInfo tm
-  -- (nm := exp) =@ fn nm
-  BindExpr : (name : tm) -> (expr : tm) -> OperatorLHSInfo tm
-  -- (nm : ty := exp) =@ fn nm
-  BindExplicitType : (name : tm) ->  (type, expr : tm) -> OperatorLHSInfo tm
+data BinderInformation : Type -> Type where
+  -- (nm : ty)
+  BindType : (name : tm) -> (ty : tm) -> BinderInformation tm
+  -- (nm := exp)
+  BindExpr : (name : tm) -> (expr : tm) -> BinderInformation tm
+  -- (nm : ty := exp)
+  BindExplicitType : (name : tm) ->  (type, expr : tm) -> BinderInformation tm
 
 export
-Show (OperatorLHSInfo tm) where
-  show (NoBinder lhs)                    = "regular"
+Functor BinderInformation where
+  map f (BindType name ty) = BindType (f name) (f ty)
+  map f (BindExpr name expr) = BindExpr (f name) (f expr)
+  map f (BindExplicitType name type expr) = BindExplicitType (f name) (f type) (f expr)
+
+export
+(.getPat) : BinderInformation tm -> tm
+(.getPat) (BindType name ty) = name
+(.getPat) (BindExpr name expr) = name
+(.getPat) (BindExplicitType name type expr) = name
+
+-- Left-hand-side information for operators, carries autobind information
+-- an operator can either be
+public export
+data OperatorLHSInfo : Type -> Type where
+  NoBinder : (lhs : tm) -> OperatorLHSInfo tm
+  HasBinder : BinderInformation tm -> OperatorLHSInfo tm
+
+export
+Functor OperatorLHSInfo where
+  map f (NoBinder lhs) = NoBinder (f lhs)
+  map f (HasBinder x) = HasBinder $ map f x
+
+export
+Show (BinderInformation tm) where
   show (BindType name ty)                = "type-binding (typebind)"
   show (BindExpr name expr)              = "automatically-binding (autobind)"
   show (BindExplicitType name type expr) = "automatically-binding (autobind)"
 
-%name OperatorLHSInfo opInfo
-
 export
-Functor OperatorLHSInfo where
-  map f (NoBinder lhs) = NoBinder $ f lhs
-  map f (BindType nm lhs) = BindType (f nm) (f lhs)
-  map f (BindExpr nm lhs) = BindExpr (f nm) (f lhs)
-  map f (BindExplicitType nm ty lhs) = BindExplicitType (f nm) (f ty) (f lhs)
+Show (OperatorLHSInfo tm) where
+  show (NoBinder lhs)     = "regular"
+  show (HasBinder binder) = show binder
+
+%name OperatorLHSInfo opInfo
 
 export
 (.getLhs) : OperatorLHSInfo tm -> tm
 (.getLhs) (NoBinder lhs) = lhs
-(.getLhs) (BindExpr _ lhs) = lhs
-(.getLhs) (BindType _ lhs) = lhs
-(.getLhs) (BindExplicitType _ _ lhs) = lhs
+(.getLhs) (HasBinder $ BindExpr _ lhs) = lhs
+(.getLhs) (HasBinder $ BindType _ lhs) = lhs
+(.getLhs) (HasBinder $ BindExplicitType _ _ lhs) = lhs
 
 export
 (.getBoundPat) : OperatorLHSInfo tm -> Maybe tm
 (.getBoundPat) (NoBinder lhs) = Nothing
-(.getBoundPat) (BindType name ty) = Just name
-(.getBoundPat) (BindExpr name expr) = Just name
-(.getBoundPat) (BindExplicitType name type expr) = Just name
+(.getBoundPat) (HasBinder b) = Just b.getPat
 
 export
 (.getBinder) : OperatorLHSInfo tm -> BindingModifier
 (.getBinder) (NoBinder lhs) = NotBinding
-(.getBinder) (BindType name ty) = Typebind
-(.getBinder) (BindExpr name expr) = Autobind
-(.getBinder) (BindExplicitType name type expr) = Autobind
+(.getBinder) (HasBinder $ BindType name ty) = Typebind
+(.getBinder) (HasBinder $ BindExpr name expr) = Autobind
+(.getBinder) (HasBinder $ BindExplicitType name type expr) = Autobind
 
 public export
 data TotalReq = Total | CoveringOnly | PartialOK

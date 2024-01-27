@@ -99,27 +99,9 @@ mapPTermM f = goPTerm where
       >>= f
     goPTerm t@(PImplicit _) = f t
     goPTerm t@(PInfer _) = f t
-    goPTerm (POp fc opFC (NoBinder left) op right) =
+    goPTerm (POp fc opFC bindInfo op right) =
       POp fc opFC
-          <$> (NoBinder <$> goPTerm left)
-          <*> pure op
-          <*> goPTerm right
-      >>= f
-    goPTerm (POp fc opFC (BindType nm left) op right) =
-      POp fc opFC
-          <$> (BindType <$> goPTerm nm <*> goPTerm left)
-          <*> pure op
-          <*> goPTerm right
-      >>= f
-    goPTerm (POp fc opFC (BindExpr nm left) op right) =
-      POp fc opFC
-          <$> (BindExpr nm <$> goPTerm left)
-          <*> pure op
-          <*> goPTerm right
-      >>= f
-    goPTerm (POp fc opFC (BindExplicitType nm ty left) op right) =
-      POp fc opFC
-          <$> (BindExplicitType <$> goPTerm nm <*> goPTerm ty <*> goPTerm left)
+          <$> goOpBinder bindInfo
           <*> pure op
           <*> goPTerm right
       >>= f
@@ -140,11 +122,10 @@ mapPTermM f = goPTerm where
     goPTerm (PBracketed fc x) =
       PBracketed fc <$> goPTerm x
       >>= f
-    goPTerm (PBindingApp fc binder pat bound body) =
+    goPTerm (PBindingApp fc binder bindInfo body) =
      pure (PBindingApp fc)
        <*> pure binder
-       <*> goPTerm pat
-       <*> goPTerm bound
+       <*> goBinderInfo bindInfo
        <*> goPTerm body
        >>= f
     goPTerm (PString fc x ys) =
@@ -254,6 +235,15 @@ mapPTermM f = goPTerm where
     goPWithProblem : PWithProblem' nm -> Core (PWithProblem' nm)
     goPWithProblem (MkPWithProblem rig wval mnm)
       = MkPWithProblem rig <$> goPTerm wval <*> pure mnm
+
+    goOpBinder : OperatorLHSInfo (PTerm' nm) -> Core (OperatorLHSInfo (PTerm' nm))
+    goOpBinder (NoBinder lhs) = NoBinder <$> goPTerm lhs
+    goOpBinder (HasBinder lhs) = HasBinder <$> goBinderInfo lhs
+
+    goBinderInfo : BinderInformation (PTerm' nm) -> Core (BinderInformation (PTerm' nm))
+    goBinderInfo (BindType name ty) = BindType <$> goPTerm name <*> goPTerm ty
+    goBinderInfo (BindExpr name expr) = BindExpr <$> goPTerm name <*> goPTerm expr
+    goBinderInfo (BindExplicitType name type expr) = BindExplicitType <$> goPTerm name <*> goPTerm type <*> goPTerm expr
 
     goPDecl : PDecl' nm -> Core (PDecl' nm)
     goPDecl (PClaim fc c v opts tdecl) =
@@ -461,8 +451,8 @@ mapPTerm f = goPTerm where
       = f $ PDotted fc $ goPTerm x
     goPTerm t@(PImplicit _) = f t
     goPTerm t@(PInfer _) = f t
-    goPTerm (POp fc opFC autoBindInfo opName z)
-      = f $ POp fc opFC (map f autoBindInfo) opName (goPTerm z)
+    goPTerm (POp fc opFC bindingInfo opName z)
+      = f $ POp fc opFC (map f bindingInfo) opName (goPTerm z)
     goPTerm (PPrefixOp fc opFC x y)
       = f $ PPrefixOp fc opFC x $ goPTerm y
     goPTerm (PSectionL fc opFC x y)
@@ -473,8 +463,8 @@ mapPTerm f = goPTerm where
       = f $ PEq fc (goPTerm x) (goPTerm y)
     goPTerm (PBracketed fc x)
       = f $ PBracketed fc $ goPTerm x
-    goPTerm (PBindingApp fc binder pat bound body)
-      = f $ PBindingApp fc binder (goPTerm pat) (goPTerm bound) (goPTerm body)
+    goPTerm (PBindingApp fc binder bindingInfo body)
+      = f $ PBindingApp fc binder (map f bindingInfo) (goPTerm body)
     goPTerm (PString fc x ys)
       = f $ PString fc x $ goPStr <$> ys
     goPTerm (PMultiline fc x y zs)
@@ -653,7 +643,7 @@ substFC fc = mapPTerm $ \case
   PSectionR _ _ x y => PSectionR fc fc x y
   PEq _ x y => PEq fc x y
   PBracketed _ x => PBracketed fc x
-  PBindingApp _ expr name bound body => PBindingApp fc expr name bound body
+  PBindingApp _ expr bindInfo body => PBindingApp fc expr bindInfo body
   PString _ x ys => PString fc x ys
   PMultiline _ x y zs => PMultiline fc x y zs
   PDoBlock _ x xs => PDoBlock fc x xs

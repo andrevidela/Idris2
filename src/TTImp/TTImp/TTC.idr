@@ -91,8 +91,8 @@ mutual
         = do tag 30; toBuf b ns; toBuf b rhs
     toBuf b (IAutoApp fc fn arg)
         = do tag 31; toBuf b fc; toBuf b fn; toBuf b arg
-    toBuf b (IBindingApp fc fn nm bound scope)
-        = do tag 32; toBuf b fc; toBuf b fn; toBuf b nm
+    toBuf b (IBindingApp fc fn bound scope)
+        = do tag 32; toBuf b fc; toBuf b fn
            ; toBuf b bound ; toBuf b scope
 
     fromBuf b
@@ -189,9 +189,9 @@ mutual
                         arg <- fromBuf b
                         pure (IAutoApp fc fn arg)
                32 => do fc <- fromBuf b; fn <- fromBuf b
-                        nm <- fromBuf b; bound <- fromBuf b
+                        bound <- fromBuf b
                         scope <- fromBuf b
-                        pure (IBindingApp fc fn nm bound scope)
+                        pure (IBindingApp fc fn bound scope)
                _ => corrupt "RawImp"
 
   export
@@ -385,6 +385,23 @@ mutual
                    bin <- fromBuf b
                    tot <- fromBuf b
                    pure (MkDataHeader vis bin tot)
+
+  export
+  TTC x => TTC (BinderInformation x) where
+    toBuf b (BindType name ty) = do tag 0 ; toBuf b name ; toBuf b ty
+    toBuf b (BindExpr name expr) = do tag 1 ; toBuf b name ; toBuf b expr
+    toBuf b (BindExplicitType name type expr)
+        = do tag 2 ; toBuf b name ; toBuf b type ; toBuf b expr
+
+    fromBuf b
+        = case !getTag of
+               0 => do name <- fromBuf b ; type <- fromBuf b
+                       pure $ BindType name type
+               1 => do name <- fromBuf b ; expr <- fromBuf b
+                       pure $ BindExpr name expr
+               2 => do name <- fromBuf b ; type <- fromBuf b ; expr <- fromBuf b ;
+                       pure $ BindExplicitType name type expr
+               _ => corrupt "BinderInformation"
 
   export
   TTC ImpDecl where

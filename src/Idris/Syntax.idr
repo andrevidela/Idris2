@@ -108,7 +108,9 @@ mutual
        PBracketed : FC -> PTerm' nm -> PTerm' nm
 
        -- Syntactic sugar
-       PBindingApp : FC -> (binder : Name) -> (boundPat, boundExpr, body : PTerm' nm) -> PTerm' nm
+       PBindingApp : FC -> (binder : Name) ->
+                     (binderInfo : BinderInformation (PTerm' nm)) ->
+                     (body : PTerm' nm) -> PTerm' nm
        PString : FC -> (hashtag : Nat) -> List (PStr' nm) -> PTerm' nm
        PMultiline : FC -> (hashtag : Nat) -> (indent : Nat) -> List (List (PStr' nm)) -> PTerm' nm
        PDoBlock : FC -> Maybe Namespace -> List (PDo' nm) -> PTerm' nm
@@ -173,7 +175,7 @@ mutual
   getPTermLoc (PSectionR fc _ _ _) = fc
   getPTermLoc (PEq fc _ _) = fc
   getPTermLoc (PBracketed fc _) = fc
-  getPTermLoc (PBindingApp fc _ _ _ _) = fc
+  getPTermLoc (PBindingApp fc _ _ _) = fc
   getPTermLoc (PString fc _ _) = fc
   getPTermLoc (PMultiline fc _ _ _) = fc
   getPTermLoc (PDoBlock fc _ _) = fc
@@ -664,6 +666,8 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate : PFieldUpdate' nm -> String
   showPTermPrec : Prec -> PTerm' nm -> String
   showOpPrec : Prec -> OpStr' nm -> String
+  showOpBinder : OperatorLHSInfo (PTerm' nm) -> String
+  showBinder : BinderInformation (PTerm' nm) -> String
 
   showPTerm : PTerm' nm -> String
   showPTerm = showPTermPrec Open
@@ -772,21 +776,15 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPTermPrec d (PDotted _ p) = "." ++ showPTermPrec d p
   showPTermPrec _ (PImplicit _) = "_"
   showPTermPrec _ (PInfer _) = "?"
-  showPTermPrec d (POp _ _ (NoBinder left) op right)
-        = showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right
-  showPTermPrec d (POp _ _ (BindType nm left) op right)
-        = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
-  showPTermPrec d (POp _ _ (BindExpr nm left) op right)
-        = "(" ++ showPTermPrec d nm ++ " := " ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
-  showPTermPrec d (POp _ _ (BindExplicitType nm ty left) op right)
-        = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d ty ++ ":=" ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
+  showPTermPrec d (POp _ _ bindingInfo op right)
+        = showOpBinder bindingInfo ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right
   showPTermPrec d (PPrefixOp _ _ op x) = showOpPrec d op ++ showPTermPrec d x
   showPTermPrec d (PSectionL _ _ op x) = "(" ++ showOpPrec d op ++ " " ++ showPTermPrec d x ++ ")"
   showPTermPrec d (PSectionR _ _ x op) = "(" ++ showPTermPrec d x ++ " " ++ showOpPrec d op ++ ")"
   showPTermPrec d (PEq fc l r) = showPTermPrec d l ++ " = " ++ showPTermPrec d r
   showPTermPrec d (PBracketed _ tm) = "(" ++ showPTermPrec d tm ++ ")"
-  showPTermPrec d (PBindingApp _ binder boundPat boundExpr body)
-        = show binder ++ " (" ++ showPTermPrec d boundPat ++ " : " ++ showPTermPrec d boundExpr ++ ") | " ++ showPTermPrec d body
+  showPTermPrec d (PBindingApp _ binder binderInfo body)
+        = show binder ++ showBinder binderInfo ++ "|" ++ showPTermPrec d body
   showPTermPrec d (PString _ _ xs) = join " ++ " $ showPStr <$> xs
   showPTermPrec d (PMultiline _ _ indent xs) = "multiline (" ++ (join " ++ " $ showPStr <$> concat xs) ++ ")"
   showPTermPrec d (PDoBlock _ ns ds)
@@ -840,6 +838,13 @@ parameters {0 nm : Type} (toName : nm -> Name)
     if isOpName op
     then        showPrec d op
     else "`" ++ showPrec d op ++ "`"
+
+  showOpBinder (NoBinder lhs) = showPTermPrec Open lhs
+  showOpBinder (HasBinder b) = showBinder b
+
+  showBinder (BindType name ty) = "(" ++ showPTermPrec Open name ++ ":" ++ showPTermPrec Open ty ++ ")"
+  showBinder (BindExpr name expr) = "(" ++ showPTermPrec Open name ++ ":=" ++ showPTermPrec Open expr ++ ")"
+  showBinder (BindExplicitType name type expr) = "(" ++ showPTermPrec Open name ++ ":" ++ showPTermPrec Open type ++ ":=" ++ showPTermPrec Open expr ++ ")"
 
 export
 covering

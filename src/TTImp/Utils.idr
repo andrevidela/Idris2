@@ -150,8 +150,12 @@ findBindableNamesQuot env used (IApp fc x y)
     = findBindableNamesQuot env used ![x, y]
 findBindableNamesQuot env used (INamedApp fc x y z)
     = findBindableNamesQuot env used ![x, z]
-findBindableNamesQuot env used (IBindingApp fc binder pat bound body)
-    = findBindableNamesQuot env used ![pat, bound, body]
+findBindableNamesQuot env used (IBindingApp fc binder (BindType name ty) body)
+    = findBindableNamesQuot env used ![ty, body]
+findBindableNamesQuot env used (IBindingApp fc binder (BindExpr name expr) body)
+    = findBindableNamesQuot env used ![expr, body]
+findBindableNamesQuot env used (IBindingApp fc binder (BindExplicitType name type expr) body)
+    = findBindableNamesQuot env used ![type, expr, body]
 findBindableNamesQuot env used (IAutoApp fc x y)
     = findBindableNamesQuot env used ![x, y]
 findBindableNamesQuot env used (IWithApp fc x y)

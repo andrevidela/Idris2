@@ -846,6 +846,13 @@ namespace Binder
   traverse f (PLet fc c val ty) = pure $ PLet fc c !(f val) !(f ty)
   traverse f (PVTy fc c ty) = pure $ PVTy fc c !(f ty)
 
+namespace BinderInfo
+  export
+  traverse : (a -> Core b) -> BinderInformation a -> Core (BinderInformation b)
+  traverse f (BindType name ty) = pure $ BindType !(f name) !(f ty)
+  traverse f (BindExpr name expr) = pure $ BindExpr !(f name) !(f expr)
+  traverse f (BindExplicitType name type expr) = pure $ BindExplicitType !(f name) !(f type) !(f expr)
+
 export
 mapTermM : ({vars : _} -> Term vars -> Core (Term vars)) ->
            ({vars : _} -> Term vars -> Core (Term vars))
