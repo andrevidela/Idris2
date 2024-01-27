@@ -11,7 +11,7 @@ record Container  where
   -- typebind data constructor
   typebind
   constructor MKCont
-  fst : x
+  fst : Type
   snd : fst -> Type
 
 -- typebind function definition
