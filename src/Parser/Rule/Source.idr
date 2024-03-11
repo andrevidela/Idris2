@@ -304,6 +304,14 @@ namespacedIdent
                  Ident i => Just (Nothing, i)
                  _ => Nothing
 
+%foreign "scheme:(lambda (c) (if (char-upper-case? c) 1 0))"
+prim__isSchemeCapital : Char -> Int
+
+isUpperCase : Char -> Bool
+isUpperCase x = case prim__isSchemeCapital x of
+                     1 => True
+                     _ => False
+
 isCapitalisedIdent : WithBounds String -> EmptyRule ()
 isCapitalisedIdent str =
   let val = str.val
@@ -312,7 +320,7 @@ isCapitalisedIdent str =
           = failLoc loc ("Expected a capitalised identifier, got: \{val}")
   in case strM val of
        StrNil => err
-       StrCons c _ => if (isUpper c || c > chr 160) then pure () else err
+       StrCons c _ => if isUpperCase c then pure () else err
 
 export
 namespaceId : Rule Namespace
