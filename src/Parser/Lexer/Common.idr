@@ -17,7 +17,7 @@ comment
 ||| Allowed unicode operators
 export
 unicode : List Char
-unicode = ['•','×','⊗','⊕','∈','∋','○','≡','¬','⊃','⊂','√','∫','⨾','▷','◁']
+unicode = ['•','×','⊗','⊕','∈','∋','○','≡','¬','⊃','⊂','√','∫','⨾','▷','◁', '≈', '≅']
 
 -- Identifier Lexer
 -- There are multiple variants.
