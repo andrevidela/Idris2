@@ -67,7 +67,7 @@ blockComment = is '{' <+> is '-' <+> many (is '-') <+> (eof <|> toEndComment 1)
 ||| Allowed unicode operators
 export
 unicode : List Char
-unicode = ['•','×','⊗','⊕','∈','∋','○','≡','¬','⊃','⊂','√','∫','⨾','▷','◁']
+unicode = ['•','×','⊗','⊕','∈','∋','○','≡','¬','⊃','⊂','√','∫','⨾','▷','◁', '≈', '≅']
 
 -- Identifier Lexer
 -- There are multiple variants.
