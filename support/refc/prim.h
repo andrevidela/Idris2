@@ -4,27 +4,32 @@
 
 // IORef
 
-Value *newIORef(Value *, Value *, Value *);
-Value *readIORef(Value *, Value *, Value *);
-Value *writeIORef(Value *, Value *, Value *, Value *);
+Value *idris2_Data_IORef_prim__newIORef(Value *, Value *, Value *);
+#define idris2_Data_IORef_prim__readIORef(erased, ioref, world)                \
+  (idris2_newReference(((Value_IORef *)ioref)->v))
+
+Value *idris2_Data_IORef_prim__writeIORef(Value *, Value *, Value *, Value *);
 
 // Sys
 
-Value *sysOS(void);
-Value *sysCodegen(void);
+Value *idris2_System_Info_prim__os(void);
+Value *idris2_System_Info_prim__codegen(void);
 Value *idris2_crash(Value *msg);
 
 // Array
 
-Value *newArray(Value *, Value *, Value *, Value *);
-Value *arrayGet(Value *, Value *, Value *, Value *);
-Value *arraySet(Value *, Value *, Value *, Value *, Value *);
+Value *idris2_Data_IOArray_Prims_prim__newArray(Value *, Value *, Value *,
+                                                Value *);
+#define idris2_Data_IOArray_Prims_prim__arrayGet(rased, array, i, word)        \
+  (idris2_newReference(((Value_Array *)(array))->arr[idris2_vp_to_Int64(i)]))
+Value *idris2_Data_IOArray_Prims_prim__arraySet(Value *, Value *, Value *,
+                                                Value *, Value *);
 
 // Pointer
-Value *onCollect(Value *, Value *, Value *, Value *);
-Value *onCollectAny(Value *, Value *, Value *);
+Value *idris2_Prelude_IO_prim__onCollect(Value *, Value *, Value *, Value *);
+Value *idris2_Prelude_IO_prim__onCollectAny(Value *, Value *, Value *);
 
-Value *voidElim(Value *, Value *);
+#define idris2_Prelude_Uninhabited_prim__void(x, y) (NULL)
 
 // Threads
 Value *System_Concurrency_Raw_prim__mutexRelease(Value *, Value *);
@@ -43,3 +48,17 @@ Value *System_Concurrency_Raw_prim__conditionWaitTimeout(Value *, Value *,
 Value *System_Concurrency_Raw_prim__conditionSignal(Value *, Value *);
 
 Value *System_Concurrency_Raw_prim__conditionBroadcast(Value *, Value *);
+
+extern char const idris2_constr_Int[];
+extern char const idris2_constr_Int8[];
+extern char const idris2_constr_Int16[];
+extern char const idris2_constr_Int32[];
+extern char const idris2_constr_Int64[];
+extern char const idris2_constr_Bits8[];
+extern char const idris2_constr_Bits16[];
+extern char const idris2_constr_Bits32[];
+extern char const idris2_constr_Bits64[];
+extern char const idris2_constr_Double[];
+extern char const idris2_constr_Integer[];
+extern char const idris2_constr_Char[];
+extern char const idris2_constr_String[];

@@ -30,8 +30,39 @@ import Parser.Lexer.Source
 %default covering
 
 public export
-OpStr' : Type -> Type
-OpStr' nm = nm
+data OpStr' nm = OpSymbols nm | Backticked nm
+
+-- Left: backticked, Right: operator symbols
+export
+opNameToEither : OpStr' nm -> Either nm nm
+opNameToEither (Backticked nm) = Left nm
+opNameToEither (OpSymbols nm) = Right nm
+
+export
+Functor OpStr' where
+  map f (OpSymbols x) = OpSymbols (f x)
+  map f (Backticked x) = Backticked (f x)
+
+export
+Foldable OpStr' where
+  foldr f i (OpSymbols x) = f x i
+  foldr f i (Backticked x) = f x i
+
+export
+traverseOp : (fn : Functor f) => (a -> f b) -> OpStr' a -> f (OpStr' b)
+traverseOp f (OpSymbols x) = map OpSymbols (f x)
+traverseOp f (Backticked x) = map Backticked (f x)
+
+
+public export
+Show nm => Show (OpStr' nm) where
+  show (OpSymbols nm) = show nm
+  show (Backticked nm) = "`\{show nm}`"
+
+public export
+(.toName) : OpStr' nm -> nm
+(.toName) (OpSymbols nm) = nm
+(.toName) (Backticked nm) = nm
 
 public export
 OpStr : Type
@@ -776,8 +807,14 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPTermPrec d (PDotted _ p) = "." ++ showPTermPrec d p
   showPTermPrec _ (PImplicit _) = "_"
   showPTermPrec _ (PInfer _) = "?"
-  showPTermPrec d (POp _ _ bindingInfo op right)
-        = showOpBinder bindingInfo ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right
+  showPTermPrec d (POp _ _ (NoBinder left) op right)
+        = showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right
+  showPTermPrec d (POp _ _ (HasBinder $ BindType nm left) op right)
+        = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
+  showPTermPrec d (POp _ _ (HasBinder $ BindExpr nm left) op right)
+        = "(" ++ showPTermPrec d nm ++ " := " ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
+  showPTermPrec d (POp _ _ (HasBinder $ BindExplicitType nm ty left) op right)
+        = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d ty ++ ":=" ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
   showPTermPrec d (PPrefixOp _ _ op x) = showOpPrec d op ++ showPTermPrec d x
   showPTermPrec d (PSectionL _ _ op x) = "(" ++ showOpPrec d op ++ " " ++ showPTermPrec d x ++ ")"
   showPTermPrec d (PSectionR _ _ x op) = "(" ++ showPTermPrec d x ++ " " ++ showOpPrec d op ++ ")"
@@ -834,10 +871,8 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPTermPrec d (PWithUnambigNames fc ns rhs)
         = "with " ++ show ns ++ " " ++ showPTermPrec d rhs
 
-  showOpPrec d op = let op = toName op in
-    if isOpName op
-    then        showPrec d op
-    else "`" ++ showPrec d op ++ "`"
+  showOpPrec d (OpSymbols op) = showPrec d (toName op)
+  showOpPrec d (Backticked op) = "`\{showPrec d (toName op)}`"
 
   showOpBinder (NoBinder lhs) = showPTermPrec Open lhs
   showOpBinder (HasBinder b) = showBinder b
@@ -1054,3 +1089,4 @@ Show PDecl where
   show (PRunElabDecl{}) = "PRunElabDecl"
   show (PDirective{}) = "PDirective"
   show (PBuiltin{}) = "PBuiltin"
+

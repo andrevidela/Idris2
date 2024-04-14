@@ -18,6 +18,7 @@ import Idris.REPL.Opts
 import Idris.Syntax
 
 import Libraries.Data.NameMap
+import Libraries.Data.WithDefault
 import Libraries.Utils.Path
 
 import TTImp.Elab.Check
@@ -159,6 +160,20 @@ elabScript rig fc nest env script@(NDCon nfc nm t ar args) exp
     elabCon defs "Pure" [_,val]
         = do empty <- clearDefs defs
              evalClosure empty val
+    elabCon defs "Map" [_,_,fm,act]
+        -- fm : A -> B
+        -- elab : A
+        = do act <- elabScript rig fc nest env !(evalClosure defs act) exp
+             act <- quote defs env act
+             fm <- evalClosure defs fm
+             applyToStack defs withHoles env fm [(getLoc act, toClosure withAll env act)]
+    elabCon defs "Ap" [_,_,actF,actX]
+        -- actF : Elab (A -> B)
+        -- actX : Elab A
+        = do actF <- elabScript rig fc nest env !(evalClosure defs actF) exp
+             actX <- elabScript rig fc nest env !(evalClosure defs actX) exp
+             actX <- quote defs env actX
+             applyToStack defs withHoles env actF [(getLoc actX, toClosure withAll env actX)]
     elabCon defs "Bind" [_,_,act,k]
         -- act : Elab A
         -- k : A -> Elab B
@@ -277,6 +292,10 @@ elabScript rig fc nest env script@(NDCon nfc nm t ar args) exp
         = do n' <- evalClosure defs n
              res <- lookupNameInfo !(reify defs n') (gamma defs)
              scriptRet res
+    elabCon defs "GetVis" [n]
+        = do dn <- reify defs !(evalClosure defs n)
+             ds <- lookupCtxtName dn (gamma defs)
+             scriptRet $ map (\(n,_,d) => (n, collapseDefault $ visibility d)) ds
     elabCon defs "GetLocalType" [n]
         = do n' <- evalClosure defs n
              n <- reify defs n'

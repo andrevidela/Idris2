@@ -343,18 +343,26 @@ mutual
     prettyPrec d (PDotted _ p) = dot <+> prettyPrec d p
     prettyPrec d (PImplicit _) = "_"
     prettyPrec d (PInfer _) = annotate Hole $ "?"
-    prettyPrec d (POp _ _ (HasBinder bindInfo) op right) =
-        group $ pretty bindInfo
-           <++> prettyOp op
+    prettyPrec d (POp _ _ (HasBinder $ BindType nm left) op right) =
+        group $ parens (prettyPrec d nm <++> ":" <++> pretty left)
+           <++> prettyOp op.toName
+           <++> pretty right
+    prettyPrec d (POp _ _ (HasBinder $ BindExpr nm left) op right) =
+        group $ parens (prettyPrec d nm <++> ":=" <++> pretty left)
+           <++> prettyOp op.toName
+           <++> pretty right
+    prettyPrec d (POp _ _ (HasBinder $ BindExplicitType nm ty left) op right) =
+        group $ parens (prettyPrec d nm <++> ":" <++> pretty ty <++> ":=" <++> pretty left)
+           <++> prettyOp op.toName
            <++> pretty right
     prettyPrec d (POp _ _ (NoBinder x) op y) =
       parenthesise (d >= App) $
         group $ pretty x
-           <++> prettyOp op
+           <++> prettyOp op.toName
            <++> pretty y
-    prettyPrec d (PPrefixOp _ _ op x) = parenthesise (d > startPrec) $ prettyOp op <+> pretty x
-    prettyPrec d (PSectionL _ _ op x) = parens (prettyOp op <++> pretty x)
-    prettyPrec d (PSectionR _ _ x op) = parens (pretty x <++> prettyOp op)
+    prettyPrec d (PPrefixOp _ _ op x) = parenthesise (d > startPrec) $ prettyOp op.toName <+> pretty x
+    prettyPrec d (PSectionL _ _ op x) = parens (prettyOp op.toName <++> pretty x)
+    prettyPrec d (PSectionR _ _ x op) = parens (pretty x <++> prettyOp op.toName)
     prettyPrec d (PEq fc l r) = parenthesise (d > startPrec) $ prettyPrec Equal l <++> equals <++> prettyPrec Equal r
     prettyPrec d (PBracketed _ tm) = parens (pretty tm)
     prettyPrec d (PBindingApp _ name bound body)

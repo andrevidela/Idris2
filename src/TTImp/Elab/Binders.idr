@@ -274,3 +274,7 @@ checkLet rigc_in elabinfo nest env fc lhsFC rigl n nTy nVal scope expty {vars}
     linearErr (InLHS _ _ e) = linearErr e
     linearErr (InRHS _ _ e) = linearErr e
     linearErr _ = Nothing
+
+export
+checkCustomBinder : Name -> (info : BinderInformation RawImp) -> (scope : RawImp) -> Core (Term vars, Glued vars)
+checkCustomBinder binder binderInfo scope = ?checkCustomBinder_rhs

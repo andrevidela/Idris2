@@ -171,17 +171,20 @@ Eq FixityInfo where
 
 ||| Whenever we read an operator from the parser, we don't know if it's a backticked expression with no fixity
 ||| declaration, or if it has a fixity declaration. If it does not have a declaration, we represent this state
-||| with `Backticked`.
+||| with `UndeclaredFixity`.
 ||| Note that a backticked expression can have a fixity declaration, in which case it is represented with
 ||| `DeclaredFixity`.
 public export
-data BacktickOrOperatorFixity = Backticked | DeclaredFixity FixityInfo
+data FixityDeclarationInfo = UndeclaredFixity | DeclaredFixity FixityInfo
 
 export
-Show BacktickOrOperatorFixity where
-  show Backticked = "undefined fixity"
-  show (DeclaredFixity i) = show i
+Show FixityDeclarationInfo where
+  show UndeclaredFixity = "undeclared fixity"
+  show (DeclaredFixity fx) = show fx
 
+-- Left-hand-side information for operators, carries autobind information
+-- an operator can either be
+-- - not autobind, a regular operator
 -- - binding types, such that `(nm : ty) =@ fn nm` desugars into `(=@) ty (\(nm : ty) => fn nm)`
 -- - binding expressing with an inferred type such that
 --   `(nm := exp) =@ fn nm` desugars into `(=@) exp (\(nm : ?) => fn nm)`

@@ -11,6 +11,12 @@ idris2="$1"
 rm -rf build
 rm -rf prefix
 
+if type valgrind >/dev/null 2>&1; then
+    export VALGRIND="valgrind --leak-check=full -s --log-file=output.valgrind.refc.log"
+else
+    unset VALGRIND
+fi
+
 idris2() {
     $idris2 --no-banner --console-width 0 --no-color "$@"
 }
@@ -21,6 +27,10 @@ check() {
 
 run() {
     idris2 --exec main "$@"
+}
+
+safesort() {
+    LC_ALL=C.UTF-8 sort
 }
 
 # Escape a string as a sed pattern literal
@@ -47,7 +57,7 @@ _awk_clean_name='
     while (match($0, /(P:[A-z]+:|arg:|conArg:|ttc[\\\/][0-9]+|[$]resolved)[0-9]+|[A-z.]+:[0-9]+:[0-9]+--[0-9]+:[0-9]+|[A-z]+[.][0-9]+:[0-9]+/)) {
         rs = RSTART
         rl = RLENGTH
-        m = substr($0, rs, rl - 1)
+        m = substr($0, rs, rl)
         pfx = "XXX"
         if (match(m,/^(\$resolved|arg:|conArg:|ttc[\\\/]|P:[A-z]+:|[A-z.]+:|[A-z]+[.])/)) { pfx = substr(m, RSTART, RLENGTH) }
         if (!(m in mapping)) {
@@ -89,7 +99,7 @@ if [ -z "$PREFIX_CHANGED" ] && [ -n "$IDRIS2_PREFIX" ]; then
     export IDRIS2_PACKAGE_PATH="$OLD_PP$SEP$NEW_PP"
     # Use TEST_IDRIS2_LIBS and TEST_IDRIS2_DATA to pass locations for
     # prebuilt libidris2_support and its DATA files.
-    export IDRIS2_LIBS="$OLD_PP/libs$SEP$NEW_PP/libs$SEP$TEST_IDRIS2_LIBS"
+    export IDRIS2_LIBS="$OLD_PP/lib$SEP$NEW_PP/lib$SEP$TEST_IDRIS2_LIBS"
     export IDRIS2_DATA="$OLD_PP/support$SEP$NEW_PP/support$SEP$TEST_IDRIS2_DATA"
 
     # Set where to install stuff

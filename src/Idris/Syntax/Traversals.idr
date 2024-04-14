@@ -99,9 +99,27 @@ mapPTermM f = goPTerm where
       >>= f
     goPTerm t@(PImplicit _) = f t
     goPTerm t@(PInfer _) = f t
-    goPTerm (POp fc opFC bindInfo op right) =
+    goPTerm (POp fc opFC (NoBinder left) op right) =
       POp fc opFC
-          <$> goOpBinder bindInfo
+          <$> (NoBinder <$> goPTerm left)
+          <*> pure op
+          <*> goPTerm right
+      >>= f
+    goPTerm (POp fc opFC (HasBinder $ BindType nm left) op right) =
+      POp fc opFC
+          <$> HasBinder <$> (BindType <$> goPTerm nm <*> goPTerm left)
+          <*> pure op
+          <*> goPTerm right
+      >>= f
+    goPTerm (POp fc opFC (HasBinder $ BindExpr nm left) op right) =
+      POp fc opFC
+          <$> (HasBinder . BindExpr nm <$> goPTerm left)
+          <*> pure op
+          <*> goPTerm right
+      >>= f
+    goPTerm (POp fc opFC (HasBinder $ BindExplicitType nm ty left) op right) =
+      POp fc opFC
+          <$> HasBinder <$> (BindExplicitType <$> goPTerm nm <*> goPTerm ty <*> goPTerm left)
           <*> pure op
           <*> goPTerm right
       >>= f

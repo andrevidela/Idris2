@@ -1,4 +1,4 @@
-{ stdenv, lib, chez, clang, gmp, fetchFromGitHub, makeWrapper, support, idris2-version
+{ stdenv, lib, chez, clang, gmp, fetchFromGitHub, makeWrapper, installShellFiles, support, idris2Version
 , srcRev, gambit, nodejs, zsh, idris2Bootstrap ? null }:
 
 # Uses scheme to bootstrap the build of idris2
@@ -9,19 +9,26 @@ let
 in
 stdenv.mkDerivation rec {
   pname = "idris2";
-  version = idris2-version;
+  version = idris2Version;
 
   src = ../.;
 
   strictDeps = true;
-  nativeBuildInputs = [ makeWrapper clang chez ]
+  nativeBuildInputs = [ makeWrapper installShellFiles clang chez ]
     ++ lib.optional stdenv.isDarwin [ zsh ]
-    ++ lib.optional (! bootstrap) [ idris2Bootstrap ];
+    ++ lib.optional (!bootstrap) [ idris2Bootstrap ];
   buildInputs = [ chez gmp support ];
 
+  # For bootstrap builds the Makefile will try to
+  # rebuild the support library if we don't patch
+  # bootstrap-install.
   prePatch = ''
     patchShebangs --build tests
-    sed 's/$(GIT_SHA1)/${srcRev}/' -i Makefile
+    substituteInPlace Makefile \
+      --replace-fail '$(GIT_SHA1)' '${srcRev}'
+  '' + lib.optionalString bootstrap ''
+    substituteInPlace Makefile \
+      --replace-fail 'bootstrap-install: install-idris2 install-support' 'bootstrap-install: install-idris2'
   '';
 
   makeFlags = [ "IDRIS2_SUPPORT_DIR=${supportLibrariesPath}" ]
@@ -48,7 +55,7 @@ stdenv.mkDerivation rec {
     "TEST_IDRIS2_SUPPORT_DIR=${supportLibrariesPath}"
   ];
 
-  installTargets = "install-idris2 install-libs";
+  installTargets = "install-idris2 install-with-src-libs";
   installFlags = [ "PREFIX=$(out)" ];
 
   # TODO: Move this into its own derivation, such that this can be changed
@@ -82,5 +89,9 @@ stdenv.mkDerivation rec {
       --suffix IDRIS2_PACKAGE_PATH ':' "${globalLibrariesPath}" \
       --suffix LD_LIBRARY_PATH ':' "${supportLibrariesPath}" \
       --suffix DYLD_LIBRARY_PATH ':' "${supportLibrariesPath}" \
+
+    installShellCompletion --cmd idris2 \
+      --bash <($out/bin/idris2 --bash-completion-script idris2) \
+      --zsh <($out/bin/idris2 --zsh-completion-script idris2) \
   '';
 }
