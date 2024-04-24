@@ -326,6 +326,7 @@ record GlobalDef where
   namedcompexpr : Maybe NamedDef
   sizeChange : List SCCall
   schemeExpr : Maybe (SchemeMode, SchemeObj Write)
+  binding : BindingModifier
 
 export
 gDefKindedName : GlobalDef -> KindedName

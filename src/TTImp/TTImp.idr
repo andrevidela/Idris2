@@ -260,6 +260,7 @@ mutual
        Totality : TotalReq -> FnOpt' nm
        Macro : FnOpt' nm
        SpecArgs : List Name -> FnOpt' nm
+       -- Definition should be used with binding syntax
        Binding : BindingModifier -> FnOpt' nm
   %name FnOpt' fopt
 

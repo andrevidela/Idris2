@@ -1093,6 +1093,17 @@ TTC SCCall where
            pure (MkSCCall fn args loc)
 
 export
+TTC BindingModifier where
+  toBuf b Autobind = tag 0
+  toBuf b Typebind = tag 1
+  toBuf b NotBinding = tag 2
+  fromBuf b = case !getTag of
+                   0 => pure Autobind
+                   1 => pure Typebind
+                   2 => pure NotBinding
+                   _ => corrupt "BindingModifier"
+
+export
 TTC GlobalDef where
   toBuf b gdef
       = -- Only write full details for user specified names. The others will
@@ -1121,6 +1132,7 @@ TTC GlobalDef where
                  toBuf b (invertible gdef)
                  toBuf b (noCycles gdef)
                  toBuf b (sizeChange gdef)
+                 toBuf b (binding gdef)
     where
       cwName : Name -> Bool
       cwName (CaseBlock _ _) = True
@@ -1147,12 +1159,14 @@ TTC GlobalDef where
                       inv <- fromBuf b
                       c <- fromBuf b
                       sc <- fromBuf b
+                      bind <- fromBuf b
                       pure (MkGlobalDef loc name ty eargs seargs specargs iargs
                                         mul vars vis
-                                        tot hatch fl refs refsR inv c True def cdef Nothing sc Nothing)
+                                        tot hatch fl refs refsR inv c True def cdef Nothing sc Nothing
+                                        bind)
               else pure (MkGlobalDef loc name (Erased loc Placeholder) [] [] [] []
                                      mul [] (specified Public) unchecked False [] refs refsR
-                                     False False True def cdef Nothing [] Nothing)
+                                     False False True def cdef Nothing [] Nothing NotBinding)
 
 export
 TTC Transform where
@@ -1181,14 +1195,3 @@ Core.Context.decode gam idx update (Coded ns bin)
          when update $ coreLift $ writeArray arr idx (Decoded def')
          pure def'
 Core.Context.decode gam idx update (Decoded def) = pure def
-
-export
-TTC BindingModifier where
-  toBuf b Autobind = tag 0
-  toBuf b Typebind = tag 1
-  toBuf b NotBinding = tag 2
-  fromBuf b = case !getTag of
-                   0 => pure Autobind
-                   1 => pure Typebind
-                   2 => pure NotBinding
-                   _ => corrupt "BindingModifier"

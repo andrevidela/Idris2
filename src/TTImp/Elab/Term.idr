@@ -157,7 +157,7 @@ checkTerm rig elabinfo nest env (IUpdate fc upds rec) exp
 checkTerm rig elabinfo nest env (IApp fc fn arg) exp
     = checkApp rig elabinfo nest env fc fn [arg] [] []  exp
 checkTerm rig elabinfo nest env (IBindingApp fc binder binderInfo scope) exp
-    = checkCustomBinder binder binderInfo scope
+    = checkCustomBinder binder binderInfo ?arg
 checkTerm rig elabinfo nest env (IAutoApp fc fn arg) exp
     = checkApp rig elabinfo nest env fc fn [] [arg] []  exp
 checkTerm rig elabinfo nest env (IWithApp fc fn arg) exp

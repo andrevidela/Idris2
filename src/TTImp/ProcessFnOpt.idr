@@ -65,8 +65,11 @@ processFnOpt fc _ ndef (Totality tot)
     = setFlag fc ndef (SetTotal tot)
 processFnOpt fc _ ndef Macro
     = setFlag fc ndef Macro
-processFnOpt fc _ ndef (Binding x)
-    = pure () -- handle binding flag
+processFnOpt fc _ ndef (Binding mod)
+    = do defs <- get Ctxt
+         Just gdef <- lookupCtxtExact ndef (gamma defs)
+              | Nothing => undefinedName fc ndef
+         ignore $ addDef ndef ({ binding := mod } gdef)
 processFnOpt fc _ ndef (SpecArgs ns)
     = do defs <- get Ctxt
          Just gdef <- lookupCtxtExact ndef (gamma defs)

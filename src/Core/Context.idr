@@ -350,6 +350,7 @@ newDef fc n rig vars ty vis def
         , namedcompexpr = Nothing
         , sizeChange = []
         , schemeExpr = Nothing
+        , binding = NotBinding
         }
 
 -- Rewrite rules, applied after type checking, for runtime code only
@@ -1368,6 +1369,7 @@ addBuiltin n ty tot op
          , namedcompexpr = Nothing
          , sizeChange = []
          , schemeExpr = Nothing
+         , binding = NotBinding
          }
 
 export
@@ -1672,6 +1674,16 @@ getTotality loc n
          Just def <- lookupCtxtExact n (gamma defs)
               | Nothing => undefinedName loc n
          pure $ totality def
+
+export
+getBinding : {auto c : Ref Ctxt Defs} ->
+             FC -> Name -> Core BindingModifier
+getBinding loc n
+    = do defs <- get Ctxt
+         Just def <- lookupCtxtExact n (gamma defs)
+              | Nothing => undefinedName loc n
+         pure $ binding def
+
 
 export
 getSizeChange : {auto c : Ref Ctxt Defs} ->
