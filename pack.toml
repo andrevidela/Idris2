@@ -1,0 +1,4 @@
+[idris2]
+type = "local"
+path = "."
+ipkg = "idris2.ipkg"
