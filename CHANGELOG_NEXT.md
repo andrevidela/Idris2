@@ -93,6 +93,9 @@ This CHANGELOG describes the merged but unreleased changes. Please see [CHANGELO
 
 * Typst files can be compiled as Literate Idris
 
+* Reflected Trees now make use of WithFC to replicate the new location tracking
+  in the compiler.
+
 ### Backend changes
 
 #### RefC Backend
