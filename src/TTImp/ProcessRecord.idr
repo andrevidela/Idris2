@@ -21,6 +21,7 @@ import TTImp.Utils
 import Libraries.Data.WithDefault
 
 import Data.List
+import Data.List1
 import Data.String
 
 %default covering
@@ -47,7 +48,7 @@ elabRecord : {vars : _} ->
              NestedNames vars -> Maybe String ->
              WithDefault Visibility Private ->
              Maybe TotalReq -> Name ->
-             (params : List (Name, RigCount, PiInfo RawImp, RawImp)) ->
+             (params : List ImpParameter) ->
              (opts : List DataOpt) ->
              (conName : Name) ->
              List IField ->
@@ -85,17 +86,17 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
   where
 
     displayParam : ImpParameter -> String
-    displayParam (nm, rig, pinfo, argty)
+    displayParam (MkImpParameter nm rig pinfo argty)
       = withPiInfo pinfo "\{showCount rig}\{show nm} : \{show argty}"
 
     paramTelescope : List ImpParameter -> List (FC, Maybe Name, RigCount, PiInfo RawImp, RawImp)
     paramTelescope params = map jname params
       where
-        jname : (Name, RigCount, PiInfo RawImp, RawImp)
+        jname : ImpParameter
              -> (FC, Maybe Name, RigCount, PiInfo RawImp, RawImp)
         -- Record type parameters are implicit in the constructor
         -- and projections
-        jname (n, _, _, t) = (EmptyFC, Just n, erased, Implicit, t)
+        jname (MkImpParameter n _ _ t) = (EmptyFC, Just n, erased, Implicit, t)
 
     fname : IField -> Name
     fname (MkIField fc c p n ty) = n
@@ -113,7 +114,8 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
     recTy : (tn : Name) -> -- fully qualified name of the record type
             (params : List ImpParameter) -> -- list of all the parameters
             RawImp
-    recTy tn params = apply (IVar (virtualiseFC fc) tn) (map (\(n, c, p, tm) => (n, IVar EmptyFC n, p)) params)
+    recTy tn params = apply (IVar (virtualiseFC fc) tn)
+                            (map (\(MkImpParameter n c p tm) => (n, IVar EmptyFC n, p)) params)
       where
         ||| Apply argument to list of explicit or implicit named arguments
         apply : RawImp -> List (Name, RawImp, PiInfo RawImp) -> RawImp
@@ -122,11 +124,11 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
         apply f ((n, arg, _       ) :: xs) = apply (INamedApp (getFC f) f n arg) xs
 
     paramNames : List ImpParameter -> List Name
-    paramNames params = map fst params
+    paramNames params = map name params
 
-    mkDataTy : FC -> List (Name, RigCount, PiInfo RawImp, RawImp) -> RawImp
+    mkDataTy : FC -> List ImpParameter -> RawImp
     mkDataTy fc [] = IType fc
-    mkDataTy fc ((n, c, p, ty) :: ps) = IPi fc c p (Just n) ty (mkDataTy fc ps)
+    mkDataTy fc (MkImpParameter n c p ty :: ps) = IPi fc c p (Just n) ty (mkDataTy fc ps)
 
     nestDrop : Core (List (Name, Nat))
     nestDrop
@@ -157,7 +159,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
              ty <- unelabNest !nestDrop tyenv ty
              log "declare.record.parameters" 30 "Unelaborated type: \{show ty}"
              params <- getParameters [<] ty
-             addMissingNames ([<] <>< map fst params0) params []
+             addMissingNames ([<] <>< map name params0) params []
 
       where
 
@@ -195,12 +197,13 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
           List ImpParameter -> -- accumulator
           Core (List ImpParameter)
         addMissingNames (nms :< nm) (tele :< (_, rest)) acc
-          = addMissingNames nms tele ((nm, rest) :: acc)
+          = addMissingNames nms tele (uncurry3 (MkImpParameter nm) rest :: acc)
         addMissingNames [<] tele acc
           = do tele <- flip Core.traverseSnocList tele $ \ (mnm, rest) =>
                          case mnm of
                            Nothing => throw (InternalError "Some names have disappeared?! \{show rest}")
-                           Just nm => pure (nm, rest)
+                           -- Just nm => pure (nm, rest)
+                           Just nm => pure ?nooo -- (nm, rest)
                unless (null tele) $
                  log "declare.record.parameters" 50 $
                    unlines ( "Decided to bind the following extra parameters:"
@@ -249,7 +252,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
     elabGetters tn con params done upds tyenv (Bind bfc n b@(Pi _ rc imp ty_chk) sc)
         = let rig = if isErased rc then erased else top
               isVis = projVis (collapseDefault def_vis)
-          in if (n `elem` map fst params) || (n `elem` vars)
+          in if (n `elem` map name params) || (n `elem` vars)
              then elabGetters tn con params
                               (if imp == Explicit && not (n `elem` vars)
                                   then S done else done)
@@ -266,7 +269,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
 
                    -- Claim the projection type
                    projTy <- bindTypeNames fc []
-                                 (map fst params ++ map fname fields ++ vars) $
+                                 (map name params ++ map fname fields ++ vars) $
                                       mkTy (paramTelescope params) $
                                       IPi bfc top Explicit (Just rname) (recTy tn params) ty'
 
@@ -345,4 +348,4 @@ processRecord : {vars : _} ->
                 WithDefault Visibility Private -> Maybe TotalReq ->
                 ImpRecord -> Core ()
 processRecord eopts nest env newns def_vis mbtot (MkImpRecord fc n ps opts cons fs)
-    = do elabRecord eopts fc env nest newns def_vis mbtot n ps opts cons fs
+    = do elabRecord eopts fc env nest newns def_vis mbtot n ?hhuuu opts cons fs

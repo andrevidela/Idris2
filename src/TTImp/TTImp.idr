@@ -372,10 +372,18 @@ mutual
   ImpParameter : Type
   ImpParameter = ImpParameter' Name
 
-  -- TODO: turn into a proper datatype
   public export
-  ImpParameter' : Type -> Type
-  ImpParameter' nm = (Name, RigCount, PiInfo (RawImp' nm), RawImp' nm)
+  record ImpParameter' (nm : Type) where
+    constructor MkImpParameter
+    name : Name
+    rig : RigCount
+    info : PiInfo (RawImp' nm)
+    type : RawImp' nm
+
+  export covering
+  Show nm => Show (ImpParameter' nm) where
+    show (MkImpParameter nm rig info type) =
+      show rig ++ " " ++ show nm ++ " " ++ show info ++ " " ++ show type
 
   public export
   ImpRecord : Type

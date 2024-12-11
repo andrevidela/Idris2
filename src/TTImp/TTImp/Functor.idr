@@ -157,7 +157,7 @@ mutual
 
   export
   Functor ImpParameter' where
-    map f (nm, rig, info, t) = (nm, rig, map (map f) info, map f t)
+    map f (MkImpParameter nm rig info t) = MkImpParameter nm rig (map (map f) info) (map f t)
 
   export
   Functor IFieldUpdate' where

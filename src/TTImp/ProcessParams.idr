@@ -36,7 +36,7 @@ processParams : {vars : _} ->
                 {auto o : Ref ROpts REPLOpts} ->
                 NestedNames vars ->
                 Env Term vars ->
-                FC -> List (Name, RigCount, PiInfo RawImp, RawImp) -> List ImpDecl ->
+                FC -> List ImpParameter -> List ImpDecl ->
                 Core ()
 processParams {vars} {c} {m} {u} nest env fc ps ds
     = do -- Turn the parameters into a function type, (x : ps) -> Type,
@@ -59,9 +59,9 @@ processParams {vars} {c} {m} {u} nest env fc ps ds
          let nestBlock = { names $= (names' ++) } nest'
          traverse_ (processDecl [] nestBlock env') ds
   where
-    mkParamTy : List (Name, RigCount, PiInfo RawImp, RawImp) -> RawImp
+    mkParamTy : List ImpParameter -> RawImp
     mkParamTy [] = IType fc
-    mkParamTy ((n, rig, info, ty) :: ps)
+    mkParamTy (MkImpParameter n rig info ty :: ps)
        = IPi fc rig info (Just n) ty (mkParamTy ps)
 
     applyEnv : {vs : _} ->

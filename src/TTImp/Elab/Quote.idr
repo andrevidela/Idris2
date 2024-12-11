@@ -125,13 +125,8 @@ mutual
                      ImpRecord ->
                      Core ImpRecord
   getUnquoteRecord (MkImpRecord fc n ps opts cn fs)
-      = pure $ MkImpRecord fc n !(traverse unqPair ps) opts cn
-                           !(traverse getUnquoteField fs)
-    where
-      unqPair : (Name, RigCount, PiInfo RawImp, RawImp) ->
-                Core (Name, RigCount, PiInfo RawImp, RawImp)
-      unqPair (n, c, p, t) = pure (n, c, p, !(getUnquote t))
-
+      = pure $ MkImpRecord fc n !(traverse getUnqParams ps) opts cn
+                                !(traverse getUnquoteField fs)
   getUnquoteData : {auto c : Ref Ctxt Defs} ->
                    {auto q : Ref Unq (List (Name, FC, RawImp))} ->
                    {auto u : Ref UST UState} ->
@@ -139,7 +134,7 @@ mutual
                    Core ImpData
   getUnquoteData (MkImpData fc n tc opts cs)
       = pure $ MkImpData fc n !(traverseOpt getUnquote tc) opts
-                         !(traverse getUnquoteTy cs)
+                              !(traverse getUnquoteTy cs)
   getUnquoteData (MkImpLater fc n tc)
       = pure $ MkImpLater fc n !(getUnquote tc)
 
@@ -156,18 +151,22 @@ mutual
       = pure $ IDef fc v !(traverse getUnquoteClause d)
   getUnquoteDecl (IParameters fc ps ds)
       = pure $ IParameters fc
-                           !(traverse unqTuple ps)
+                           !(traverse getUnqParams ps)
                            !(traverse getUnquoteDecl ds)
-    where
-      unqTuple : (Name, RigCount, PiInfo RawImp, RawImp) -> Core (Name, RigCount, PiInfo RawImp, RawImp)
-      unqTuple (n, rig, i, t) = pure (n, rig, i, !(getUnquote t))
-  getUnquoteDecl (IRecord fc ns v mbt d)
-      = pure $ IRecord fc ns v mbt !(getUnquoteRecord d)
+  getUnquoteDecl (IRecord fc ns nsv mbt d)
+      = pure $ IRecord fc ns nsv mbt !(getUnquoteRecord d)
   getUnquoteDecl (INamespace fc ns ds)
       = pure $ INamespace fc ns !(traverse getUnquoteDecl ds)
   getUnquoteDecl (ITransform fc n l r)
       = pure $ ITransform fc n !(getUnquote l) !(getUnquote r)
   getUnquoteDecl d = pure d
+
+  getUnqParams : {auto c : Ref Ctxt Defs}  ->
+                 {auto q : Ref Unq (List (Name, FC, RawImp))} ->
+                 {auto u : Ref UST UState} ->
+                 ImpParameter -> Core ImpParameter
+  getUnqParams (MkImpParameter name rig info type)
+    = pure $ MkImpParameter name rig info !(getUnquote type)
 
 bindUnqs : {vars : _} ->
            {auto c : Ref Ctxt Defs} ->

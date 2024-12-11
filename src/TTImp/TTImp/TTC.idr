@@ -318,6 +318,18 @@ mutual
              pure (MkIField fc c p n ty)
 
   export
+  TTC ImpParameter where
+    toBuf b (MkImpParameter w x y z)
+      = do toBuf b w ; toBuf b x
+         ; toBuf b y ; toBuf b z
+    fromBuf b
+      = do b1 <- fromBuf b
+           b2 <- fromBuf b
+           b3 <- fromBuf b
+           b4 <- fromBuf b
+           pure $ MkImpParameter b1 b2 b3 b4
+
+  export
   TTC ImpRecord where
     toBuf b (MkImpRecord fc n ps opts con fs)
         = do toBuf b fc; toBuf b n; toBuf b ps; toBuf b opts; toBuf b con; toBuf b fs

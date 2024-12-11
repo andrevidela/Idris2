@@ -24,6 +24,9 @@ export
 genUniqueStr : (xs : List String) -> (x : String) -> String
 genUniqueStr xs x = if x `elem` xs then genUniqueStr xs (x ++ "'") else x
 
+export
+uncurry3 : (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (x, (y, z)) = f x y z
 
 -- Extract the RawImp pieces from a ImpDecl so they can be searched for unquotes
 -- Used in findBindableNames{,Quot}
@@ -34,9 +37,9 @@ rawImpFromDecl decl = case decl of
         => maybe id (::) tycon $ map type datacons
     IData fc1 y _ (MkImpLater fc2 n tycon) => [tycon]
     IDef fc1 y ys => getFromClause !ys
-    IParameters fc1 ys zs => rawImpFromDecl !zs ++ map getParamTy ys
+    IParameters fc1 ys zs => rawImpFromDecl !zs ++ map type ys
     IRecord fc1 y z _ (MkImpRecord fc n params opts conName fields) => do
-        (a, b) <- map (snd . snd) params
+        MkImpParameter _ _ a b <- params
         getFromPiInfo a ++ [b] ++ getFromIField !fields
     IFail fc1 msg zs => rawImpFromDecl !zs
     INamespace fc1 ys zs => rawImpFromDecl !zs
@@ -45,9 +48,7 @@ rawImpFromDecl decl = case decl of
     IPragma _ _ f => []
     ILog k => []
     IBuiltin _ _ _ => []
-  where getParamTy : (a, b, c, RawImp) -> RawImp
-        getParamTy (_, _, _, ty) = ty
-        getFromClause : ImpClause -> List RawImp
+  where getFromClause : ImpClause -> List RawImp
         getFromClause (PatClause fc1 lhs rhs) = [lhs, rhs]
         getFromClause (WithClause fc1 lhs rig wval prf flags ys) = [wval, lhs] ++ getFromClause !ys
         getFromClause (ImpossibleClause fc1 lhs) = [lhs]

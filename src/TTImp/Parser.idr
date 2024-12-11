@@ -599,13 +599,13 @@ dataDecl fname indents
          end <- location
          pure (MkImpData (MkFC fname start end) n (Just ty) opts cs)
 
-recordParam : OriginDesc -> IndentInfo -> Rule (List (Name, RigCount, PiInfo RawImp, RawImp))
+recordParam : OriginDesc -> IndentInfo -> Rule (List ImpParameter)
 recordParam fname indents
     = do symbol "("
          start <- location
          params <- pibindListName fname start indents
          symbol ")"
-         pure $ map (\(c, n, tm) => (n, c, Explicit, tm)) params
+         pure $ map (\(c, n, tm) => MkImpParameter n c Explicit tm) params
   <|> do symbol "{"
          commit
          start <- location
@@ -617,11 +617,11 @@ recordParam fname indents
               <|> pure      Implicit)
          params <- pibindListName fname start indents
          symbol "}"
-         pure $ map (\(c, n, tm) => (n, c, info, tm)) params
+         pure $ map (\(c, n, tm) => MkImpParameter n c info tm) params
   <|> do start <- location
          n <- name
          end <- location
-         pure [(n, top, Explicit, Implicit (MkFC fname start end) False)]
+         pure [MkImpParameter n top Explicit (Implicit (MkFC fname start end) False)]
 
 fieldDecl : OriginDesc -> IndentInfo -> Rule (List IField)
 fieldDecl fname indents

@@ -74,6 +74,19 @@ data HidingDirective = HideName Name
 
 mutual
 
+  public export
+  PiBindListName : Type
+  PiBindListName = PiBindListName' Name
+
+  ||| A list of names bound to the same type
+  ||| (rig n1, n2, ... : type)
+  public export
+  record PiBindListName' (a : Type) where
+    constructor MkPiBindListName
+    rig : RigCount
+    names : List1 (WithFC Name)
+    type : PTerm' a
+
   ||| Source language as produced by the parser
   public export
   PTerm : Type
@@ -318,13 +331,15 @@ mutual
   public export
   data PRecordDecl' : Type -> Type where
        MkPRecord : (tyname : Name) ->
-                   (params : List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm)) ->
+                   (info : PiInfo (PTerm' nm)) ->
+                   (params : PiBindListName' nm) ->
                    (opts : List DataOpt) ->
                    (conName : Maybe (String, Name)) ->
                    (decls : List (PField' nm)) ->
                    PRecordDecl' nm
        MkPRecordLater : (tyname : Name) ->
-                        (params : List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm)) ->
+                        (info : PiInfo (PTerm' nm)) ->
+                        (params : PiBindListName' nm) ->
                         PRecordDecl' nm
 
   export

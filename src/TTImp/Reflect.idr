@@ -365,6 +365,18 @@ mutual
                _ => cantReify val "IField"
     reify defs val = cantReify val "IField"
 
+  Reify ImpParameter where
+    reify defs val@(NDCon _ n _ _ args)
+        = case (dropAllNS !(full (gamma defs) n), map snd args) of
+               (UN (Basic "MkImpParameter"), [w,x,y,z])
+                    => do w' <- reify defs !(evalClosure defs w)
+                          x' <- reify defs !(evalClosure defs x)
+                          y' <- reify defs !(evalClosure defs y)
+                          z' <- reify defs !(evalClosure defs z)
+                          pure (MkImpParameter w' x' y' z')
+               _ => cantReify val "ImpParameter"
+    reify defs val = cantReify val "ImpParameter"
+
   export
   Reify ImpRecord where
     reify defs val@(NDCon _ n _ _ args)
@@ -779,6 +791,14 @@ mutual
              y' <- reflect fc defs lhs env y
              z' <- reflect fc defs lhs env z
              appCon fc defs (reflectionttimp "MkIClaimData") [w', x', y', z']
+  export
+  Reflect ImpParameter where
+    reflect fc defs lhs env (MkImpParameter n r i t)
+        = do n' <- reflect fc defs lhs env n
+             r' <- reflect fc defs lhs env r
+             i' <- reflect fc defs lhs env i
+             t' <- reflect fc defs lhs env t
+             appCon fc defs (reflectionttimp "MkImpParameter") [n', r', i', t']
 
   export
   Reflect ImpDecl where

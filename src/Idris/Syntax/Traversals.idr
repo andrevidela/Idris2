@@ -258,6 +258,10 @@ mapPTermM f = goPTerm where
       MkPClaim c v <$> goPFnOpts opts
                    <*> traverseFC goPTypeDecl tdecl
 
+    goPiBindListNames : PiBindListName' nm -> Core (PiBindListName' nm)
+    goPiBindListNames (MkPiBindListName rig names type)
+      = MkPiBindListName rig names <$> goPTerm type
+
     goPDecl : PDecl' nm -> Core (PDecl' nm)
     goPDecl (PClaim claim) =
       PClaim <$> traverseFC goPClaim claim
@@ -285,13 +289,14 @@ mapPTermM f = goPTerm where
                                   <*> pure mn
                                   <*> pure ns
                                   <*> goMPDecls mps
-    goPDecl (PRecord fc doc v tot (MkPRecord n nts opts mn fs)) =
-      pure $ PRecord fc doc v tot !(MkPRecord n <$> go4TupledPTerms nts
+    goPDecl (PRecord fc doc v tot (MkPRecord n info names opts mn fs)) =
+      pure $ PRecord fc doc v tot !(MkPRecord n <$> goPiInfo info
+                                                <*> goPiBindListNames names
                                                 <*> pure opts
                                                 <*> pure mn
                                                 <*> goPFields fs)
-    goPDecl (PRecord fc doc v tot (MkPRecordLater n nts)) =
-      pure $ PRecord fc doc v tot (MkPRecordLater n !(go4TupledPTerms nts))
+    goPDecl (PRecord fc doc v tot (MkPRecordLater n info names)) =
+      pure $ PRecord fc doc v tot (MkPRecordLater n !(goPiInfo info) !(goPiBindListNames names))
     goPDecl (PFail fc msg ps) = PFail fc msg <$> goPDecls ps
     goPDecl (PMutual ps) = PMutual <$> traverseFC goPDecls ps
     goPDecl (PFixity p) = pure (PFixity p)
@@ -546,6 +551,10 @@ mapPTerm f = goPTerm where
     goPClaim : PClaimData' nm -> PClaimData' nm
     goPClaim (MkPClaim c v opts tdecl) = MkPClaim c v (goPFnOpt <$> opts) (mapFC goPTypeDecl tdecl)
 
+    goPiBindListNames : PiBindListName' nm -> PiBindListName' nm
+    goPiBindListNames (MkPiBindListName rig names type)
+      = MkPiBindListName rig names (goPTerm type)
+
     goPDecl : PDecl' nm -> PDecl' nm
     goPDecl (PClaim claim)
       = PClaim $ mapFC goPClaim claim
@@ -560,11 +569,11 @@ mapPTerm f = goPTerm where
     goPDecl (PImplementation fc v opts p is cs n ts mn ns mps)
       = PImplementation fc v opts p (goImplicits is) (goPairedPTerms cs)
            n (goPTerm <$> ts) mn ns (map (goPDecl <$>) mps)
-    goPDecl (PRecord fc doc v tot (MkPRecord n nts opts mn fs))
+    goPDecl (PRecord fc doc v tot (MkPRecord n info names opts mn fs))
       = PRecord fc doc v tot
-          (MkPRecord n (go4TupledPTerms nts) opts mn (map (mapFC goRecordField) fs))
-    goPDecl (PRecord fc doc v tot (MkPRecordLater n nts))
-      = PRecord fc doc v tot (MkPRecordLater n (go4TupledPTerms nts))
+          (MkPRecord n (goPiInfo info) (goPiBindListNames names) opts mn (map (mapFC goRecordField) fs))
+    goPDecl (PRecord fc doc v tot (MkPRecordLater n info names))
+      = PRecord fc doc v tot (MkPRecordLater n (goPiInfo info) (goPiBindListNames names))
     goPDecl (PFail fc msg ps) = PFail fc msg $ goPDecl <$> ps
     goPDecl (PMutual ps) = PMutual $ mapFC (map goPDecl) ps
     goPDecl (PFixity p) = PFixity p
