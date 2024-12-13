@@ -496,19 +496,15 @@ mutual
   toPRecord : {auto c : Ref Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
               ImpRecord' KindedName ->
-              Core ( Name
-                   , PiInfo (PTerm' KindedName)
-                   , PiBindListName' KindedName
-                   , List DataOpt
-                   , Maybe (String, Name)
-                   , List (PField' KindedName))
+              Core (PRecordDecl' KindedName)
   toPRecord (MkImpRecord fc n ps opts con fs)
       = do ps' <- traverse (\ (MkImpParameter n c p ty) =>
                                    do ty' <- toPTerm startPrec ty
-                                      p' <- mapPiInfo p
+                                      p'  <- mapPiInfo p
                                       pure (n, c, p', ty')) ps
            fs' <- traverse toPField fs
-           pure (n, ?info, ?nammss, opts, Just ("", con), fs')
+           -- pure (n, ?info, ?nammss, opts, Just ("", con), fs')
+           pure $ MkPRecord n ?params ?opts (Just ("", con)) fs'
     where
       mapPiInfo : PiInfo IRawImp -> Core (PiInfo IPTerm)
       mapPiInfo Explicit        = pure   Explicit
@@ -536,15 +532,17 @@ mutual
       = pure (Just (PDef $ MkFCVal fc !(traverse toPClause cs)))
   toPDecl (IParameters fc ps ds)
       = do ds' <- traverse toPDecl ds
-           pure (Just (PParameters fc
-                        !(traverse (\(MkImpParameter n rig info tpe) =>
-                            do info' <- traverse (toPTerm startPrec) info
-                               tpe' <- toPTerm startPrec tpe
-                               pure (n, rig, info', tpe')) ps)
-                (catMaybes ds')))
+           pure (Just (PParameters fc ?args
+                        -- !(traverse (\(MkImpParameter n rig info tpe) =>
+                        --     do -- info' <- traverse (toPTerm startPrec) info
+                        --        -- tpe' <- toPTerm startPrec tpe
+                        --        pure ?thing) ps)
+                        (catMaybes ds')
+                      )
+                )
   toPDecl (IRecord fc _ vis mbtot r)
-      = do (n, info, names, opts, con, fs) <- toPRecord r
-           pure (Just (PRecord fc "" vis mbtot (MkPRecord n info names opts con fs)))
+      = do rec <- toPRecord r
+           pure (Just (PRecord fc "" vis mbtot rec))
   toPDecl (IFail fc msg ds)
       = do ds' <- traverse toPDecl ds
            pure (Just (PFail fc msg (catMaybes ds')))

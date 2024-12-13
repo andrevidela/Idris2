@@ -376,7 +376,7 @@ mutual
   record ImpParameter' (nm : Type) where
     constructor MkImpParameter
     name : Name
-    rig : RigCount
+    rig  : RigCount
     info : PiInfo (RawImp' nm)
     type : RawImp' nm
 

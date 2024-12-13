@@ -306,6 +306,8 @@ mutual
     case x == pur of -- implicitly add namespace to unqualified occurrences of `pure` in a qualified do-block
       False => pure $ IVar fc x
       True => pure $ IVar fc (maybe pur (`NS` pur) ns)
+  desugarB side ps (PTele tel)
+      = ?desugarIntoPu
   desugarB side ps (PPi fc rig p mn argTy retTy)
       = let ps' = maybe ps (:: ps) mn in
             pure $ IPi fc rig !(traverse (desugar side ps') p)
@@ -1067,19 +1069,22 @@ mutual
       = pure [IData fc vis mbtot !(desugarData ps doc ddecl)]
 
   desugarDecl ps (PParameters fc params pds)
-      = do pds' <- traverse (desugarDecl (ps ++ map fst params)) pds
-           params' <- traverse (\(n, rig, i, ntm) => do tm' <- desugar AnyExpr ps ntm
-                                                        i' <- traverse (desugar AnyExpr ps) i
-                                                        pure (n, rig, i', tm')) params
+      = do -- pds' <- traverse (desugarDecl (ps ++ map fst params)) pds
+           -- params' <- traverse
+           --     (\(n, rig, i, ntm) => do
+           --         tm' <- desugar AnyExpr ps ntm
+           --         i' <- traverse (desugar AnyExpr ps) i
+           --         pure (n, rig, i', tm')) params
            -- Look for implicitly bindable names in the parameters
-           pnames <- ifThenElse (not !isUnboundImplicits) (pure [])
-             $ map concat
-             $ for (map (Builtin.snd . Builtin.snd . Builtin.snd) params')
-             $ findUniqueBindableNames fc True (ps ++ map Builtin.fst params) []
+           -- pnames <- ifThenElse (not !isUnboundImplicits) (pure [])
+           --   $ map concat
+           --   $ for (map (Builtin.snd . Builtin.snd . Builtin.snd) params')
+           --   $ findUniqueBindableNames fc True (ps {- ++ map names params-}) []
 
-           let paramsb = map (\(n, rig, info, tm) =>
-                                 MkImpParameter n rig info (doBind pnames tm)) params'
-           pure [IParameters fc paramsb (concat pds')]
+           -- let paramsb = map (\(n, rig, info, tm) =>
+           --                       MkImpParameter n rig info (doBind pnames tm)) params'
+           -- pure [IParameters fc paramsb (concat pds')]
+           ?desugharParam
   desugarDecl ps (PUsing fc uimpls uds)
       = do syn <- get Syn
            let oldu = usingImpl syn
@@ -1136,10 +1141,10 @@ mutual
 
   desugarDecl ps (PImplementation fc vis fnopts pass is cons tn params impln nusing body)
       = do opts <- traverse (desugarFnOpt ps) fnopts
-           is' <- for is $ \ (fc, c, n, pi, tm) =>
+           is' <- for is $ \ (MkPBinder info (MkPiBindListName rig names tm)) =>
                      do tm' <- desugar AnyExpr ps tm
-                        pi' <- mapDesugarPiInfo ps pi
-                        pure (fc, c, n, pi', tm')
+                        pi' <- mapDesugarPiInfo ps info
+                        pure ?result --(fc, c, n, pi', tm')
            cons' <- for cons $ \ (n, tm) =>
                      do tm' <- desugar AnyExpr ps tm
                         pure (n, tm')
@@ -1152,7 +1157,7 @@ mutual
              $ findUniqueBindableNames fc True ps []
 
            let paramsb = map (doBind bnames) params'
-           let isb = map (\ (info, r, n, p, tm) => (info, r, n, p, doBind bnames tm)) is'
+           let isb = ?what --map (\ (info, r, n, p, tm) => (info, r, n, p, doBind bnames tm)) is'
            let consb = map (\(n, tm) => (n, doBind bnames tm)) cons'
 
            body' <- maybe (pure Nothing)
@@ -1173,15 +1178,16 @@ mutual
       isNamed Nothing = False
       isNamed (Just _) = True
 
-  desugarDecl ps (PRecord fc doc vis mbtot (MkPRecordLater tn info params))
-      = desugarDecl ps (PData fc doc vis mbtot (MkPLater fc tn (mkRecType params)))
+  desugarDecl ps (PRecord fc doc vis mbtot (MkPRecordLater tn params))
+      = desugarDecl ps
+          (PData fc doc vis mbtot (MkPLater fc tn (mkRecType params)))
     where
-      mkRecType : PiBindListName -> PTerm
+      mkRecType : List PBinder -> PTerm
       -- mkRecType : List (Name, RigCount, PiInfo PTerm, PTerm) -> PTerm
       -- mkRecType [] = PType fc
       -- mkRecType ((n, c, p, t) :: ts) = PPi fc c p (Just n) t (mkRecType ts)
 
-  desugarDecl ps (PRecord fc doc vis mbtot (MkPRecord tn info params opts conname_in fields))
+  desugarDecl ps (PRecord fc doc vis mbtot (MkPRecord tn params opts conname_in fields))
       = do addDocString tn doc
            -- params' <- traverse (\ (n,c,p,tm) =>
            --                do tm' <- desugar AnyExpr ps tm
@@ -1191,7 +1197,7 @@ mutual
            -- let params' = the (PiBindListName' RawImp) ?huh
            let fnames = concat $ map getfname fields
            let _ = the (List Name) fnames
-           let parameterNames = map val $ forget $ names params
+           let parameterNames = concatMap (map val . forget . names . names) $ params
            -- Look for bindable names in the parameters
 
            let bnames = the (List (String, String)) ?bnamething

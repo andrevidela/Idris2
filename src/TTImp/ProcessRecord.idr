@@ -202,8 +202,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
           = do tele <- flip Core.traverseSnocList tele $ \ (mnm, rest) =>
                          case mnm of
                            Nothing => throw (InternalError "Some names have disappeared?! \{show rest}")
-                           -- Just nm => pure (nm, rest)
-                           Just nm => pure ?nooo -- (nm, rest)
+                           Just nm => pure (uncurry3 (MkImpParameter nm) rest)
                unless (null tele) $
                  log "declare.record.parameters" 50 $
                    unlines ( "Decided to bind the following extra parameters:"
@@ -348,4 +347,6 @@ processRecord : {vars : _} ->
                 WithDefault Visibility Private -> Maybe TotalReq ->
                 ImpRecord -> Core ()
 processRecord eopts nest env newns def_vis mbtot (MkImpRecord fc n ps opts cons fs)
-    = do elabRecord eopts fc env nest newns def_vis mbtot n ?hhuuu opts cons fs
+    = do elabRecord eopts fc env nest newns def_vis mbtot n ps opts cons fs
+
+

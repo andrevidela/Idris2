@@ -17,6 +17,8 @@ mapPTermM f = goPTerm where
 
     goPTerm : PTerm' nm -> Core (PTerm' nm)
     goPTerm t@(PRef _ _) = f t
+    goPTerm (PTele tel) =
+      PTele <$> traverseFC goTelescope tel
     goPTerm (PPi fc x info z argTy retTy) =
       PPi fc x <$> goPiInfo info
                <*> pure z
@@ -206,6 +208,8 @@ mapPTermM f = goPTerm where
       PWithUnambigNames fc ns <$> goPTerm rhs
       >>= f
 
+    goTelescope : PTelescope' nm -> Core (PTelescope' nm)
+
     goPFieldUpdate : PFieldUpdate' nm -> Core (PFieldUpdate' nm)
     goPFieldUpdate (PSetField p t)    = PSetField p <$> goPTerm t
     goPFieldUpdate (PSetFieldApp p t) = PSetFieldApp p <$> goPTerm t
@@ -267,9 +271,9 @@ mapPTermM f = goPTerm where
       PClaim <$> traverseFC goPClaim claim
     goPDecl (PDef cls) = PDef <$> traverseFC goPClauses cls
     goPDecl (PData fc doc v mbt d) = PData fc doc v mbt <$> goPDataDecl d
-    goPDecl (PParameters fc nts ps) =
-      PParameters fc <$> go4TupledPTerms nts
-                     <*> goPDecls ps
+    goPDecl (PParameters fc bound decls) =
+      PParameters fc <$> traverseList1 goPBinder bound
+                     <*> goPDecls decls
     goPDecl (PUsing fc mnts ps) =
       PUsing fc <$> goPairedPTerms mnts
                 <*> goPDecls ps
@@ -282,21 +286,21 @@ mapPTermM f = goPTerm where
                       <*> pure mn
                       <*> goPDecls ps
     goPDecl (PImplementation fc v opts p is cs n ts mn ns mps) =
-      PImplementation fc v opts p <$> goImplicits is
+      PImplementation fc v opts p <$> traverse goPBinder is
                                   <*> goPairedPTerms cs
                                   <*> pure n
                                   <*> goPTerms ts
                                   <*> pure mn
                                   <*> pure ns
                                   <*> goMPDecls mps
-    goPDecl (PRecord fc doc v tot (MkPRecord n info names opts mn fs)) =
-      pure $ PRecord fc doc v tot !(MkPRecord n <$> goPiInfo info
-                                                <*> goPiBindListNames names
+    goPDecl (PRecord fc doc v tot (MkPRecord n names opts mn fs)) =
+      pure $ PRecord fc doc v tot !(MkPRecord n <$> (traverse goPBinder names)
                                                 <*> pure opts
                                                 <*> pure mn
                                                 <*> goPFields fs)
-    goPDecl (PRecord fc doc v tot (MkPRecordLater n info names)) =
-      pure $ PRecord fc doc v tot (MkPRecordLater n !(goPiInfo info) !(goPiBindListNames names))
+    goPDecl (PRecord fc doc v tot (MkPRecordLater n names)) = do
+      names' <- traverse goPBinder names
+      pure $ PRecord fc doc v tot (MkPRecordLater n names')
     goPDecl (PFail fc msg ps) = PFail fc msg <$> goPDecls ps
     goPDecl (PMutual ps) = PMutual <$> traverseFC goPDecls ps
     goPDecl (PFixity p) = pure (PFixity p)
@@ -306,6 +310,10 @@ mapPTermM f = goPTerm where
     goPDecl (PDirective d) = pure (PDirective d)
     goPDecl p@(PBuiltin _ _ _) = pure p
 
+    goPBinder : PBinder' nm -> Core (PBinder' nm)
+    goPBinder (MkPBinder info names) =
+      MkPBinder <$> goPiInfo info
+                <*> goPiBindListNames names
 
     goPTypeDecl : PTypeDeclData' nm -> Core (PTypeDeclData' nm)
     goPTypeDecl (MkPTy n d t) = MkPTy n d <$> goPTerm t
@@ -424,6 +432,8 @@ mapPTerm f = goPTerm where
 
     goPTerm : PTerm' nm -> PTerm' nm
     goPTerm t@(PRef _ _) = f t
+    goPTerm (PTele tel)
+      = ?goPTermagain
     goPTerm (PPi fc x info z argTy retTy)
       = f $ PPi fc x (goPiInfo info) z (goPTerm argTy) (goPTerm retTy)
     goPTerm (PLam fc x info z argTy scope)
@@ -560,20 +570,20 @@ mapPTerm f = goPTerm where
       = PClaim $ mapFC goPClaim claim
     goPDecl (PDef cls) = PDef $ mapFC (map goPClause) cls
     goPDecl (PData fc doc v mbt d) = PData fc doc v mbt $ goPDataDecl d
-    goPDecl (PParameters fc nts ps)
-      = PParameters fc (go4TupledPTerms nts) (goPDecl <$> ps)
+    goPDecl (PParameters fc bound decsl)
+      = PParameters fc (goPBinder <$> bound) (goPDecl <$> decsl)
     goPDecl (PUsing fc mnts ps)
       = PUsing fc (goPairedPTerms mnts) (goPDecl <$> ps)
     goPDecl (PInterface fc v mnts n doc nrts ns mn ps)
       = PInterface fc v (goPairedPTerms mnts) n doc (go3TupledPTerms nrts) ns mn (goPDecl <$> ps)
     goPDecl (PImplementation fc v opts p is cs n ts mn ns mps)
-      = PImplementation fc v opts p (goImplicits is) (goPairedPTerms cs)
+      = PImplementation fc v opts p (goPBinder <$> is) (goPairedPTerms cs)
            n (goPTerm <$> ts) mn ns (map (goPDecl <$>) mps)
-    goPDecl (PRecord fc doc v tot (MkPRecord n info names opts mn fs))
+    goPDecl (PRecord fc doc v tot (MkPRecord n names opts mn fs))
       = PRecord fc doc v tot
-          (MkPRecord n (goPiInfo info) (goPiBindListNames names) opts mn (map (mapFC goRecordField) fs))
-    goPDecl (PRecord fc doc v tot (MkPRecordLater n info names))
-      = PRecord fc doc v tot (MkPRecordLater n (goPiInfo info) (goPiBindListNames names))
+          (MkPRecord n ?ahu opts mn (map (mapFC goRecordField) fs))
+    goPDecl (PRecord fc doc v tot (MkPRecordLater n names))
+      = PRecord fc doc v tot (MkPRecordLater n (map goPBinder names))
     goPDecl (PFail fc msg ps) = PFail fc msg $ goPDecl <$> ps
     goPDecl (PMutual ps) = PMutual $ mapFC (map goPDecl) ps
     goPDecl (PFixity p) = PFixity p
@@ -583,6 +593,9 @@ mapPTerm f = goPTerm where
     goPDecl (PDirective d) = PDirective d
     goPDecl p@(PBuiltin _ _ _) = p
 
+    goPBinder : PBinder' nm -> PBinder' nm
+    goPBinder (MkPBinder info names)
+      = MkPBinder (goPiInfo info) (goPiBindListNames names)
 
     goPTypeDecl : PTypeDeclData' nm -> PTypeDeclData' nm
     goPTypeDecl (MkPTy n d t) = MkPTy n d $ goPTerm t
@@ -639,6 +652,7 @@ export
 substFC : FC -> PTerm' nm -> PTerm' nm
 substFC fc = mapPTerm $ \case
   PRef _ x => PRef fc x
+  PTele tel => PTele ({fc := fc} tel)
   PPi _ x y z argTy retTy => PPi fc x y z argTy retTy
   PLam _ x y pat argTy scope => PLam fc x y pat argTy scope
   PLet _ x pat nTy nVal scope alts => PLet fc x pat nTy nVal scope alts

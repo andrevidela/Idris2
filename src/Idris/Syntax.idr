@@ -81,11 +81,21 @@ mutual
   ||| A list of names bound to the same type
   ||| (rig n1, n2, ... : type)
   public export
-  record PiBindListName' (a : Type) where
+  record PiBindListName' (nm : Type) where
     constructor MkPiBindListName
     rig : RigCount
     names : List1 (WithFC Name)
-    type : PTerm' a
+    type : PTerm' nm
+
+  public export
+  PBinder : Type
+  PBinder = PBinder' Name
+
+  public export
+  record PBinder' (nm : Type) where
+    constructor MkPBinder
+    info : PiInfo (PTerm' nm)
+    names : PiBindListName' nm
 
   ||| Source language as produced by the parser
   public export
@@ -99,14 +109,29 @@ mutual
   IPTerm : Type
   IPTerm = PTerm' KindedName
 
+  public export
+  PTelescope : Type
+  PTelescope = PTelescope' Name
+
+  ||| A telescope with at least one argument
+  public export
+  data PTelescope' : (nm : Type) -> Type where
+    MkPTelescope : (args : List1 (PBinder' nm)) ->
+                   -- Return type of the telescope is always a plain expression, no name or pi info
+                   (retTy : PTerm' nm) ->
+                   PTelescope' nm
+    MkForall : (names : List (WithFC Name)) -> (retTy : PTerm' nm) -> PTelescope' nm
+
+
+
   ||| The full high level source language
   ||| This gets desugared to RawImp (TTImp.TTImp),
   ||| then elaborated to Term (Core.TT)
   public export
   data PTerm' : Type -> Type where
        -- Direct (more or less) translations to RawImp
-
        PRef : FC -> nm -> PTerm' nm
+       PTele : WithFC (PTelescope' nm) -> PTerm' nm
        PPi : FC -> RigCount -> PiInfo (PTerm' nm) -> Maybe Name ->
              (argTy : PTerm' nm) -> (retTy : PTerm' nm) -> PTerm' nm
        PLam : FC -> RigCount -> PiInfo (PTerm' nm) -> (pat : PTerm' nm) ->
@@ -184,6 +209,7 @@ mutual
   export
   getPTermLoc : PTerm' nm -> FC
   getPTermLoc (PRef fc _) = fc
+  getPTermLoc (PTele tel) = tel.fc
   getPTermLoc (PPi fc _ _ _ _ _) = fc
   getPTermLoc (PLam fc _ _ _ _ _) = fc
   getPTermLoc (PLet fc _ _ _ _ _ _) = fc
@@ -331,15 +357,13 @@ mutual
   public export
   data PRecordDecl' : Type -> Type where
        MkPRecord : (tyname : Name) ->
-                   (info : PiInfo (PTerm' nm)) ->
-                   (params : PiBindListName' nm) ->
+                   (params : List (PBinder' nm)) ->
                    (opts : List DataOpt) ->
                    (conName : Maybe (String, Name)) ->
                    (decls : List (PField' nm)) ->
                    PRecordDecl' nm
        MkPRecordLater : (tyname : Name) ->
-                        (info : PiInfo (PTerm' nm)) ->
-                        (params : PiBindListName' nm) ->
+                        (params : List (PBinder' nm)) ->
                         PRecordDecl' nm
 
   export
@@ -497,8 +521,9 @@ mutual
        PData : FC -> (doc : String) -> WithDefault Visibility Private ->
                Maybe TotalReq -> PDataDecl' nm -> PDecl' nm
        PParameters : FC ->
-                     List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm) ->
-                     List (PDecl' nm) -> PDecl' nm
+                     (args : List1 (PBinder' nm)) ->
+                     (decls : List (PDecl' nm)) ->
+                     PDecl' nm
        PUsing : FC -> List (Maybe Name, PTerm' nm) ->
                 List (PDecl' nm) -> PDecl' nm
        PInterface : FC ->
@@ -513,7 +538,7 @@ mutual
                     PDecl' nm
        PImplementation : FC ->
                          Visibility -> List PFnOpt -> Pass ->
-                         (implicits : List (FC, RigCount, Name, PiInfo (PTerm' nm), PTerm' nm)) ->
+                         (implicits : List (PBinder' nm)) ->
                          (constraints : List (Maybe Name, PTerm' nm)) ->
                          Name ->
                          (params : List (PTerm' nm)) ->
@@ -764,7 +789,7 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate : PFieldUpdate' nm -> String
   showPTermPrec : Prec -> PTerm' nm -> String
   showOpPrec : Prec -> OpStr' nm -> String
-
+  showTelescope : PTelescope' nm -> String
   showPTerm : PTerm' nm -> String
   showPTerm = showPTermPrec Open
 
@@ -796,6 +821,8 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate (PSetFieldApp p v) = showSep "." p ++ " $= " ++ showPTerm v
 
   showPTermPrec d (PRef _ n) = showPrec d (toName n)
+  showPTermPrec d (PTele tel)
+        = showTelescope tel.val
   showPTermPrec d (PPi _ rig Explicit Nothing arg ret)
         = showPTermPrec d arg ++ " -> " ++ showPTermPrec d ret
   showPTermPrec d (PPi _ rig Explicit (Just n) arg ret)
@@ -939,6 +966,14 @@ parameters {0 nm : Type} (toName : nm -> Name)
 
   showOpPrec d (OpSymbols op) = showPrec d (toName op)
   showOpPrec d (Backticked op) = "`\{showPrec d (toName op)}`"
+
+  showTelescope (MkForall names ret)
+    = "forall \{commasep (map (show . val) names)} . \{showPTerm ret}"
+    where commasep : List String -> String
+          commasep = concat . intersperse ", "
+  showTelescope (MkPTelescope args ret)
+      = ?showTele
+
 
 export
 covering
@@ -1132,6 +1167,11 @@ getFixityInfo : {auto s : Ref Syn SyntaxInfo} -> String -> Core (List (Name, Fix
 getFixityInfo nm = do
   syn <- get Syn
   pure $ lookupName (UN $ Basic nm) (fixities syn)
+
+export
+covering
+Show PTelescope where
+  show = showTelescope id
 
 export
 covering
