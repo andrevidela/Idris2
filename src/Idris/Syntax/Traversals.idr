@@ -209,6 +209,8 @@ mapPTermM f = goPTerm where
       >>= f
 
     goTelescope : PTelescope' nm -> Core (PTelescope' nm)
+    goTelescope (MkPTelescope args retTy) = MkPTelescope <$> traverseList1 goPBinder args <*> goPTerm retTy
+    goTelescope (MkForall names retTy) = MkForall names <$> goPTerm retTy
 
     goPFieldUpdate : PFieldUpdate' nm -> Core (PFieldUpdate' nm)
     goPFieldUpdate (PSetField p t)    = PSetField p <$> goPTerm t
@@ -433,7 +435,7 @@ mapPTerm f = goPTerm where
     goPTerm : PTerm' nm -> PTerm' nm
     goPTerm t@(PRef _ _) = f t
     goPTerm (PTele tel)
-      = ?goPTermagain
+      = PTele (mapFC goPTelescope tel)
     goPTerm (PPi fc x info z argTy retTy)
       = f $ PPi fc x (goPiInfo info) z (goPTerm argTy) (goPTerm retTy)
     goPTerm (PLam fc x info z argTy scope)
@@ -528,6 +530,8 @@ mapPTerm f = goPTerm where
     goPTerm (PWithUnambigNames fc ns rhs)
       = f $ PWithUnambigNames fc ns (goPTerm rhs)
 
+    goPTelescope : PTelescope' nm -> PTelescope' nm
+
     goPFieldUpdate : PFieldUpdate' nm -> PFieldUpdate' nm
     goPFieldUpdate (PSetField p t)    = PSetField p $ goPTerm t
     goPFieldUpdate (PSetFieldApp p t) = PSetFieldApp p $ goPTerm t
@@ -581,7 +585,7 @@ mapPTerm f = goPTerm where
            n (goPTerm <$> ts) mn ns (map (goPDecl <$>) mps)
     goPDecl (PRecord fc doc v tot (MkPRecord n names opts mn fs))
       = PRecord fc doc v tot
-          (MkPRecord n ?ahu opts mn (map (mapFC goRecordField) fs))
+          (MkPRecord n names opts mn (map (mapFC goRecordField) fs))
     goPDecl (PRecord fc doc v tot (MkPRecordLater n names))
       = PRecord fc doc v tot (MkPRecordLater n (map goPBinder names))
     goPDecl (PFail fc msg ps) = PFail fc msg $ goPDecl <$> ps
