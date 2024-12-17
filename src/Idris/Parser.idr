@@ -1816,6 +1816,21 @@ fieldDecl fname indents
                     pure (MkRecordField doc rig p (forget ns) ty))
              pure b.withFC
 
+typedArg' : OriginDesc -> IndentInfo -> Rule (List1 PBinder)
+typedArg' fname indents
+    = do params <- parens fname $ pibindListName fname indents
+         pure $ map (MkPBinder Explicit) params
+  <|> do decoratedSymbol fname "{"
+         commit
+         info <-
+                 (pure  AutoImplicit <* decoratedKeyword fname "auto"
+              <|> (decoratedKeyword fname "default" *> DefImplicit <$> simpleExpr fname indents)
+              <|> pure      Implicit)
+         params <- pibindListName fname indents
+         decoratedSymbol fname "}"
+         pure $ map (MkPBinder info) params
+
+-- Kept for compatibility reasons, to remove later
 typedArg : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm, PTerm))
 typedArg fname indents
     = do params <- parens fname $ pibindListName fname indents
@@ -1884,9 +1899,9 @@ paramDecls fname indents = do
     oldParamDecls
         = parens fname $ sepBy1 (decoratedSymbol fname ",") plainBinder
 
-    newParamDecls : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm, PTerm))
+    newParamDecls : OriginDesc -> IndentInfo -> Rule (List1 PBinder)
     newParamDecls fname indents
-        = map join (some $ typedArg fname indents)
+        = map join (some $ typedArg' fname indents)
 
 
 -- topLevelClaim is for claims appearing at the top-level of the file

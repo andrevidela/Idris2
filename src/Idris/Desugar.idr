@@ -1082,17 +1082,17 @@ mutual
            pure [IParameters fc paramsb (concat pds')]
       where
         getArgs : Either (List1 PlainBinder)
-                         (List1 (Name, RigCount, PiInfo PTerm, PTerm)) ->
+                         (List1 PBinder) ->
                          Core (List1 (ImpParameter' Name))
         getArgs (Left params)
           = traverseList1 (\(MkPlainBinder n ty) => do
               ty' <- desugar AnyExpr ps ty
               pure (n.val, top, Explicit, ty')) params
         getArgs (Right params)
-          = traverseList1 (\(n, rig, i, ntm) => do
+          = traverseList1 (\(MkPBinder info (MkBasicBinder rig n ntm)) => do
               tm' <- desugar AnyExpr ps ntm
-              i' <- traverse (desugar AnyExpr ps) i
-              pure (n, rig, i', tm')) params
+              i' <- traverse (desugar AnyExpr ps) info
+              pure (n.val, rig, i', tm')) params
 
   desugarDecl ps (PUsing fc uimpls uds)
       = do syn <- get Syn
