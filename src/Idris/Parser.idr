@@ -669,11 +669,11 @@ mutual
           _ => fail "Invalid multiplicity (must be 0 or 1)"
 
   pibindAll : OriginDesc -> PiInfo PTerm ->
-              List (RigCount, WithBounds (Maybe Name), PTerm) ->
+              List1 (RigCount, WithBounds (Maybe Name), PTerm) ->
               PTerm -> PTerm
-  pibindAll fname p [] scope = scope
-  pibindAll fname p ((rig, n, ty) :: rest) scope
-           = PPi (boundToFC fname n) rig p (n.val) ty (pibindAll fname p rest scope)
+  pibindAll fname pinfo ((rig, n, ty) ::: []) scope = PPi (boundToFC fname n) rig pinfo n.val ty scope
+  pibindAll fname pinfo ((rig, n, ty) ::: x :: xs) y
+    = PPi (boundToFC fname n) rig pinfo n.val ty (pibindAll fname pinfo (x ::: xs) y)
 
   bindList : OriginDesc -> IndentInfo ->
              Rule (List (RigCount, WithBounds PTerm, PTerm))
@@ -687,13 +687,12 @@ mutual
                               pure (rig, pat, ty))
 
   pibindListName : OriginDesc -> IndentInfo ->
-                   Rule (List (RigCount, WithBounds Name, PTerm))
+                   Rule (List1 (RigCount, WithBounds Name, PTerm))
   pibindListName fname indents
        = do rig <- multiplicity fname
             ns <- sepBy1 (decoratedSymbol fname ",")
                          (bounds $ UN <$> binderName)
-            let ns = forget ns
-            decorateBoundedNames fname Bound ns
+            decorateBoundedNames fname Bound (forget ns)
             decoratedSymbol fname ":"
             ty <- typeExpr pdef fname indents
             atEnd indents
@@ -705,7 +704,7 @@ mutual
                <|> symbol "_" $> Underscore
 
   PiBindList : Type
-  PiBindList = List (RigCount, WithBounds (Maybe Name), PTerm)
+  PiBindList = List1 (RigCount, WithBounds (Maybe Name), PTerm)
 
   pibindList : OriginDesc -> IndentInfo ->
                Rule PiBindList
@@ -762,7 +761,7 @@ mutual
                   pure $ map (\n => ( erased {a=RigCount}
                                     , map (Just . UN . Basic) n
                                     , PImplicit (boundToFC fname n))
-                             ) (forget ns)
+                             ) ns
            b' <- bounds peek
            mustWorkBecause b'.bounds "Expected ',' or '.'"
              $ decoratedSymbol fname "."
@@ -1707,7 +1706,7 @@ implBinds fname indents namedImpl = concatMap (map adjust) <$> go where
           piInfo <- bounds $ option Implicit $ defImplicitField fname indents
           when (not namedImpl && isDefaultImplicit piInfo.val) $
             fatalLoc piInfo.bounds "Default implicits are allowed only for named implementations"
-          ns <- map @{Compose} (\(rc, wb, n) => (rc, wb, piInfo.val, n)) $ pibindListName fname indents
+          ns <- map @{Compose} (\(rc, wb, n) => (rc, wb, piInfo.val, n)) $ forget <$> pibindListName fname indents
           commitSymbol fname "}"
           commitSymbol fname "->"
           more <- go
@@ -1811,7 +1810,7 @@ fieldDecl fname indents
                     pure (MkRecordField doc rig p (forget ns) ty))
              pure b.withFC
 
-typedArg : OriginDesc -> IndentInfo -> Rule (List (Name, RigCount, PiInfo PTerm, PTerm))
+typedArg : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm, PTerm))
 typedArg fname indents
     = do params <- parens fname $ pibindListName fname indents
          pure $ map (\(c, n, tm) => (n.val, c, Explicit, tm)) params
@@ -1825,11 +1824,11 @@ typedArg fname indents
          decoratedSymbol fname "}"
          pure $ map (\(c, n, tm) => (n.val, c, info, tm)) params
 
-recordParam : OriginDesc -> IndentInfo -> Rule (List (Name, RigCount, PiInfo PTerm,  PTerm))
+recordParam : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm,  PTerm))
 recordParam fname indents
     = typedArg fname indents
   <|> do n <- bounds (UN . Basic <$> decoratedSimpleBinderName fname)
-         pure [(n.val, top, Explicit, PInfer (boundToFC fname n))]
+         pure (singleton (n.val, top, Explicit, PInfer (boundToFC fname n)))
 
 -- A record without a where is a forward declaration
 recordBody : OriginDesc -> IndentInfo ->
@@ -1857,7 +1856,7 @@ recordDecl fname indents
                          col         <- column
                          decoratedKeyword fname "record"
                          n       <- mustWork (decoratedDataTypeName fname)
-                         paramss <- many (continue indents >> recordParam fname indents)
+                         paramss <- many (continue indents >> forget <$> recordParam fname indents)
                          let params = concat paramss
                          recordBody fname indents doc vis mbtot col n params)
          pure (b.val (boundToFC fname b))
@@ -1888,7 +1887,7 @@ paramDecls fname indents = do
 
     newParamDecls : OriginDesc -> IndentInfo -> Rule (List (Name, RigCount, PiInfo PTerm, PTerm))
     newParamDecls fname indents
-        = map concat (some $ typedArg fname indents)
+        = forget <$> map join (some $ typedArg fname indents)
 
 
 -- topLevelClaim is for claims appearing at the top-level of the file

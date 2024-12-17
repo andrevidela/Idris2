@@ -255,6 +255,17 @@ mutual
        StrLiteral : FC -> String -> PStr' nm
        StrInterp : FC -> PTerm' nm -> PStr' nm
 
+  public export
+  PBinder : Type
+  PBinder = PBinder' Name
+
+  public export
+  record PBinder' (nm : Type) where
+    constructor MkPBinder
+    rig : RigCount
+    name : WithFC Name
+    type : PTerm' nm
+
   export
   getLoc : PDo' nm -> FC
   getLoc (DoExp fc _) = fc
