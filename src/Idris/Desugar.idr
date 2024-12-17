@@ -1067,19 +1067,31 @@ mutual
       = pure [IData fc vis mbtot !(desugarData ps doc ddecl)]
 
   desugarDecl ps (PParameters fc params pds)
-      = do pds' <- traverse (desugarDecl (ps ++ map fst params)) pds
-           params' <- traverse (\(n, rig, i, ntm) => do tm' <- desugar AnyExpr ps ntm
-                                                        i' <- traverse (desugar AnyExpr ps) i
-                                                        pure (n, rig, i', tm')) params
+      = do
+           params' <- getArgs params
+           pds' <- traverse (desugarDecl (ps ++ map fst params')) pds
            -- Look for implicitly bindable names in the parameters
            pnames <- ifThenElse (not !isUnboundImplicits) (pure [])
              $ map concat
              $ for (map (Builtin.snd . Builtin.snd . Builtin.snd) params')
-             $ findUniqueBindableNames fc True (ps ++ map Builtin.fst params) []
+             $ findUniqueBindableNames fc True (ps ++ map Builtin.fst params') []
 
            let paramsb = map (\(n, rig, info, tm) =>
                                  (n, rig, info, doBind pnames tm)) params'
            pure [IParameters fc paramsb (concat pds')]
+      where
+        getArgs : Either (List1 PlainBinder)
+                         (List (Name, RigCount, PiInfo PTerm, PTerm)) ->
+                         Core (List (ImpParameter' Name))
+        getArgs (Left params)
+          = traverse (\(MkPlainBinder n ty) => do
+              ty' <- desugar AnyExpr ps ty
+              pure (n.val, top, Explicit, ty')) (forget params)
+        getArgs (Right params)
+          = traverse (\(n, rig, i, ntm) => do tm' <- desugar AnyExpr ps ntm
+                                              i' <- traverse (desugar AnyExpr ps) i
+                                              pure (n, rig, i', tm')) params
+
   desugarDecl ps (PUsing fc uimpls uds)
       = do syn <- get Syn
            let oldu = usingImpl syn

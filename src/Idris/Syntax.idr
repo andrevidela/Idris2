@@ -255,16 +255,47 @@ mutual
        StrLiteral : FC -> String -> PStr' nm
        StrInterp : FC -> PTerm' nm -> PStr' nm
 
+
+  public export
+  PlainBinder : Type
+  PlainBinder = PlainBinder' Name
+
+  ||| A plain binder without information about its use
+  ||| plainBinder := name ':' term
+  public export
+  record PlainBinder' (nm : Type) where
+    constructor MkPlainBinder
+    name : WithFC Name
+    type : PTerm' nm
+
+  public export
+  BasicBinder : Type
+  BasicBinder = BasicBinder' Name
+
+  ||| A binder with quantity information attached
+  ||| basicBinder := qty plainBinder
+  public export
+  record BasicBinder' (nm : Type) where
+    constructor MkBasicBinder
+    rig : RigCount
+    name : WithFC Name
+    type : PTerm' nm
+
   public export
   PBinder : Type
   PBinder = PBinder' Name
 
+  ||| A binder with information about how it is binding
+  ||| pbinder := '{' basicBinder '}'
+  |||          | '{' auto basicBinder '}'
+  |||          | '{' default term basicBinder '}'
+  |||          | '(' basicBinder ')'
   public export
   record PBinder' (nm : Type) where
     constructor MkPBinder
-    rig : RigCount
-    name : WithFC Name
-    type : PTerm' nm
+    info : PiInfo (PTerm' nm)
+    bind : BasicBinder' nm
+
 
   export
   getLoc : PDo' nm -> FC
@@ -493,7 +524,8 @@ mutual
        PData : FC -> (doc : String) -> WithDefault Visibility Private ->
                Maybe TotalReq -> PDataDecl' nm -> PDecl' nm
        PParameters : FC ->
-                     List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm) ->
+                     Either (List1 PlainBinder)
+                            (List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm)) ->
                      List (PDecl' nm) -> PDecl' nm
        PUsing : FC -> List (Maybe Name, PTerm' nm) ->
                 List (PDecl' nm) -> PDecl' nm
