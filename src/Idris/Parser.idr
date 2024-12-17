@@ -669,10 +669,10 @@ mutual
           _ => fail "Invalid multiplicity (must be 0 or 1)"
 
   pibindAll : OriginDesc -> PiInfo PTerm ->
-              List1 PBinder ->
+              List1 BasicBinder ->
               PTerm -> PTerm
-  pibindAll fname pinfo (MkPBinder rig n ty ::: []) scope = PPi n.fc rig pinfo (Just n.val) ty scope
-  pibindAll fname pinfo (MkPBinder rig n ty ::: x :: xs) y
+  pibindAll fname pinfo (MkBasicBinder rig n ty ::: []) scope = PPi n.fc rig pinfo (Just n.val) ty scope
+  pibindAll fname pinfo (MkBasicBinder rig n ty ::: x :: xs) y
     = PPi n.fc rig pinfo (Just n.val) ty (pibindAll fname pinfo (x ::: xs) y)
 
   bindList : OriginDesc -> IndentInfo ->
@@ -687,7 +687,7 @@ mutual
                               pure (rig, pat, ty))
 
   pibindListName : OriginDesc -> IndentInfo ->
-                   Rule (List1 PBinder)
+                   Rule (List1 BasicBinder)
   pibindListName fname indents
        = do rig <- multiplicity fname
             ns <- sepBy1 (decoratedSymbol fname ",")
@@ -696,7 +696,7 @@ mutual
             decoratedSymbol fname ":"
             ty <- typeExpr pdef fname indents
             atEnd indents
-            pure (map (\n => MkPBinder rig n.withFC ty) ns)
+            pure (map (\n => MkBasicBinder rig n.withFC ty) ns)
     where
       -- _ gets treated specially here, it means "I don't care about the name"
       binderName : Rule UserName
@@ -704,10 +704,10 @@ mutual
                <|> symbol "_" $> Underscore
 
   PiBindList : Type
-  PiBindList = List1 PBinder
+  PiBindList = List1 BasicBinder
 
   pibindList : OriginDesc -> IndentInfo ->
-               Rule (List1 PBinder)
+               Rule (List1 BasicBinder)
   pibindList fname indents
     = pibindListName fname indents
 
@@ -758,7 +758,7 @@ mutual
                   commit
                   ns <- sepBy1 (decoratedSymbol fname ",")
                                (fcBounds (decoratedSimpleBinderName fname))
-                  pure $ map (\n => MkPBinder (erased {a=RigCount})
+                  pure $ map (\n => MkBasicBinder (erased {a=RigCount})
                                               (mapFC (UN . Basic) n)
                                               (PImplicit n.fc)
                              ) ns
@@ -1191,6 +1191,12 @@ exportVisibility : OriginDesc -> EmptyRule (WithDefault Visibility Export)
 exportVisibility fname
     = (specified <$> visOption fname)
   <|> pure defaulted
+
+plainBinder : (fname : OriginDesc) => (indents : IndentInfo) => Rule PlainBinder
+plainBinder = do name <- fcBounds (UN . Basic <$> decoratedSimpleBinderName fname)
+                 decoratedSymbol fname ":"
+                 ty <- typeExpr pdef fname indents
+                 pure $ MkPlainBinder name ty
 
 tyDecls : Rule Name -> String -> OriginDesc -> IndentInfo -> Rule PTypeDecl
 tyDecls declName predoc fname indents
@@ -1706,7 +1712,7 @@ implBinds fname indents namedImpl = concatMap (map adjust) <$> go where
           piInfo <- bounds $ option Implicit $ defImplicitField fname indents
           when (not namedImpl && isDefaultImplicit piInfo.val) $
             fatalLoc piInfo.bounds "Default implicits are allowed only for named implementations"
-          ns <- map @{Compose} (\(MkPBinder rc wb n) => (rc, wb, piInfo.val, n)) $ forget <$> pibindListName fname indents
+          ns <- map @{Compose} (\(MkBasicBinder rc wb n) => (rc, wb, piInfo.val, n)) $ forget <$> pibindListName fname indents
           commitSymbol fname "}"
           commitSymbol fname "->"
           more <- go
@@ -1813,7 +1819,7 @@ fieldDecl fname indents
 typedArg : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm, PTerm))
 typedArg fname indents
     = do params <- parens fname $ pibindListName fname indents
-         pure $ map (\(MkPBinder c n tm) => (n.val, c, Explicit, tm)) params
+         pure $ map (\(MkBasicBinder c n tm) => (n.val, c, Explicit, tm)) params
   <|> do decoratedSymbol fname "{"
          commit
          info <-
@@ -1822,7 +1828,7 @@ typedArg fname indents
               <|> pure      Implicit)
          params <- pibindListName fname indents
          decoratedSymbol fname "}"
-         pure $ map (\(MkPBinder c n tm) => (n.val, c, info, tm)) params
+         pure $ map (\(MkBasicBinder c n tm) => (n.val, c, info, tm)) params
 
 recordParam : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm,  PTerm))
 recordParam fname indents
@@ -1866,7 +1872,7 @@ paramDecls fname indents = do
          startCol <- column
          b1 <- bounds (decoratedKeyword fname "parameters")
          commit
-         args <- bounds (newParamDecls fname indents <|> oldParamDecls fname indents)
+         args <- bounds (Right <$> newParamDecls fname indents <|> Left <$> oldParamDecls)
          commit
          declarations <- bounds $ nonEmptyBlockAfter startCol (topDecl fname)
          mergedBounds <- pure $ b1 `mergeBounds` (args `mergeBounds` declarations)
@@ -1874,16 +1880,9 @@ paramDecls fname indents = do
                   (collectDefs (forget declarations.val)))
 
   where
-    oldParamDecls : OriginDesc -> IndentInfo -> Rule (List (Name, RigCount, PiInfo PTerm, PTerm))
-    oldParamDecls fname indents
-        = do decoratedSymbol fname "("
-             ps <- sepBy (decoratedSymbol fname ",")
-                         (do x <- UN . Basic <$> decoratedSimpleBinderName fname
-                             decoratedSymbol fname ":"
-                             ty <- typeExpr pdef fname indents
-                             pure (x, top, Explicit, ty))
-             decoratedSymbol fname ")"
-             pure ps
+    oldParamDecls : Rule (List1 PlainBinder)
+    oldParamDecls
+        = parens fname $ sepBy1 (decoratedSymbol fname ",") plainBinder
 
     newParamDecls : OriginDesc -> IndentInfo -> Rule (List (Name, RigCount, PiInfo PTerm, PTerm))
     newParamDecls fname indents

@@ -258,13 +258,15 @@ mapPTermM f = goPTerm where
       MkPClaim c v <$> goPFnOpts opts
                    <*> traverseFC goPTypeDecl tdecl
 
+    -- goParamArgs :
+
     goPDecl : PDecl' nm -> Core (PDecl' nm)
     goPDecl (PClaim claim) =
       PClaim <$> traverseFC goPClaim claim
     goPDecl (PDef cls) = PDef <$> traverseFC goPClauses cls
     goPDecl (PData fc doc v mbt d) = PData fc doc v mbt <$> goPDataDecl d
     goPDecl (PParameters fc nts ps) =
-      PParameters fc <$> go4TupledPTerms nts
+      PParameters fc <$> ?thing -- go4TupledPTerms nts
                      <*> goPDecls ps
     goPDecl (PUsing fc mnts ps) =
       PUsing fc <$> goPairedPTerms mnts
@@ -552,7 +554,7 @@ mapPTerm f = goPTerm where
     goPDecl (PDef cls) = PDef $ mapFC (map goPClause) cls
     goPDecl (PData fc doc v mbt d) = PData fc doc v mbt $ goPDataDecl d
     goPDecl (PParameters fc nts ps)
-      = PParameters fc (go4TupledPTerms nts) (goPDecl <$> ps)
+      = PParameters fc (?parmaARgs) (goPDecl <$> ps)
     goPDecl (PUsing fc mnts ps)
       = PUsing fc (goPairedPTerms mnts) (goPDecl <$> ps)
     goPDecl (PInterface fc v mnts n doc nrts ns mn ps)

@@ -536,10 +536,10 @@ mutual
   toPDecl (IParameters fc ps ds)
       = do ds' <- traverse toPDecl ds
            pure (Just (PParameters fc
-                        !(traverse (\(n, rig, info, tpe) =>
+                        (Right !(traverse (\(n, rig, info, tpe) =>
                             do info' <- traverse (toPTerm startPrec) info
                                tpe' <- toPTerm startPrec tpe
-                               pure (n, rig, info', tpe')) ps)
+                               pure (n, rig, info', tpe')) ps))
                 (catMaybes ds')))
   toPDecl (IRecord fc _ vis mbtot r)
       = do (n, ps, opts, con, fs) <- toPRecord r
