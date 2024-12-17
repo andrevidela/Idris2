@@ -536,7 +536,7 @@ mutual
   toPDecl (IParameters fc ps ds)
       = do ds' <- traverse toPDecl ds
            pure (Just (PParameters fc
-                        (Right !(traverse (\(n, rig, info, tpe) =>
+                        (Right !(traverseList1 (\(n, rig, info, tpe) =>
                             do info' <- traverse (toPTerm startPrec) info
                                tpe' <- toPTerm startPrec tpe
                                pure (n, rig, info', tpe')) ps))
