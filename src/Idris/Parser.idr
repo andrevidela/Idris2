@@ -1884,9 +1884,9 @@ paramDecls fname indents = do
     oldParamDecls
         = parens fname $ sepBy1 (decoratedSymbol fname ",") plainBinder
 
-    newParamDecls : OriginDesc -> IndentInfo -> Rule (List (Name, RigCount, PiInfo PTerm, PTerm))
+    newParamDecls : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm, PTerm))
     newParamDecls fname indents
-        = forget <$> map join (some $ typedArg fname indents)
+        = map join (some $ typedArg fname indents)
 
 
 -- topLevelClaim is for claims appearing at the top-level of the file

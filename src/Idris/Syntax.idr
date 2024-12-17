@@ -525,7 +525,7 @@ mutual
                Maybe TotalReq -> PDataDecl' nm -> PDecl' nm
        PParameters : FC ->
                      Either (List1 PlainBinder)
-                            (List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm)) ->
+                            (List1 (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm)) ->
                      List (PDecl' nm) -> PDecl' nm
        PUsing : FC -> List (Maybe Name, PTerm' nm) ->
                 List (PDecl' nm) -> PDecl' nm
