@@ -75,6 +75,12 @@ parens fname p
             <*> p
             <* decoratedSymbol fname ")"
 
+curly : {b : _} -> OriginDesc -> BRule b a -> Rule a
+curly fname p
+  = pure id <* decoratedSymbol fname "{"
+            <*> p
+            <* decoratedSymbol fname "}"
+
 decoratedDataTypeName : OriginDesc -> Rule Name
 decoratedDataTypeName fname = decorate fname Typ dataTypeName
 
@@ -722,12 +728,10 @@ mutual
 
   autoImplicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   autoImplicitPi fname indents
-      = do b <- bounds $ do
-                  decoratedSymbol fname "{"
+      = do b <- bounds $ curly fname $ do
                   decoratedKeyword fname "auto"
                   commit
                   binders <- pibindList fname indents
-                  decoratedSymbol fname "}"
                   pure binders
            mustWorkBecause b.bounds "Cannot return an auto implicit argument"
              $ decoratedSymbol fname "->"
@@ -736,13 +740,11 @@ mutual
 
   defaultImplicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   defaultImplicitPi fname indents
-      = do b <- bounds $ do
-                  decoratedSymbol fname "{"
+      = do b <- bounds $ curly fname $ do
                   decoratedKeyword fname "default"
                   commit
                   t <- simpleExpr fname indents
                   binders <- pibindList fname indents
-                  decoratedSymbol fname "}"
                   pure (t, binders)
            mustWorkBecause b.bounds "Cannot return a default implicit argument"
              $ decoratedSymbol fname "->"
@@ -769,11 +771,7 @@ mutual
 
   implicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   implicitPi fname indents
-      = do b <- bounds $ do
-                  decoratedSymbol fname "{"
-                  binders <- pibindList fname indents
-                  decoratedSymbol fname "}"
-                  pure binders
+      = do b <- bounds $ curly fname $ pibindList fname indents
            mustWorkBecause b.bounds "Cannot return an implicit argument"
             $ decoratedSymbol fname "->"
            scope <- mustWork $ typeExpr pdef fname indents
@@ -907,7 +905,7 @@ mutual
                  ))
              <|>
                bounds (body False))
-           pure (PUpdate (boundToFC fname b) b.val)
+           pure (PUpdate (boundToFC fname b) (forget b.val))
     where
       oldSyntaxWarning : String
       oldSyntaxWarning = unlines
@@ -916,13 +914,10 @@ mutual
         , #"  and "{ f $= v } p" instead of "record { f $= v } p""#
         ]
 
-      body : Bool -> Rule (List PFieldUpdate)
-      body kw = do
-        decoratedSymbol fname "{"
+      body : Bool -> Rule (List1 PFieldUpdate)
+      body kw = curly fname $ do
         commit
-        fs <- sepBy1 (decoratedSymbol fname ",") (field kw fname indents)
-        decoratedSymbol fname "}"
-        pure $ forget fs
+        sepBy1 (decoratedSymbol fname ",") (field kw fname indents)
 
   field : Bool -> OriginDesc -> IndentInfo -> Rule PFieldUpdate
   field kw fname indents
