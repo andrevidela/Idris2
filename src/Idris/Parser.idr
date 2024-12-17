@@ -1865,7 +1865,9 @@ paramDecls fname indents = do
          startCol <- column
          b1 <- bounds (decoratedKeyword fname "parameters")
          commit
-         args <- bounds (newParamDecls fname indents <|> oldParamDecls fname indents)
+         args <- bounds (newParamDecls fname indents
+                     <|> withWarning "DEPRECATED: Use new parameter block syntax."
+                                     (oldParamDecls fname indents))
          commit
          declarations <- bounds $ nonEmptyBlockAfter startCol (topDecl fname)
          mergedBounds <- pure $ b1 `mergeBounds` (args `mergeBounds` declarations)
