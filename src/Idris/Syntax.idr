@@ -71,6 +71,19 @@ OpStr = OpStr' Name
 public export
 data HidingDirective = HideName Name
                      | HideFixity Fixity Name
+-------------------------------------------------------------------------------
+-- With Name functor to carry name information with a payload
+public export
+record WithName (ty : Type) where
+  constructor MkWithName
+  name : WithFC Name
+  val : ty
+
+export
+mapWName : (ty -> sy) -> WithName ty -> WithName sy
+mapWName f = {val $= f}
+
+-------------------------------------------------------------------------------
 
 mutual
 
@@ -95,6 +108,8 @@ mutual
 
        PRef : FC -> nm -> PTerm' nm
        NewPi : WithFC (PBinderScope' nm) -> PTerm' nm
+       Forall : WithFC (List1 (WithFC Name), PTerm' nm) -> PTerm' nm
+
        PPi : FC -> RigCount -> PiInfo (PTerm' nm) -> Maybe Name ->
              (argTy : PTerm' nm) -> (retTy : PTerm' nm) -> PTerm' nm
        PLam : FC -> RigCount -> PiInfo (PTerm' nm) -> (pat : PTerm' nm) ->
@@ -173,6 +188,7 @@ mutual
   getPTermLoc : PTerm' nm -> FC
   getPTermLoc (PRef fc _) = fc
   getPTermLoc (NewPi x) = x.fc
+  getPTermLoc (Forall x) = x.fc
   getPTermLoc (PPi fc _ _ _ _ _) = fc
   getPTermLoc (PLam fc _ _ _ _ _) = fc
   getPTermLoc (PLet fc _ _ _ _ _ _) = fc
@@ -257,6 +273,15 @@ mutual
        StrLiteral : FC -> String -> PStr' nm
        StrInterp : FC -> PTerm' nm -> PStr' nm
 
+  public export
+  PlainMultiBinder : Type
+  PlainMultiBinder = PlainMultiBinder' Name
+
+  ||| A plain binder without information about its use
+  ||| plainBinder := name ':' term
+  public export
+  PlainMultiBinder' : (nm : Type) -> Type
+  PlainMultiBinder' nm = List1 (WithName (PTerm' nm))
 
   public export
   PlainBinder : Type
@@ -265,10 +290,8 @@ mutual
   ||| A plain binder without information about its use
   ||| plainBinder := name ':' term
   public export
-  record PlainBinder' (nm : Type) where
-    constructor MkPlainBinder
-    name : WithFC Name
-    type : PTerm' nm
+  PlainBinder' : (nm : Type) -> Type
+  PlainBinder' nm  = WithName (PTerm' nm)
 
   public export
   BasicMultiBinder : Type
@@ -853,6 +876,8 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate (PSetFieldApp p v) = showSep "." p ++ " $= " ++ showPTerm v
 
   showPTermPrec d (PRef _ n) = showPrec d (toName n)
+  showPTermPrec d (Forall scope)
+        = ?showLater2
   showPTermPrec d (NewPi scope)
         = ?showLater
   showPTermPrec d (PPi _ rig Explicit Nothing arg ret)

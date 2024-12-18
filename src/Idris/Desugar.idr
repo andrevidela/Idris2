@@ -306,12 +306,26 @@ mutual
     case x == pur of -- implicitly add namespace to unqualified occurrences of `pure` in a qualified do-block
       False => pure $ IVar fc x
       True => pure $ IVar fc (maybe pur (`NS` pur) ns)
+
+  -- Desugaring forall n1, n2, n3 . s into
+  -- {0 n1 : ?} -> {0 n2 : ?} -> {0 n3 : ?} -> s
+  desugarB side ps (Forall (MkFCVal fc (names, scope)))
+        = desugarForallNames ps (forget names)
+      where
+        desugarForallNames : (ctx : List Name) ->
+                             (names : List (WithFC Name)) -> Core RawImp
+        desugarForallNames ctx [] = desugarB side ctx scope
+        desugarForallNames ctx (x :: xs)
+          = IPi x.fc erased Implicit (Just x.val)
+          <$> desugarB side ps (PInfer x.fc)
+          <*> desugarForallNames (x.val :: ctx) xs
+
   -- Desugaring (n1, n2, n3 : t) -> s into
   -- (n1 : t) -> (n2 : t) -> (n3 : t) -> s
   desugarB side ps
       (NewPi (MkFCVal fc
           (MkPBinderScope (MkPBinder info (MkBasicMultiBinder rig names type)) scope)))
-      = desugarMultiBinder ps (forget names)
+        = desugarMultiBinder ps (forget names)
       where
         desugarMultiBinder : (ctx : List Name) -> List (WithFC Name) -> Core RawImp
         desugarMultiBinder ctx []
@@ -1103,7 +1117,7 @@ mutual
                          (List1 PBinder) ->
                          Core (List1 (ImpParameter' Name))
         getArgs (Left params)
-          = traverseList1 (\(MkPlainBinder n ty) => do
+          = traverseList1 (\(MkWithName n ty) => do
               ty' <- desugar AnyExpr ps ty
               pure (n.val, top, Explicit, ty')) params
         getArgs (Right params)
