@@ -1190,24 +1190,25 @@ mutual
   desugarDecl ps (PRecord fc doc vis mbtot (MkPRecordLater tn params))
       = desugarDecl ps (PData fc doc vis mbtot (MkPLater fc tn (mkRecType params)))
     where
-      mkRecType : List (Name, RigCount, PiInfo PTerm, PTerm) -> PTerm
+      mkRecType : List PBinder -> PTerm
       mkRecType [] = PType fc
-      mkRecType ((n, c, p, t) :: ts) = PPi fc c p (Just n) t (mkRecType ts)
+      mkRecType (MkPBinder p (MkBasicBinder c n t) :: ts) = PPi fc c p (Just n.val) t (mkRecType ts)
   desugarDecl ps (PRecord fc doc vis mbtot (MkPRecord tn params opts conname_in fields))
       = do addDocString tn doc
-           params' <- traverse (\ (n,c,p,tm) =>
+           params' <- traverse (\ (MkPBinder info (MkBasicBinder rig name tm)) =>
                           do tm' <- desugar AnyExpr ps tm
-                             p'  <- mapDesugarPiInfo ps p
-                             pure (n, c, p', tm'))
+                             p'  <- mapDesugarPiInfo ps info
+                             pure (name.val, rig, p', tm'))
                         params
            let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) params'
            let fnames = concat $ map getfname fields
+           let paramNames = map (val . name . bind) params
            let _ = the (List Name) fnames
            -- Look for bindable names in the parameters
 
            let bnames = if !isUnboundImplicits
                         then concatMap (findBindableNames True
-                                         (ps ++ fnames ++ map fst params) [])
+                                         (ps ++ fnames ++ paramNames) [])
                                        (map (\(_,_,_,d) => d) params')
                         else []
            let _ = the (List (String, String)) bnames
@@ -1215,8 +1216,8 @@ mutual
            let paramsb = map (\ (n, c, p, tm) => (n, c, p, doBind bnames tm)) params'
            let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) paramsb
            let recName = nameRoot tn
-           fields' <- traverse (desugarField (ps ++ fnames ++
-                                              map fst params) (mkNamespace recName))
+           fields' <- traverse (desugarField (ps ++ fnames ++ paramNames
+                                             ) (mkNamespace recName))
                                fields
            let _ = the (List $ List IField) fields'
            let conname = maybe (mkConName tn) snd conname_in

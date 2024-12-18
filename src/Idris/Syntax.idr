@@ -296,6 +296,10 @@ mutual
     info : PiInfo (PTerm' nm)
     bind : BasicBinder' nm
 
+  public export
+  MkFullBinder : PiInfo (PTerm' nm) -> RigCount -> WithFC Name -> PTerm' nm -> PBinder' nm
+  MkFullBinder info rig x y = MkPBinder info (MkBasicBinder rig x y)
+
 
   export
   getLoc : PDo' nm -> FC
@@ -360,13 +364,13 @@ mutual
   public export
   data PRecordDecl' : Type -> Type where
        MkPRecord : (tyname : Name) ->
-                   (params : List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm)) ->
+                   (params : List (PBinder' nm)) ->
                    (opts : List DataOpt) ->
                    (conName : Maybe (String, Name)) ->
                    (decls : List (PField' nm)) ->
                    PRecordDecl' nm
        MkPRecordLater : (tyname : Name) ->
-                        (params : List (Name, RigCount, PiInfo (PTerm' nm), PTerm' nm)) ->
+                        (params : List (PBinder' nm)) ->
                         PRecordDecl' nm
 
   export
