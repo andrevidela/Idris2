@@ -704,15 +704,6 @@ mutual
       binderName = Basic <$> unqualifiedName
                <|> symbol "_" $> Underscore
 
-  PiBindList : Type
-  PiBindList = List1 BasicBinder
-
-  pibindList : OriginDesc -> IndentInfo ->
-               Rule (List1 BasicBinder)
-  pibindList fname indents
-    = pibindListName fname indents
-
-
   bindSymbol : OriginDesc -> Rule (PiInfo PTerm)
   bindSymbol fname
       = (decoratedSymbol fname "->" $> Explicit)
@@ -720,7 +711,7 @@ mutual
 
   explicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   explicitPi fname indents
-      = do b <- bounds $ parens fname $ pibindList fname indents
+      = do b <- bounds $ parens fname $ pibindListName fname indents
            exp <- mustWorkBecause b.bounds "Cannot return a named argument"
                     $ bindSymbol fname
            scope <- mustWork $ typeExpr pdef fname indents
@@ -731,7 +722,7 @@ mutual
       = do b <- bounds $ curly fname $ do
                   decoratedKeyword fname "auto"
                   commit
-                  binders <- pibindList fname indents
+                  binders <- pibindListName fname indents
                   pure binders
            mustWorkBecause b.bounds "Cannot return an auto implicit argument"
              $ decoratedSymbol fname "->"
@@ -744,7 +735,7 @@ mutual
                   decoratedKeyword fname "default"
                   commit
                   t <- simpleExpr fname indents
-                  binders <- pibindList fname indents
+                  binders <- pibindListName fname indents
                   pure (t, binders)
            mustWorkBecause b.bounds "Cannot return a default implicit argument"
              $ decoratedSymbol fname "->"
@@ -771,7 +762,7 @@ mutual
 
   implicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   implicitPi fname indents
-      = do b <- bounds $ curly fname $ pibindList fname indents
+      = do b <- bounds $ curly fname $ pibindListName fname indents
            mustWorkBecause b.bounds "Cannot return an implicit argument"
             $ decoratedSymbol fname "->"
            scope <- mustWork $ typeExpr pdef fname indents
