@@ -269,6 +269,19 @@ mutual
     type : PTerm' nm
 
   public export
+  BasicMultiBinder : Type
+  BasicMultiBinder = BasicMultiBinder' Name
+
+  ||| A binder with quantity information attached
+  ||| basicBinder := qty plainBinder
+  public export
+  record BasicMultiBinder' (nm : Type) where
+    constructor MkBasicMultiBinder
+    rig : RigCount
+    names : List1 (WithFC Name)
+    type : PTerm' nm
+
+  public export
   BasicBinder : Type
   BasicBinder = BasicBinder' Name
 
@@ -538,7 +551,7 @@ mutual
                     (constraints : List (Maybe Name, PTerm' nm)) ->
                     Name ->
                     (doc : String) ->
-                    (params : List (BasicBinder' nm)) ->
+                    (params : List (BasicMultiBinder' nm)) ->
                     (det : List Name) ->
                     (conName : Maybe (String, Name)) ->
                     List (PDecl' nm) ->
