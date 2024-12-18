@@ -178,6 +178,7 @@ mutual
   Pretty IdrisSyntax IPTerm where
     prettyPrec d (PRef _ nm) = annotateM (kindAnn nm) $ cast $ prettyOp False nm.rawName
     prettyPrec d (NewPi scopr) = ?later
+    prettyPrec d (Forall scopr) = ?later2
     prettyPrec d (PPi _ rig Explicit Nothing arg ret) =
       parenthesise (d > startPrec) $ group $
         branchVal

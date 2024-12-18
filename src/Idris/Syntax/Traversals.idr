@@ -19,6 +19,8 @@ mapPTermM f = goPTerm where
     goPTerm t@(PRef _ _) = f t
     goPTerm (NewPi x) =
       ?gonext -- NewPi fc <$> goPBinder args <*> goPTerm scope
+    goPTerm (Forall x) =
+      ?gonext2 -- NewPi fc <$> goPBinder args <*> goPTerm scope
     goPTerm (PPi fc x info z argTy retTy) =
       PPi fc x <$> goPiInfo info
                <*> pure z
@@ -429,9 +431,10 @@ mapPTerm f = goPTerm where
 
   mutual
 
-
     goPTerm : PTerm' nm -> PTerm' nm
     goPTerm t@(PRef _ _) = f t
+    goPTerm (Forall binderScope)
+      = ?dunno2
     goPTerm (NewPi binderScope)
       = ?dunno
     goPTerm (PPi fc x info z argTy retTy)
@@ -562,7 +565,7 @@ mapPTerm f = goPTerm where
     goPClaim (MkPClaim c v opts tdecl) = MkPClaim c v (goPFnOpt <$> opts) (mapFC goPTypeDecl tdecl)
 
     goPlainBinder : PlainBinder' nm -> PlainBinder' nm
-    goPlainBinder (MkPlainBinder name type) = MkPlainBinder name (goPTerm type)
+    goPlainBinder = mapWName goPTerm
 
     goPDecl : PDecl' nm -> PDecl' nm
     goPDecl (PClaim claim)
@@ -657,6 +660,7 @@ substFC : FC -> PTerm' nm -> PTerm' nm
 substFC fc = mapPTerm $ \case
   PRef _ x => PRef fc x
   NewPi x => NewPi (setFC fc x)
+  Forall x => Forall (setFC fc x)
   PPi _ x y z argTy retTy => PPi fc x y z argTy retTy
   PLam _ x y pat argTy scope => PLam fc x y pat argTy scope
   PLet _ x pat nTy nVal scope alts => PLet fc x pat nTy nVal scope alts

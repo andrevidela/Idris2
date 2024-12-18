@@ -90,6 +90,9 @@ decoratedDataConstructorName fname = decorate fname Data dataConstructorName
 decoratedSimpleBinderName : OriginDesc -> Rule String
 decoratedSimpleBinderName fname = decorate fname Bound unqualifiedName
 
+decoratedSimpleBinderUName : OriginDesc -> Rule Name
+decoratedSimpleBinderUName fname = UN . Basic <$> decorate fname Bound unqualifiedName
+
 decoratedSimpleNamedArg : OriginDesc -> Rule String
 decoratedSimpleNamedArg fname
   = decorate fname Bound unqualifiedName
@@ -668,14 +671,6 @@ mutual
           Nothing => pure top
           _ => fail "Invalid multiplicity (must be 0 or 1)"
 
-  pibindAll : OriginDesc -> PiInfo PTerm ->
-              List1 BasicBinder ->
-              PTerm -> PTerm
-  pibindAll fname pinfo (MkBasicBinder rig n ty ::: []) scope
-    = PPi n.fc rig pinfo (Just n.val) ty scope
-  pibindAll fname pinfo (MkBasicBinder rig n ty ::: x :: xs) y
-    = PPi n.fc rig pinfo (Just n.val) ty (pibindAll fname pinfo (x ::: xs) y)
-
   bindList : OriginDesc -> IndentInfo ->
              Rule (List (RigCount, WithBounds PTerm, PTerm))
   bindList fname indents
@@ -748,20 +743,18 @@ mutual
 
   forall_ : OriginDesc -> IndentInfo -> Rule PTerm
   forall_ fname indents
-      = do b <- bounds $ do
+      = Forall <$> fcBounds (do
+           b <- bounds $ do
                   decoratedKeyword fname "forall"
                   commit
                   ns <- sepBy1 (decoratedSymbol fname ",")
-                               (fcBounds (decoratedSimpleBinderName fname))
-                  pure $ map (\n => MkBasicBinder (erased {a=RigCount})
-                                                  (mapFC (UN . Basic) n)
-                                                  (PImplicit n.fc)
-                             ) ns
+                               (fcBounds (decoratedSimpleBinderUName fname))
+                  pure ns
            b' <- bounds peek
            mustWorkBecause b'.bounds "Expected ',' or '.'"
              $ decoratedSymbol fname "."
            scope <- mustWork $ typeExpr pdef fname indents
-           pure (pibindAll fname Implicit b.val scope)
+           pure (b.val, scope))
 
   implicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   implicitPi fname indents
@@ -1190,16 +1183,16 @@ exportVisibility fname
   <|> pure defaulted
 
 plainBinder : (fname : OriginDesc) => (indents : IndentInfo) => Rule PlainBinder
-plainBinder = do name <- fcBounds (UN . Basic <$> decoratedSimpleBinderName fname)
+plainBinder = do name <- fcBounds (decoratedSimpleBinderUName fname)
                  decoratedSymbol fname ":"
                  ty <- typeExpr pdef fname indents
-                 pure $ MkPlainBinder name ty
+                 pure $ MkWithName name ty
 
 basicMultiBinder : (fname : OriginDesc) => (indents : IndentInfo) => Rule BasicMultiBinder
 basicMultiBinder
   = do rig <- multiplicity fname
        names <- sepBy1 (decoratedSymbol fname ",")
-                     $ fcBounds (UN . Basic <$> decoratedSimpleBinderName fname)
+                     $ fcBounds (decoratedSimpleBinderUName fname)
        decoratedSymbol fname ":"
        ty <- typeExpr pdef fname indents
        pure $ MkBasicMultiBinder rig names ty
@@ -1836,7 +1829,7 @@ typedArg
 recordParam : OriginDesc -> IndentInfo -> Rule (PBinder)
 recordParam fname indents
     = typedArg
-  <|> do n <- fcBounds (UN . Basic <$> decoratedSimpleBinderName fname)
+  <|> do n <- fcBounds (decoratedSimpleBinderUName fname)
          pure (MkFullBinder Explicit top n $ PInfer n.fc)
 
 -- A record without a where is a forward declaration
