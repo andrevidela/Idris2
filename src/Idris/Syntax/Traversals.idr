@@ -262,6 +262,8 @@ mapPTermM f = goPTerm where
 
     goBasicBinder : BasicBinder' nm -> Core (BasicBinder' nm)
 
+    goBasicMultiBinder : BasicMultiBinder' nm -> Core (BasicMultiBinder' nm)
+
     goPBinder : PBinder' nm -> Core (PBinder' nm)
 
     -- goParamArgs :
@@ -282,7 +284,7 @@ mapPTermM f = goPTerm where
       PInterface fc v <$> goPairedPTerms mnts
                       <*> pure n
                       <*> pure doc
-                      <*> traverse goBasicBinder nrts
+                      <*> traverse goBasicMultiBinder nrts
                       <*> pure ns
                       <*> pure mn
                       <*> goPDecls ps
@@ -568,7 +570,7 @@ mapPTerm f = goPTerm where
     goPDecl (PUsing fc mnts ps)
       = PUsing fc (goPairedPTerms mnts) (goPDecl <$> ps)
     goPDecl (PInterface fc v mnts n doc nrts ns mn ps)
-      = PInterface fc v (goPairedPTerms mnts) n doc (goBasicBinder <$> nrts) ns mn (goPDecl <$> ps)
+      = PInterface fc v (goPairedPTerms mnts) n doc (goBasicMultiBinder <$> nrts) ns mn (goPDecl <$> ps)
     goPDecl (PImplementation fc v opts p is cs n ts mn ns mps)
       = PImplementation fc v opts p (goImplicits is) (goPairedPTerms cs)
            n (goPTerm <$> ts) mn ns (map (goPDecl <$>) mps)
@@ -588,6 +590,8 @@ mapPTerm f = goPTerm where
 
     goPBinder : PBinder' nm -> PBinder' nm
     goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (goBasicBinder bind)
+
+    goBasicMultiBinder : BasicMultiBinder' nm -> BasicMultiBinder' nm
 
     goBasicBinder : BasicBinder' nm -> BasicBinder' nm
     goBasicBinder (MkBasicBinder rig name type)

@@ -671,7 +671,8 @@ mutual
   pibindAll : OriginDesc -> PiInfo PTerm ->
               List1 BasicBinder ->
               PTerm -> PTerm
-  pibindAll fname pinfo (MkBasicBinder rig n ty ::: []) scope = PPi n.fc rig pinfo (Just n.val) ty scope
+  pibindAll fname pinfo (MkBasicBinder rig n ty ::: []) scope
+    = PPi n.fc rig pinfo (Just n.val) ty scope
   pibindAll fname pinfo (MkBasicBinder rig n ty ::: x :: xs) y
     = PPi n.fc rig pinfo (Just n.val) ty (pibindAll fname pinfo (x ::: xs) y)
 
@@ -759,8 +760,8 @@ mutual
                   ns <- sepBy1 (decoratedSymbol fname ",")
                                (fcBounds (decoratedSimpleBinderName fname))
                   pure $ map (\n => MkBasicBinder (erased {a=RigCount})
-                                              (mapFC (UN . Basic) n)
-                                              (PImplicit n.fc)
+                                                  (mapFC (UN . Basic) n)
+                                                  (PImplicit n.fc)
                              ) ns
            b' <- bounds peek
            mustWorkBecause b'.bounds "Expected ',' or '.'"
@@ -1197,6 +1198,15 @@ plainBinder = do name <- fcBounds (UN . Basic <$> decoratedSimpleBinderName fnam
                  decoratedSymbol fname ":"
                  ty <- typeExpr pdef fname indents
                  pure $ MkPlainBinder name ty
+
+basicMultiBinder : (fname : OriginDesc) => (indents : IndentInfo) => Rule BasicMultiBinder
+basicMultiBinder
+  = do rig <- multiplicity fname
+       names <- sepBy1 (decoratedSymbol fname ",")
+                     $ fcBounds (UN . Basic <$> decoratedSimpleBinderName fname)
+       decoratedSymbol fname ":"
+       ty <- typeExpr pdef fname indents
+       pure $ MkBasicMultiBinder rig names ty
 
 tyDecls : Rule Name -> String -> OriginDesc -> IndentInfo -> Rule PTypeDecl
 tyDecls declName predoc fname indents
@@ -1719,17 +1729,11 @@ implBinds fname indents namedImpl = concatMap (map adjust) <$> go where
           pure (ns :: more)
     <|> pure []
 
-ifaceParam : OriginDesc -> IndentInfo -> Rule (List (WithFC Name), (RigCount, PTerm))
+ifaceParam : OriginDesc -> IndentInfo -> Rule BasicMultiBinder
 ifaceParam fname indents
-    = do decoratedSymbol fname "("
-         rig <- multiplicity fname
-         ns <- sepBy1 (decoratedSymbol fname ",") (fcBounds $ decorate fname Bound name)
-         decoratedSymbol fname ":"
-         tm <- typeExpr pdef fname indents
-         decoratedSymbol fname ")"
-         pure (forget ns, (rig, tm))
+    = parens fname basicMultiBinder
   <|> do n <- fcBounds (decorate fname Bound name)
-         pure ([n], (erased, PInfer n.fc))
+         pure (MkBasicMultiBinder erased (singleton n) (PInfer n.fc))
 
 ifaceDecl : OriginDesc -> IndentInfo -> Rule PDecl
 ifaceDecl fname indents
@@ -1740,8 +1744,7 @@ ifaceDecl fname indents
                          commit
                          cons   <- constraints fname indents
                          n      <- decorate fname Typ name
-                         paramss <- many (ifaceParam fname indents)
-                         let params = concatMap (\ (ns, rig, type) => map (\ n => MkBasicBinder rig n type) ns) paramss
+                         params <- many (ifaceParam fname indents)
                          det    <- option [] $ decoratedSymbol fname "|" *> sepBy (decoratedSymbol fname ",") (decorate fname Bound name)
                          decoratedKeyword fname "where"
                          dc <- optional (recordConstructor fname)
