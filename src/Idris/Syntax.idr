@@ -528,7 +528,7 @@ mutual
        PData : FC -> (doc : String) -> WithDefault Visibility Private ->
                Maybe TotalReq -> PDataDecl' nm -> PDecl' nm
        PParameters : FC ->
-                     Either (List1 PlainBinder)
+                     Either (List1 (PlainBinder' nm))
                             (List1 (PBinder' nm)) ->
                      List (PDecl' nm) -> PDecl' nm
        PUsing : FC -> List (Maybe Name, PTerm' nm) ->
@@ -538,7 +538,7 @@ mutual
                     (constraints : List (Maybe Name, PTerm' nm)) ->
                     Name ->
                     (doc : String) ->
-                    (params : List (Name, (RigCount, PTerm' nm))) ->
+                    (params : List (BasicBinder' nm)) ->
                     (det : List Name) ->
                     (conName : Maybe (String, Name)) ->
                     List (PDecl' nm) ->
