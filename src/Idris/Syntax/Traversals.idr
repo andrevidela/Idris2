@@ -17,6 +17,8 @@ mapPTermM f = goPTerm where
 
     goPTerm : PTerm' nm -> Core (PTerm' nm)
     goPTerm t@(PRef _ _) = f t
+    goPTerm (NewPi x) =
+      ?gonext -- NewPi fc <$> goPBinder args <*> goPTerm scope
     goPTerm (PPi fc x info z argTy retTy) =
       PPi fc x <$> goPiInfo info
                <*> pure z
@@ -430,6 +432,8 @@ mapPTerm f = goPTerm where
 
     goPTerm : PTerm' nm -> PTerm' nm
     goPTerm t@(PRef _ _) = f t
+    goPTerm (NewPi binderScope)
+      = ?dunno
     goPTerm (PPi fc x info z argTy retTy)
       = f $ PPi fc x (goPiInfo info) z (goPTerm argTy) (goPTerm retTy)
     goPTerm (PLam fc x info z argTy scope)
@@ -589,7 +593,7 @@ mapPTerm f = goPTerm where
     goPDecl p@(PBuiltin _ _ _) = p
 
     goPBinder : PBinder' nm -> PBinder' nm
-    goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (goBasicBinder bind)
+    goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (goBasicMultiBinder bind)
 
     goBasicMultiBinder : BasicMultiBinder' nm -> BasicMultiBinder' nm
 
@@ -652,6 +656,7 @@ export
 substFC : FC -> PTerm' nm -> PTerm' nm
 substFC fc = mapPTerm $ \case
   PRef _ x => PRef fc x
+  NewPi x => NewPi (setFC fc x)
   PPi _ x y z argTy retTy => PPi fc x y z argTy retTy
   PLam _ x y pat argTy scope => PLam fc x y pat argTy scope
   PLet _ x pat nTy nVal scope alts => PLet fc x pat nTy nVal scope alts

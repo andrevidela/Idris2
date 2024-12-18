@@ -1,6 +1,7 @@
 module Idris.Desugar.Mutual
 
 import Idris.Syntax
+import Data.List1
 
 %default total
 
@@ -28,7 +29,11 @@ getDecl AsType (PRecord fc doc vis mbtot (MkPRecord n ps _ _ _))
   where
     mkRecType : List PBinder -> PTerm
     mkRecType [] = PType fc
-    mkRecType (MkPBinder p (MkBasicBinder c n t) :: ts) = PPi fc c p (Just n.val) t (mkRecType ts)
+    mkRecType (MkPBinder p (MkBasicMultiBinder c (n ::: []) t) :: ts)
+      = PPi fc c p (Just n.val) t (mkRecType ts)
+    mkRecType (MkPBinder p (MkBasicMultiBinder c (n ::: x :: xs) t) :: ts)
+      = PPi fc c p (Just n.val) t
+          (assert_total $ mkRecType (MkPBinder p (MkBasicMultiBinder c (x ::: xs) t) :: ts))
 getDecl AsType d@(PFixity _ ) = Just d
 getDecl AsType d@(PDirective _) = Just d
 getDecl AsType d = Nothing
