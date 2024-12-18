@@ -545,7 +545,14 @@ mutual
                 (catMaybes ds')))
   toPDecl (IRecord fc _ vis mbtot r)
       = do (n, ps, opts, con, fs) <- toPRecord r
-           pure (Just (PRecord fc "" vis mbtot (MkPRecord n ps opts con fs)))
+           pure (Just (PRecord fc "" vis mbtot (MkPRecord n (map ?bbuh ps) opts con fs)))
+           where
+             toBinder : (Name, ZeroOneOmega, PiInfo (PTerm' KindedName), PTerm' KindedName) -> PBinder' KindedName
+             toBinder (n, rig, info, ty)
+               = MkFullBinder info rig (NoFC n) ty
+                              --        ^^^^
+                              -- we should know this location
+
   toPDecl (IFail fc msg ds)
       = do ds' <- traverse toPDecl ds
            pure (Just (PFail fc msg (catMaybes ds')))

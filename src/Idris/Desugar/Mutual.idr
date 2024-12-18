@@ -26,9 +26,9 @@ getDecl AsType d@(PInterface _ _ _ _ _ _ _ _ _) = Just d
 getDecl AsType (PRecord fc doc vis mbtot (MkPRecord n ps _ _ _))
     = Just (PData fc doc vis mbtot (MkPLater fc n (mkRecType ps)))
   where
-    mkRecType : List (Name, RigCount, PiInfo PTerm, PTerm) -> PTerm
+    mkRecType : List PBinder -> PTerm
     mkRecType [] = PType fc
-    mkRecType ((n, c, p, t) :: ts) = PPi fc c p (Just n) t (mkRecType ts)
+    mkRecType (MkPBinder p (MkBasicBinder c n t) :: ts) = PPi fc c p (Just n.val) t (mkRecType ts)
 getDecl AsType d@(PFixity _ ) = Just d
 getDecl AsType d@(PDirective _) = Just d
 getDecl AsType d = Nothing

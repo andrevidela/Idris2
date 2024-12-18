@@ -1816,6 +1816,7 @@ fieldDecl fname indents
                     pure (MkRecordField doc rig p (forget ns) ty))
              pure b.withFC
 
+-- A Single binder with multiple names
 typedArg' : OriginDesc -> IndentInfo -> Rule (List1 PBinder)
 typedArg' fname indents
     = do params <- parens fname $ pibindListName fname indents
@@ -1845,11 +1846,11 @@ typedArg fname indents
          decoratedSymbol fname "}"
          pure $ map (\(MkBasicBinder c n tm) => (n.val, c, info, tm)) params
 
-recordParam : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm,  PTerm))
+recordParam : OriginDesc -> IndentInfo -> Rule (List1 PBinder)
 recordParam fname indents
-    = typedArg fname indents
-  <|> do n <- bounds (UN . Basic <$> decoratedSimpleBinderName fname)
-         pure (singleton (n.val, top, Explicit, PInfer (boundToFC fname n)))
+    = typedArg' fname indents
+  <|> do n <- fcBounds (UN . Basic <$> decoratedSimpleBinderName fname)
+         pure (singleton (MkFullBinder Explicit top n $ PInfer n.fc))
 
 -- A record without a where is a forward declaration
 recordBody : OriginDesc -> IndentInfo ->
@@ -1857,7 +1858,7 @@ recordBody : OriginDesc -> IndentInfo ->
              Maybe TotalReq ->
              Int ->
              Name ->
-             List (Name, RigCount, PiInfo PTerm, PTerm) ->
+             List PBinder ->
              EmptyRule (FC -> PDecl)
 recordBody fname indents doc vis mbtot col n params
     = do atEndIndent indents

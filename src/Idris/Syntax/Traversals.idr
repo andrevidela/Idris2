@@ -288,12 +288,12 @@ mapPTermM f = goPTerm where
                                   <*> pure ns
                                   <*> goMPDecls mps
     goPDecl (PRecord fc doc v tot (MkPRecord n nts opts mn fs)) =
-      pure $ PRecord fc doc v tot !(MkPRecord n <$> go4TupledPTerms nts
+      pure $ PRecord fc doc v tot !(MkPRecord n <$> ?lool --go4TupledPTerms nts
                                                 <*> pure opts
                                                 <*> pure mn
                                                 <*> goPFields fs)
     goPDecl (PRecord fc doc v tot (MkPRecordLater n nts)) =
-      pure $ PRecord fc doc v tot (MkPRecordLater n !(go4TupledPTerms nts))
+      pure $ PRecord fc doc v tot (MkPRecordLater n (?goBinder))
     goPDecl (PFail fc msg ps) = PFail fc msg <$> goPDecls ps
     goPDecl (PMutual ps) = PMutual <$> traverseFC goPDecls ps
     goPDecl (PFixity p) = pure (PFixity p)
@@ -564,9 +564,9 @@ mapPTerm f = goPTerm where
            n (goPTerm <$> ts) mn ns (map (goPDecl <$>) mps)
     goPDecl (PRecord fc doc v tot (MkPRecord n nts opts mn fs))
       = PRecord fc doc v tot
-          (MkPRecord n (go4TupledPTerms nts) opts mn (map (mapFC goRecordField) fs))
+          (MkPRecord n (?goagain nts) opts mn (map (mapFC goRecordField) fs))
     goPDecl (PRecord fc doc v tot (MkPRecordLater n nts))
-      = PRecord fc doc v tot (MkPRecordLater n (go4TupledPTerms nts))
+      = PRecord fc doc v tot (MkPRecordLater n (?travBinder ))
     goPDecl (PFail fc msg ps) = PFail fc msg $ goPDecl <$> ps
     goPDecl (PMutual ps) = PMutual $ mapFC (map goPDecl) ps
     goPDecl (PFixity p) = PFixity p
