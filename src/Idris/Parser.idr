@@ -1719,17 +1719,17 @@ implBinds fname indents namedImpl = concatMap (map adjust) <$> go where
           pure (ns :: more)
     <|> pure []
 
-ifaceParam : OriginDesc -> IndentInfo -> Rule (List Name, (RigCount, PTerm))
+ifaceParam : OriginDesc -> IndentInfo -> Rule (List (WithFC Name), (RigCount, PTerm))
 ifaceParam fname indents
     = do decoratedSymbol fname "("
          rig <- multiplicity fname
-         ns <- sepBy1 (decoratedSymbol fname ",") (decorate fname Bound name)
+         ns <- sepBy1 (decoratedSymbol fname ",") (fcBounds $ decorate fname Bound name)
          decoratedSymbol fname ":"
          tm <- typeExpr pdef fname indents
          decoratedSymbol fname ")"
          pure (forget ns, (rig, tm))
-  <|> do n <- bounds (decorate fname Bound name)
-         pure ([n.val], (erased, PInfer (boundToFC fname n)))
+  <|> do n <- fcBounds (decorate fname Bound name)
+         pure ([n], (erased, PInfer n.fc))
 
 ifaceDecl : OriginDesc -> IndentInfo -> Rule PDecl
 ifaceDecl fname indents
@@ -1741,7 +1741,7 @@ ifaceDecl fname indents
                          cons   <- constraints fname indents
                          n      <- decorate fname Typ name
                          paramss <- many (ifaceParam fname indents)
-                         let params = concatMap (\ (ns, rt) => map (\ n => (n, rt)) ns) paramss
+                         let params = concatMap (\ (ns, rig, type) => map (\ n => MkBasicBinder rig n type) ns) paramss
                          det    <- option [] $ decoratedSymbol fname "|" *> sepBy (decoratedSymbol fname ",") (decorate fname Bound name)
                          decoratedKeyword fname "where"
                          dc <- optional (recordConstructor fname)
@@ -1817,8 +1817,8 @@ fieldDecl fname indents
              pure b.withFC
 
 -- A Single binder with multiple names
-typedArg' : OriginDesc -> IndentInfo -> Rule (List1 PBinder)
-typedArg' fname indents
+typedArg : (fname : OriginDesc) => (indents : IndentInfo) => Rule (List1 PBinder)
+typedArg
     = do params <- parens fname $ pibindListName fname indents
          pure $ map (MkPBinder Explicit) params
   <|> do decoratedSymbol fname "{"
@@ -1831,24 +1831,9 @@ typedArg' fname indents
          decoratedSymbol fname "}"
          pure $ map (MkPBinder info) params
 
--- Kept for compatibility reasons, to remove later
-typedArg : OriginDesc -> IndentInfo -> Rule (List1 (Name, RigCount, PiInfo PTerm, PTerm))
-typedArg fname indents
-    = do params <- parens fname $ pibindListName fname indents
-         pure $ map (\(MkBasicBinder c n tm) => (n.val, c, Explicit, tm)) params
-  <|> do decoratedSymbol fname "{"
-         commit
-         info <-
-                 (pure  AutoImplicit <* decoratedKeyword fname "auto"
-              <|> (decoratedKeyword fname "default" *> DefImplicit <$> simpleExpr fname indents)
-              <|> pure      Implicit)
-         params <- pibindListName fname indents
-         decoratedSymbol fname "}"
-         pure $ map (\(MkBasicBinder c n tm) => (n.val, c, info, tm)) params
-
 recordParam : OriginDesc -> IndentInfo -> Rule (List1 PBinder)
 recordParam fname indents
-    = typedArg' fname indents
+    = typedArg
   <|> do n <- fcBounds (UN . Basic <$> decoratedSimpleBinderName fname)
          pure (singleton (MkFullBinder Explicit top n $ PInfer n.fc))
 
@@ -1888,7 +1873,7 @@ paramDecls fname indents = do
          startCol <- column
          b1 <- bounds (decoratedKeyword fname "parameters")
          commit
-         args <- bounds (Right <$> newParamDecls fname indents <|> Left <$> oldParamDecls)
+         args <- bounds (Right <$> newParamDecls <|> Left <$> oldParamDecls)
          commit
          declarations <- bounds $ nonEmptyBlockAfter startCol (topDecl fname)
          mergedBounds <- pure $ b1 `mergeBounds` (args `mergeBounds` declarations)
@@ -1900,9 +1885,9 @@ paramDecls fname indents = do
     oldParamDecls
         = parens fname $ sepBy1 (decoratedSymbol fname ",") plainBinder
 
-    newParamDecls : OriginDesc -> IndentInfo -> Rule (List1 PBinder)
-    newParamDecls fname indents
-        = map join (some $ typedArg' fname indents)
+    newParamDecls : Rule (List1 PBinder)
+    newParamDecls
+        = map join (some typedArg)
 
 
 -- topLevelClaim is for claims appearing at the top-level of the file

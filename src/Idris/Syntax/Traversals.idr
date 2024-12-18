@@ -258,6 +258,12 @@ mapPTermM f = goPTerm where
       MkPClaim c v <$> goPFnOpts opts
                    <*> traverseFC goPTypeDecl tdecl
 
+    goPlainBinder : PlainBinder' nm -> Core (PlainBinder' nm)
+
+    goBasicBinder : BasicBinder' nm -> Core (BasicBinder' nm)
+
+    goPBinder : PBinder' nm -> Core (PBinder' nm)
+
     -- goParamArgs :
 
     goPDecl : PDecl' nm -> Core (PDecl' nm)
@@ -266,7 +272,8 @@ mapPTermM f = goPTerm where
     goPDecl (PDef cls) = PDef <$> traverseFC goPClauses cls
     goPDecl (PData fc doc v mbt d) = PData fc doc v mbt <$> goPDataDecl d
     goPDecl (PParameters fc nts ps) =
-      PParameters fc <$> ?thing -- go4TupledPTerms nts
+      PParameters fc <$> either (\x => Left <$> traverseList1 goPlainBinder x)
+                                (\x => Right <$> traverseList1 goPBinder x) nts -- go4TupledPTerms nts
                      <*> goPDecls ps
     goPDecl (PUsing fc mnts ps) =
       PUsing fc <$> goPairedPTerms mnts
@@ -275,7 +282,7 @@ mapPTermM f = goPTerm where
       PInterface fc v <$> goPairedPTerms mnts
                       <*> pure n
                       <*> pure doc
-                      <*> go3TupledPTerms nrts
+                      <*> traverse goBasicBinder nrts
                       <*> pure ns
                       <*> pure mn
                       <*> goPDecls ps
@@ -288,12 +295,12 @@ mapPTermM f = goPTerm where
                                   <*> pure ns
                                   <*> goMPDecls mps
     goPDecl (PRecord fc doc v tot (MkPRecord n nts opts mn fs)) =
-      pure $ PRecord fc doc v tot !(MkPRecord n <$> ?lool --go4TupledPTerms nts
+      pure $ PRecord fc doc v tot !(MkPRecord n <$> traverse goPBinder nts
                                                 <*> pure opts
                                                 <*> pure mn
                                                 <*> goPFields fs)
     goPDecl (PRecord fc doc v tot (MkPRecordLater n nts)) =
-      pure $ PRecord fc doc v tot (MkPRecordLater n (?goBinder))
+      pure $ PRecord fc doc v tot (MkPRecordLater n !(traverse goPBinder nts))
     goPDecl (PFail fc msg ps) = PFail fc msg <$> goPDecls ps
     goPDecl (PMutual ps) = PMutual <$> traverseFC goPDecls ps
     goPDecl (PFixity p) = pure (PFixity p)
@@ -548,25 +555,28 @@ mapPTerm f = goPTerm where
     goPClaim : PClaimData' nm -> PClaimData' nm
     goPClaim (MkPClaim c v opts tdecl) = MkPClaim c v (goPFnOpt <$> opts) (mapFC goPTypeDecl tdecl)
 
+    goPlainBinder : PlainBinder' nm -> PlainBinder' nm
+    goPlainBinder (MkPlainBinder name type) = MkPlainBinder name (goPTerm type)
+
     goPDecl : PDecl' nm -> PDecl' nm
     goPDecl (PClaim claim)
       = PClaim $ mapFC goPClaim claim
     goPDecl (PDef cls) = PDef $ mapFC (map goPClause) cls
     goPDecl (PData fc doc v mbt d) = PData fc doc v mbt $ goPDataDecl d
     goPDecl (PParameters fc nts ps)
-      = PParameters fc (?parmaARgs) (goPDecl <$> ps)
+      = PParameters fc (bimap (map goPlainBinder) (map goPBinder) nts) (goPDecl <$> ps)
     goPDecl (PUsing fc mnts ps)
       = PUsing fc (goPairedPTerms mnts) (goPDecl <$> ps)
     goPDecl (PInterface fc v mnts n doc nrts ns mn ps)
-      = PInterface fc v (goPairedPTerms mnts) n doc (go3TupledPTerms nrts) ns mn (goPDecl <$> ps)
+      = PInterface fc v (goPairedPTerms mnts) n doc (goBasicBinder <$> nrts) ns mn (goPDecl <$> ps)
     goPDecl (PImplementation fc v opts p is cs n ts mn ns mps)
       = PImplementation fc v opts p (goImplicits is) (goPairedPTerms cs)
            n (goPTerm <$> ts) mn ns (map (goPDecl <$>) mps)
     goPDecl (PRecord fc doc v tot (MkPRecord n nts opts mn fs))
       = PRecord fc doc v tot
-          (MkPRecord n (?goagain nts) opts mn (map (mapFC goRecordField) fs))
+          (MkPRecord n (map goPBinder nts) opts mn (map (mapFC goRecordField) fs))
     goPDecl (PRecord fc doc v tot (MkPRecordLater n nts))
-      = PRecord fc doc v tot (MkPRecordLater n (?travBinder ))
+      = PRecord fc doc v tot (MkPRecordLater n (goPBinder <$> nts ))
     goPDecl (PFail fc msg ps) = PFail fc msg $ goPDecl <$> ps
     goPDecl (PMutual ps) = PMutual $ mapFC (map goPDecl) ps
     goPDecl (PFixity p) = PFixity p
@@ -576,6 +586,12 @@ mapPTerm f = goPTerm where
     goPDecl (PDirective d) = PDirective d
     goPDecl p@(PBuiltin _ _ _) = p
 
+    goPBinder : PBinder' nm -> PBinder' nm
+    goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (goBasicBinder bind)
+
+    goBasicBinder : BasicBinder' nm -> BasicBinder' nm
+    goBasicBinder (MkBasicBinder rig name type)
+      = MkBasicBinder rig name (goPTerm type)
 
     goPTypeDecl : PTypeDeclData' nm -> PTypeDeclData' nm
     goPTypeDecl (MkPTy n d t) = MkPTy n d $ goPTerm t

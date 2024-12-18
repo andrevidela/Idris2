@@ -1106,13 +1106,13 @@ mutual
            pure (concat uds')
   desugarDecl ps (PInterface fc vis cons_in tn doc params det conname body)
       = do addDocString tn doc
-           let paramNames = map fst params
+           let paramNames = map (val . name) params
 
            let cons = concatMap expandConstraint cons_in
            cons' <- traverse (\ ntm => do tm' <- desugar AnyExpr (ps ++ paramNames)
                                                          (snd ntm)
                                           pure (fst ntm, tm')) cons
-           params' <- traverse (\ (nm, (rig, tm)) =>
+           params' <- traverse (\ (MkBasicBinder rig nm tm) =>
                          do tm' <- desugar AnyExpr ps tm
                             pure (nm, (rig, tm')))
                       params
@@ -1125,7 +1125,7 @@ mutual
 
            let paramsb = map (\ (nm, (rig, tm)) =>
                                  let tm' = doBind bnames tm in
-                                 (nm, (rig, tm')))
+                                 (nm.val, (rig, tm')))
                          params'
            let consb = map (\ (nm, tm) => (nm, doBind bnames tm)) cons'
 
