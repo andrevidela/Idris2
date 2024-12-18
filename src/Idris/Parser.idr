@@ -688,20 +688,19 @@ mutual
                               pure (rig, pat, ty))
 
   pibindListName : OriginDesc -> IndentInfo ->
-                   Rule (List1 BasicBinder)
+                   Rule BasicMultiBinder
   pibindListName fname indents
        = do rig <- multiplicity fname
             ns <- sepBy1 (decoratedSymbol fname ",")
-                         (bounds $ UN <$> binderName)
-            decorateBoundedNames fname Bound (forget ns)
+                         (fcBounds $ UN <$> binderName)
             decoratedSymbol fname ":"
             ty <- typeExpr pdef fname indents
             atEnd indents
-            pure (map (\n => MkBasicBinder rig n.withFC ty) ns)
+            pure (MkBasicMultiBinder rig ns ty)
     where
       -- _ gets treated specially here, it means "I don't care about the name"
       binderName : Rule UserName
-      binderName = Basic <$> unqualifiedName
+      binderName = Basic <$> decoratedSimpleBinderName fname
                <|> symbol "_" $> Underscore
 
   bindSymbol : OriginDesc -> Rule (PiInfo PTerm)
@@ -711,15 +710,17 @@ mutual
 
   explicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   explicitPi fname indents
-      = do b <- bounds $ parens fname $ pibindListName fname indents
+      = NewPi <$> fcBounds (do
+           b <- bounds $ parens fname $ pibindListName fname indents
            exp <- mustWorkBecause b.bounds "Cannot return a named argument"
                     $ bindSymbol fname
            scope <- mustWork $ typeExpr pdef fname indents
-           pure (pibindAll fname exp b.val scope)
+           pure (MkPBinderScope (MkPBinder exp b.val) scope))
 
   autoImplicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   autoImplicitPi fname indents
-      = do b <- bounds $ curly fname $ do
+      = NewPi <$> fcBounds (do
+           b <- bounds $ curly fname $ do
                   decoratedKeyword fname "auto"
                   commit
                   binders <- pibindListName fname indents
@@ -727,21 +728,23 @@ mutual
            mustWorkBecause b.bounds "Cannot return an auto implicit argument"
              $ decoratedSymbol fname "->"
            scope <- mustWork $ typeExpr pdef fname indents
-           pure (pibindAll fname AutoImplicit b.val scope)
+           pure (MkPBinderScope (MkPBinder AutoImplicit b.val) scope)
+           )
 
   defaultImplicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   defaultImplicitPi fname indents
-      = do b <- bounds $ curly fname $ do
+      = NewPi <$> fcBounds (do
+           b <- bounds $ curly fname $ do
                   decoratedKeyword fname "default"
                   commit
                   t <- simpleExpr fname indents
                   binders <- pibindListName fname indents
-                  pure (t, binders)
+                  pure (MkPBinder (DefImplicit t) binders)
            mustWorkBecause b.bounds "Cannot return a default implicit argument"
              $ decoratedSymbol fname "->"
            scope <- mustWork $ typeExpr pdef fname indents
-           pure $ let (t, binders) = b.val in
-                  pibindAll fname (DefImplicit t) binders scope
+           pure (MkPBinderScope b.val scope)
+           )
 
   forall_ : OriginDesc -> IndentInfo -> Rule PTerm
   forall_ fname indents
@@ -762,11 +765,13 @@ mutual
 
   implicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   implicitPi fname indents
-      = do b <- bounds $ curly fname $ pibindListName fname indents
+      = NewPi <$> fcBounds (do
+           b <- bounds $ curly fname $ pibindListName fname indents
            mustWorkBecause b.bounds "Cannot return an implicit argument"
             $ decoratedSymbol fname "->"
            scope <- mustWork $ typeExpr pdef fname indents
-           pure (pibindAll fname Implicit b.val scope)
+           pure (MkPBinderScope (MkPBinder Implicit b.val) scope)
+           )
 
   lam : OriginDesc -> IndentInfo -> Rule PTerm
   lam fname indents
@@ -1713,7 +1718,10 @@ implBinds fname indents namedImpl = concatMap (map adjust) <$> go where
           piInfo <- bounds $ option Implicit $ defImplicitField fname indents
           when (not namedImpl && isDefaultImplicit piInfo.val) $
             fatalLoc piInfo.bounds "Default implicits are allowed only for named implementations"
-          ns <- map @{Compose} (\(MkBasicBinder rc wb n) => (rc, wb, piInfo.val, n)) $ forget <$> pibindListName fname indents
+          ns <- map
+                    (\case (MkBasicMultiBinder rig names type) => map (\nm => (rig, nm, piInfo.val, type)) (forget names))
+                    (pibindListName fname indents)
+          let ns = the (List (ZeroOneOmega, (WithFC Name, (PiInfo (PTerm' Name), PTerm' Name)))) ns
           commitSymbol fname "}"
           commitSymbol fname "->"
           more <- go
@@ -1811,25 +1819,25 @@ fieldDecl fname indents
              pure b.withFC
 
 -- A Single binder with multiple names
-typedArg : (fname : OriginDesc) => (indents : IndentInfo) => Rule (List1 PBinder)
+typedArg : (fname : OriginDesc) => (indents : IndentInfo) => Rule PBinder
 typedArg
     = do params <- parens fname $ pibindListName fname indents
-         pure $ map (MkPBinder Explicit) params
+         pure $ MkPBinder Explicit params
   <|> do decoratedSymbol fname "{"
          commit
          info <-
-                 (pure  AutoImplicit <* decoratedKeyword fname "auto"
+                  (pure  AutoImplicit <* decoratedKeyword fname "auto"
               <|> (decoratedKeyword fname "default" *> DefImplicit <$> simpleExpr fname indents)
               <|> pure      Implicit)
          params <- pibindListName fname indents
          decoratedSymbol fname "}"
-         pure $ map (MkPBinder info) params
+         pure $ MkPBinder info params
 
-recordParam : OriginDesc -> IndentInfo -> Rule (List1 PBinder)
+recordParam : OriginDesc -> IndentInfo -> Rule (PBinder)
 recordParam fname indents
     = typedArg
   <|> do n <- fcBounds (UN . Basic <$> decoratedSimpleBinderName fname)
-         pure (singleton (MkFullBinder Explicit top n $ PInfer n.fc))
+         pure (MkFullBinder Explicit top n $ PInfer n.fc)
 
 -- A record without a where is a forward declaration
 recordBody : OriginDesc -> IndentInfo ->
@@ -1857,9 +1865,8 @@ recordDecl fname indents
                          col         <- column
                          decoratedKeyword fname "record"
                          n       <- mustWork (decoratedDataTypeName fname)
-                         paramss <- many (continue indents >> forget <$> recordParam fname indents)
-                         let params = concat paramss
-                         recordBody fname indents doc vis mbtot col n params)
+                         paramss <- many (continue indents >> recordParam fname indents)
+                         recordBody fname indents doc vis mbtot col n paramss)
          pure (b.val (boundToFC fname b))
 
 paramDecls : OriginDesc -> IndentInfo -> Rule PDecl
@@ -1880,8 +1887,7 @@ paramDecls fname indents = do
         = parens fname $ sepBy1 (decoratedSymbol fname ",") plainBinder
 
     newParamDecls : Rule (List1 PBinder)
-    newParamDecls
-        = map join (some typedArg)
+    newParamDecls = some typedArg
 
 
 -- topLevelClaim is for claims appearing at the top-level of the file

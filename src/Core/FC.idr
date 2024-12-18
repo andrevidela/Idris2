@@ -108,6 +108,10 @@ export
 HasFC (WithFC ty) where
   (.getFC) (MkFCVal f _) = f
 
+export
+setFC : FC -> WithFC a -> WithFC a
+setFC x = { fc := x }
+
 ------------------------------------------------------------------------
 -- Conversion between NonEmptyFC and FC
 

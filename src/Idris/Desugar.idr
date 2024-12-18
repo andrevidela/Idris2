@@ -306,6 +306,24 @@ mutual
     case x == pur of -- implicitly add namespace to unqualified occurrences of `pure` in a qualified do-block
       False => pure $ IVar fc x
       True => pure $ IVar fc (maybe pur (`NS` pur) ns)
+  -- Desugaring (n1, n2, n3 : t) -> s into
+  -- (n1 : t) -> (n2 : t) -> (n3 : t) -> s
+  desugarB side ps
+      (NewPi (MkFCVal fc
+          (MkPBinderScope (MkPBinder info (MkBasicMultiBinder rig names type)) scope)))
+      = desugarMultiBinder ps (forget names)
+      where
+        desugarMultiBinder : (ctx : List Name) -> List (WithFC Name) -> Core RawImp
+        desugarMultiBinder ctx []
+          = desugarB side ctx scope
+        desugarMultiBinder ctx (name :: xs)
+          = let extendedCtx = name.val :: ps
+            in IPi fc rig
+              <$> mapDesugarPiInfo extendedCtx info
+              <*> (pure (Just name.val))
+              <*> desugarB side ps type
+              <*> desugarMultiBinder extendedCtx xs
+
   desugarB side ps (PPi fc rig p mn argTy retTy)
       = let ps' = maybe ps (:: ps) mn in
             pure $ IPi fc rig !(traverse (desugar side ps') p)
@@ -1089,10 +1107,11 @@ mutual
               ty' <- desugar AnyExpr ps ty
               pure (n.val, top, Explicit, ty')) params
         getArgs (Right params)
-          = traverseList1 (\(MkPBinder info (MkBasicBinder rig n ntm)) => do
+          = join <$> traverseList1 (\(MkPBinder info (MkBasicMultiBinder rig n ntm)) => do
               tm' <- desugar AnyExpr ps ntm
               i' <- traverse (desugar AnyExpr ps) info
-              pure (n.val, rig, i', tm')) params
+              let allbinders = map (\nn => (nn.val, rig, i', tm')) n
+              pure allbinders) params
 
   desugarDecl ps (PUsing fc uimpls uds)
       = do syn <- get Syn
@@ -1193,17 +1212,21 @@ mutual
     where
       mkRecType : List PBinder -> PTerm
       mkRecType [] = PType fc
-      mkRecType (MkPBinder p (MkBasicBinder c n t) :: ts) = PPi fc c p (Just n.val) t (mkRecType ts)
+      mkRecType (MkPBinder p (MkBasicMultiBinder c (n ::: []) t) :: ts)
+        = PPi fc c p (Just n.val) t (mkRecType ts)
+      mkRecType (MkPBinder p (MkBasicMultiBinder c (n ::: x :: xs) t) :: ts)
+        = PPi fc c p (Just n.val) t (mkRecType (MkPBinder p (MkBasicMultiBinder c (x ::: xs) t) :: ts))
   desugarDecl ps (PRecord fc doc vis mbtot (MkPRecord tn params opts conname_in fields))
       = do addDocString tn doc
-           params' <- traverse (\ (MkPBinder info (MkBasicBinder rig name tm)) =>
+           params' <- concat <$> traverse (\ (MkPBinder info (MkBasicMultiBinder rig names tm)) =>
                           do tm' <- desugar AnyExpr ps tm
                              p'  <- mapDesugarPiInfo ps info
-                             pure (name.val, rig, p', tm'))
+                             let allBinders = map (\nn => (nn.val, rig, p', tm')) (forget names)
+                             pure allBinders)
                         params
            let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) params'
            let fnames = concat $ map getfname fields
-           let paramNames = map (val . name . bind) params
+           let paramNames = concatMap (map val . forget . names . bind) params
            let _ = the (List Name) fnames
            -- Look for bindable names in the parameters
 

@@ -541,7 +541,7 @@ mutual
                                tpe' <- toPTerm startPrec tpe
                                -- Suspicious use of `NoFC` here, we should be able to
                                -- where this name came from
-                               pure (MkPBinder info' (MkBasicBinder rig (NoFC n) tpe'))) ps))
+                               pure (MkFullBinder info' rig (NoFC n) tpe')) ps))
                 (catMaybes ds')))
   toPDecl (IRecord fc _ vis mbtot r)
       = do (n, ps, opts, con, fs) <- toPRecord r

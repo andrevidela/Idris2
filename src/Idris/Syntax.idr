@@ -94,6 +94,7 @@ mutual
        -- Direct (more or less) translations to RawImp
 
        PRef : FC -> nm -> PTerm' nm
+       NewPi : WithFC (PBinderScope' nm) -> PTerm' nm
        PPi : FC -> RigCount -> PiInfo (PTerm' nm) -> Maybe Name ->
              (argTy : PTerm' nm) -> (retTy : PTerm' nm) -> PTerm' nm
        PLam : FC -> RigCount -> PiInfo (PTerm' nm) -> (pat : PTerm' nm) ->
@@ -171,6 +172,7 @@ mutual
   export
   getPTermLoc : PTerm' nm -> FC
   getPTermLoc (PRef fc _) = fc
+  getPTermLoc (NewPi x) = x.fc
   getPTermLoc (PPi fc _ _ _ _ _) = fc
   getPTermLoc (PLam fc _ _ _ _ _) = fc
   getPTermLoc (PLet fc _ _ _ _ _ _) = fc
@@ -307,11 +309,21 @@ mutual
   record PBinder' (nm : Type) where
     constructor MkPBinder
     info : PiInfo (PTerm' nm)
-    bind : BasicBinder' nm
+    bind : BasicMultiBinder' nm
+
+  public export
+  PBinderScope : Type
+  PBinderScope = PBinderScope' Name
+
+  public export
+  record PBinderScope' (nm : Type) where
+    constructor MkPBinderScope
+    binder : PBinder' nm
+    scope : PTerm' nm
 
   public export
   MkFullBinder : PiInfo (PTerm' nm) -> RigCount -> WithFC Name -> PTerm' nm -> PBinder' nm
-  MkFullBinder info rig x y = MkPBinder info (MkBasicBinder rig x y)
+  MkFullBinder info rig x y = MkPBinder info (MkBasicMultiBinder rig (singleton x) y)
 
 
   export
@@ -841,6 +853,8 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate (PSetFieldApp p v) = showSep "." p ++ " $= " ++ showPTerm v
 
   showPTermPrec d (PRef _ n) = showPrec d (toName n)
+  showPTermPrec d (NewPi scope)
+        = ?showLater
   showPTermPrec d (PPi _ rig Explicit Nothing arg ret)
         = showPTermPrec d arg ++ " -> " ++ showPTermPrec d ret
   showPTermPrec d (PPi _ rig Explicit (Just n) arg ret)
