@@ -148,9 +148,9 @@ mutual
        POp : (full : FC) ->
              (lhsInfo : WithFC (OperatorLHSInfo (PTerm' nm))) ->
              WithFC (OpStr' nm) -> (rhs : PTerm' nm) -> PTerm' nm
-       PPrefixOp : (full, opFC : FC) -> OpStr' nm -> PTerm' nm -> PTerm' nm
-       PSectionL : (full, opFC : FC) -> OpStr' nm -> PTerm' nm -> PTerm' nm
-       PSectionR : (full, opFC : FC) -> PTerm' nm -> OpStr' nm -> PTerm' nm
+       PPrefixOp : (full : FC) -> WithFC (OpStr' nm) -> PTerm' nm -> PTerm' nm
+       PSectionL : (full : FC) -> WithFC (OpStr' nm) -> PTerm' nm -> PTerm' nm
+       PSectionR : (full : FC) -> PTerm' nm -> WithFC (OpStr' nm) -> PTerm' nm
        PEq : FC -> PTerm' nm -> PTerm' nm -> PTerm' nm
        PBracketed : FC -> PTerm' nm -> PTerm' nm
 
@@ -216,9 +216,9 @@ mutual
   getPTermLoc (PImplicit fc) = fc
   getPTermLoc (PInfer fc) = fc
   getPTermLoc (POp fc _ _ _) = fc
-  getPTermLoc (PPrefixOp fc _ _ _) = fc
-  getPTermLoc (PSectionL fc _ _ _) = fc
-  getPTermLoc (PSectionR fc _ _ _) = fc
+  getPTermLoc (PPrefixOp fc _ _) = fc
+  getPTermLoc (PSectionL fc _ _) = fc
+  getPTermLoc (PSectionR fc _ _) = fc
   getPTermLoc (PEq fc _ _) = fc
   getPTermLoc (PBracketed fc _) = fc
   getPTermLoc (PString fc _ _) = fc
@@ -967,9 +967,9 @@ parameters {0 nm : Type} (toName : nm -> Name)
         = "(" ++ showPTermPrec d nm ++ " := " ++ showPTermPrec d left ++ " " ++ showOpPrec d op.val ++ " " ++ showPTermPrec d right ++ ")"
   showPTermPrec d (POp _ (MkFCVal _ $ BindExplicitType nm ty left) op right)
         = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d ty ++ ":=" ++ showPTermPrec d left ++ " " ++ showOpPrec d op.val ++ " " ++ showPTermPrec d right ++ ")"
-  showPTermPrec d (PPrefixOp _ _ op x) = showOpPrec d op ++ showPTermPrec d x
-  showPTermPrec d (PSectionL _ _ op x) = "(" ++ showOpPrec d op ++ " " ++ showPTermPrec d x ++ ")"
-  showPTermPrec d (PSectionR _ _ x op) = "(" ++ showPTermPrec d x ++ " " ++ showOpPrec d op ++ ")"
+  showPTermPrec d (PPrefixOp _ op x) = showOpPrec d op.val ++ showPTermPrec d x
+  showPTermPrec d (PSectionL _ op x) = "(" ++ showOpPrec d op.val ++ " " ++ showPTermPrec d x ++ ")"
+  showPTermPrec d (PSectionR _ x op) = "(" ++ showPTermPrec d x ++ " " ++ showOpPrec d op.val ++ ")"
   showPTermPrec d (PEq fc l r) = showPTermPrec d l ++ " = " ++ showPTermPrec d r
   showPTermPrec d (PBracketed _ tm) = "(" ++ showPTermPrec d tm ++ ")"
   showPTermPrec d (PString _ _ xs) = join " ++ " $ showPStr <$> xs

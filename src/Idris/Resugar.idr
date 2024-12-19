@@ -57,7 +57,7 @@ mkOp tm@(PApp fc (PApp _ (PRef opFC kn) x) y)
 mkOp tm@(PApp fc (PRef opFC kn) x)
   = do syn <- get Syn
        let n = rawName kn
-       let asOp = PSectionR fc opFC (unbracketApp x) (OpSymbols kn)
+       let asOp = PSectionR fc (unbracketApp x) (MkFCVal opFC $ OpSymbols kn)
        if not (null $ lookupName (UN $ Basic (nameRoot n)) (infixes syn))
          then pure asOp
          else case dropNS n of
@@ -75,7 +75,7 @@ mkSectionL tm@(PLam fc rig info (PRef _ bd) ty
          | _ => pure tm
        syn <- get Syn
        let n = rawName kn
-       let asOp = PSectionL fc opFC (OpSymbols kn) (unbracketApp x)
+       let asOp = PSectionL fc (MkFCVal opFC $ OpSymbols kn) (unbracketApp x)
        if not (null $ lookupName (UN $ Basic (nameRoot n)) (fixities syn))
          then pure asOp
          else case dropNS n of
@@ -604,12 +604,15 @@ cleanPTerm ptm
     cleanNode (POp fc abi op y) =
       (\ op => POp fc abi op y)
       <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
-    cleanNode (PPrefixOp fc opFC op x) =
-      (\ op => PPrefixOp fc opFC op x) <$> traverseOp @{Functor.CORE} cleanKindedName op
-    cleanNode (PSectionL fc opFC op x) =
-      (\ op => PSectionL fc opFC op x) <$> traverseOp @{Functor.CORE} cleanKindedName op
-    cleanNode (PSectionR fc opFC x op) =
-      PSectionR fc opFC x <$> traverseOp @{Functor.CORE} cleanKindedName op
+    cleanNode (PPrefixOp fc op x) =
+      (\ op => PPrefixOp fc op x)
+      <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
+    cleanNode (PSectionL fc op x) =
+      (\ op => PSectionL fc op x)
+      <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
+    cleanNode (PSectionR fc x op) =
+      PSectionR fc x
+      <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
     cleanNode (PPi fc rig vis (Just n) arg ret) =
       (\ n => PPi fc rig vis n arg ret) <$> (cleanBinderName vis n)
     cleanNode tm = pure tm

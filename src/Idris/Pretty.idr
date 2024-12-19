@@ -356,9 +356,9 @@ mutual
         group $ pretty x
            <++> prettyOp op.val.toName
            <++> pretty y
-    prettyPrec d (PPrefixOp _ _ op x) = parenthesise (d > startPrec) $ prettyOp op.toName <+> pretty x
-    prettyPrec d (PSectionL _ _ op x) = parens (prettyOp op.toName <++> pretty x)
-    prettyPrec d (PSectionR _ _ x op) = parens (pretty x <++> prettyOp op.toName)
+    prettyPrec d (PPrefixOp _ op x) = parenthesise (d > startPrec) $ prettyOp op.val.toName <+> pretty x
+    prettyPrec d (PSectionL _ op x) = parens (prettyOp op.val.toName <++> pretty x)
+    prettyPrec d (PSectionR _ x op) = parens (pretty x <++> prettyOp op.val.toName)
     prettyPrec d (PEq fc l r) = parenthesise (d > startPrec) $ prettyPrec Equal l <++> equals <++> prettyPrec Equal r
     prettyPrec d (PBracketed _ tm) = parens (pretty tm)
     prettyPrec d (PString _ _ xs) = parenthesise (d > startPrec) $ hsep $ punctuate "++" (prettyPStr <$> xs)

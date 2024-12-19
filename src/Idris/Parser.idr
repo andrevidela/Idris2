@@ -248,9 +248,9 @@ mutual
     <|> do b <- bounds (MkPair <$> simpleExpr fname indents <*> many (argExpr q fname indents))
            (f, args) <- pure b.val
            pure (applyExpImp (start b) (end b) f (concat args))
-    <|> do b <- bounds (MkPair <$> bounds iOperator <*> expr pdef fname indents)
+    <|> do b <- fcBounds (MkPair <$> fcBounds iOperator <*> expr pdef fname indents)
            (op, arg) <- pure b.val
-           pure (PPrefixOp (boundToFC fname b) (boundToFC fname op) op.val arg)
+           pure (PPrefixOp b.fc op arg)
     <|> fail "Expected 'case', 'if', 'do', application or operator expression"
     where
       applyExpImp : FilePos -> FilePos -> PTerm ->
@@ -432,15 +432,14 @@ mutual
       -- left section. This may also be a prefix operator, but we'll sort
       -- that out when desugaring: if the operator is infix, treat it as a
       -- section otherwise treat it as prefix
-      = do b <- bounds (do op <- bounds iOperator
+      = do b <- bounds (do op <- fcBounds iOperator
                            e <- expr pdef fname indents
                            continueWithDecorated fname indents ")"
                            pure (op, e))
            (op, e) <- pure b.val
            actD (toNonEmptyFC $ boundToFC fname s, Keyword, Nothing)
            let fc = boundToFC fname (mergeBounds s b)
-           let opFC = boundToFC fname op
-           pure (PSectionL fc opFC op.val e)
+           pure (PSectionL fc op e)
     <|> do  -- (.y.z)  -- section of projection (chain)
            b <- bounds $ forget <$> some (bounds postfixProj)
            decoratedSymbol fname ")"
@@ -463,11 +462,10 @@ mutual
                             (PImplicit (boundToFC fname (mergeBounds s rest)))
                             rest.val)) <|>
              -- right sections
-             ((do op <- bounds (bounds iOperator <* decoratedSymbol fname ")")
+             ((do op <- bounds (fcBounds iOperator <* decoratedSymbol fname ")")
                   actD (toNonEmptyFC $ boundToFC fname s, Keyword, Nothing)
                   let fc = boundToFC fname (mergeBounds s op)
-                  let opFC = boundToFC fname op.val
-                  pure (PSectionR fc opFC e.val op.val.val)
+                  pure (PSectionR fc e.val op.val)
                <|>
               -- all the other bracketed expressions
               tuple fname s indents e.val))
