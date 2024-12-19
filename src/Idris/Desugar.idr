@@ -317,7 +317,7 @@ mutual
         desugarForallNames ctx [] = desugarB side ctx scope
         desugarForallNames ctx (x :: xs)
           = IPi x.fc erased Implicit (Just x.val)
-          <$> desugarB side ps (PInfer x.fc)
+          <$> desugarB side ps (PImplicit x.fc)
           <*> desugarForallNames (x.val :: ctx) xs
 
   -- Desugaring (n1, n2, n3 : t) -> s into
