@@ -103,27 +103,9 @@ mapPTermM f = goPTerm where
       >>= f
     goPTerm t@(PImplicit _) = f t
     goPTerm t@(PInfer _) = f t
-    goPTerm (POp fc opFC (NoBinder left) op right) =
-      POp fc opFC
-          <$> (NoBinder <$> goPTerm left)
-          <*> pure op
-          <*> goPTerm right
-      >>= f
-    goPTerm (POp fc opFC (BindType nm left) op right) =
-      POp fc opFC
-          <$> (BindType <$> goPTerm nm <*> goPTerm left)
-          <*> pure op
-          <*> goPTerm right
-      >>= f
-    goPTerm (POp fc opFC (BindExpr nm left) op right) =
-      POp fc opFC
-          <$> (BindExpr nm <$> goPTerm left)
-          <*> pure op
-          <*> goPTerm right
-      >>= f
-    goPTerm (POp fc opFC (BindExplicitType nm ty left) op right) =
-      POp fc opFC
-          <$> (BindExplicitType <$> goPTerm nm <*> goPTerm ty <*> goPTerm left)
+    goPTerm (POp fc bind op right) =
+      POp fc
+          <$> traverseFC goOpBinder bind
           <*> pure op
           <*> goPTerm right
       >>= f
@@ -209,6 +191,13 @@ mapPTermM f = goPTerm where
     goPTerm (PWithUnambigNames fc ns rhs) =
       PWithUnambigNames fc ns <$> goPTerm rhs
       >>= f
+
+    goOpBinder : OperatorLHSInfo (PTerm' nm) -> Core (OperatorLHSInfo (PTerm' nm))
+    goOpBinder (NoBinder lhs) = NoBinder <$> goPTerm lhs
+    goOpBinder (BindType name ty) = BindType <$> goPTerm name <*> goPTerm ty
+    goOpBinder (BindExpr name expr) = BindExpr <$> goPTerm name <*> goPTerm expr
+    goOpBinder (BindExplicitType name type expr)
+      = BindExplicitType <$> goPTerm name <*> goPTerm type <*> goPTerm expr
 
     goPFieldUpdate : PFieldUpdate' nm -> Core (PFieldUpdate' nm)
     goPFieldUpdate (PSetField p t)    = PSetField p <$> goPTerm t
@@ -482,8 +471,8 @@ mapPTerm f = goPTerm where
       = f $ PDotted fc $ goPTerm x
     goPTerm t@(PImplicit _) = f t
     goPTerm t@(PInfer _) = f t
-    goPTerm (POp fc opFC autoBindInfo opName z)
-      = f $ POp fc opFC (map f autoBindInfo) opName (goPTerm z)
+    goPTerm (POp fc autoBindInfo opName z)
+      = f $ POp fc (mapFC (map f) autoBindInfo) opName (goPTerm z)
     goPTerm (PPrefixOp fc opFC x y)
       = f $ PPrefixOp fc opFC x $ goPTerm y
     goPTerm (PSectionL fc opFC x y)
@@ -687,7 +676,7 @@ substFC fc = mapPTerm $ \case
   PDotted _ x => PDotted fc x
   PImplicit _ => PImplicit fc
   PInfer _ => PInfer fc
-  POp _ _ ab nm r => POp fc fc ab nm r
+  POp _ ab nm r => POp fc (setFC fc ab) nm r
   PPrefixOp _ _ x y => PPrefixOp fc fc x y
   PSectionL _ _ x y => PSectionL fc fc x y
   PSectionR _ _ x y => PSectionR fc fc x y
