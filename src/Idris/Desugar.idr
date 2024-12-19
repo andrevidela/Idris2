@@ -239,10 +239,10 @@ parameters (side : Side)
                   (checkConflictingBinding opn fixInfo l r)
            rtoks <- toTokList r
            pure (Expr l.getLhs :: Op fc opn.fc ((opn.val, fixInfo), Just l) precInfo :: rtoks)
-  toTokList (PPrefixOp fc opFC opn arg)
-      = do (precInfo, fixInfo) <- checkConflictingFixities True (MkFCVal opFC opn)
+  toTokList (PPrefixOp fc opn arg)
+      = do (precInfo, fixInfo) <- checkConflictingFixities True opn
            rtoks <- toTokList arg
-           pure (Op fc opFC ((opn, fixInfo), Nothing) precInfo :: rtoks)
+           pure (Op fc opn.fc ((opn.val, fixInfo), Nothing) precInfo :: rtoks)
   toTokList t = pure [Expr t]
 
 record BangData where
@@ -420,27 +420,27 @@ mutual
            tree <- parseOps @{interpName} @{showWithLoc} ts
            unop <- desugarTree side ps (mapFst (\((x, _), y) => (x, y)) tree)
            desugarB side ps unop
-  desugarB side ps (PPrefixOp fc opFC op arg)
-      = do ts <- toTokList side (PPrefixOp fc opFC op arg)
+  desugarB side ps (PPrefixOp fc op arg)
+      = do ts <- toTokList side (PPrefixOp fc op arg)
            tree <- parseOps @{interpName} @{showWithLoc} ts
            unop <- desugarTree side ps (mapFst (\((x, _), y) => (x, y)) tree)
            desugarB side ps unop
-  desugarB side ps (PSectionL fc opFC op arg)
+  desugarB side ps (PSectionL fc op arg)
       = do syn <- get Syn
            -- It might actually be a prefix argument rather than a section
            -- so check that first, otherwise desugar as a lambda
-           case lookupName op.toName (prefixes syn) of
+           case lookupName op.val.toName (prefixes syn) of
                 [] =>
                     desugarB side ps
                         (PLam fc top Explicit (PRef fc (MN "arg" 0)) (PImplicit fc)
-                            (POp fc (MkFCVal opFC $ NoBinder (PRef fc (MN "arg" 0)))
-                                    (MkFCVal opFC op) arg))
-                (prec :: _) => desugarB side ps (PPrefixOp fc opFC op arg)
-  desugarB side ps (PSectionR fc opFC arg op)
+                            (POp fc (MkFCVal fc $ NoBinder (PRef fc (MN "arg" 0)))
+                                    op arg))
+                (prec :: _) => desugarB side ps (PPrefixOp fc op arg)
+  desugarB side ps (PSectionR fc arg op)
       = desugarB side ps
           (PLam fc top Explicit (PRef fc (MN "arg" 0)) (PImplicit fc)
-              (POp fc (MkFCVal opFC $ NoBinder arg)
-                      (MkFCVal opFC op)
+              (POp fc (MkFCVal op.fc $ NoBinder arg)
+                      op
                       (PRef fc (MN "arg" 0))
               )
           )

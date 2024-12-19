@@ -109,14 +109,14 @@ mapPTermM f = goPTerm where
           <*> pure op
           <*> goPTerm right
       >>= f
-    goPTerm (PPrefixOp fc opFC x y) =
-      PPrefixOp fc opFC x <$> goPTerm y
+    goPTerm (PPrefixOp fc x y) =
+      PPrefixOp fc x <$> goPTerm y
       >>= f
-    goPTerm (PSectionL fc opFC x y) =
-      PSectionL fc opFC x <$> goPTerm y
+    goPTerm (PSectionL fc x y) =
+      PSectionL fc x <$> goPTerm y
       >>= f
-    goPTerm (PSectionR fc opFC x y) =
-      PSectionR fc opFC <$> goPTerm x
+    goPTerm (PSectionR fc x y) =
+      PSectionR fc <$> goPTerm x
                    <*> pure y
       >>= f
     goPTerm (PEq fc x y) =
@@ -473,12 +473,12 @@ mapPTerm f = goPTerm where
     goPTerm t@(PInfer _) = f t
     goPTerm (POp fc autoBindInfo opName z)
       = f $ POp fc (mapFC (map f) autoBindInfo) opName (goPTerm z)
-    goPTerm (PPrefixOp fc opFC x y)
-      = f $ PPrefixOp fc opFC x $ goPTerm y
-    goPTerm (PSectionL fc opFC x y)
-      = f $ PSectionL fc opFC x $ goPTerm y
-    goPTerm (PSectionR fc opFC x y)
-      = f $ PSectionR fc opFC (goPTerm x) y
+    goPTerm (PPrefixOp fc x y)
+      = f $ PPrefixOp fc x $ goPTerm y
+    goPTerm (PSectionL fc x y)
+      = f $ PSectionL fc x $ goPTerm y
+    goPTerm (PSectionR fc x y)
+      = f $ PSectionR fc (goPTerm x) y
     goPTerm (PEq fc x y)
       = f $ PEq fc (goPTerm x) (goPTerm y)
     goPTerm (PBracketed fc x)
@@ -677,9 +677,9 @@ substFC fc = mapPTerm $ \case
   PImplicit _ => PImplicit fc
   PInfer _ => PInfer fc
   POp _ ab nm r => POp fc (setFC fc ab) nm r
-  PPrefixOp _ _ x y => PPrefixOp fc fc x y
-  PSectionL _ _ x y => PSectionL fc fc x y
-  PSectionR _ _ x y => PSectionR fc fc x y
+  PPrefixOp _ x y => PPrefixOp fc (setFC fc x) y
+  PSectionL _ x y => PSectionL fc (setFC fc x) y
+  PSectionR _ x y => PSectionR fc x (setFC fc y)
   PEq _ x y => PEq fc x y
   PBracketed _ x => PBracketed fc x
   PString _ x ys => PString fc x ys
