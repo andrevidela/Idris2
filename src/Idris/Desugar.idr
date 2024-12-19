@@ -124,8 +124,8 @@ mkPrec Prefix = Prefix
 checkConflictingFixities : {auto s : Ref Syn SyntaxInfo} ->
                            {auto c : Ref Ctxt Defs} ->
                            (isPrefix : Bool) ->
-                           FC -> OpStr' Name -> Core (OpPrec, FixityDeclarationInfo)
-checkConflictingFixities isPrefix exprFC opn
+                           WithFC (OpStr' Name) -> Core (OpPrec, FixityDeclarationInfo)
+checkConflictingFixities isPrefix (MkFCVal exprFC opn)
   = do let op = nameRoot opn.toName
        foundFixities <- getFixityInfo op
        let (pre, inf) = partition ((== Prefix) . fix . snd) foundFixities
@@ -174,9 +174,9 @@ checkConflictingFixities isPrefix exprFC opn
 
 checkConflictingBinding : Ref Ctxt Defs =>
                           Ref Syn SyntaxInfo =>
-                          FC -> OpStr -> (foundFixity : FixityDeclarationInfo) ->
+                          WithFC OpStr -> (foundFixity : FixityDeclarationInfo) ->
                           (usage : OperatorLHSInfo PTerm) -> (rhs : PTerm) -> Core ()
-checkConflictingBinding fc opName foundFixity use_site rhs
+checkConflictingBinding (MkFCVal fc opName) foundFixity use_site rhs
     = if isCompatible foundFixity use_site
          then pure ()
          else throw $ OperatorBindingMismatch
@@ -230,17 +230,17 @@ parameters (side : Side)
   toTokList : {auto s : Ref Syn SyntaxInfo} ->
               {auto c : Ref Ctxt Defs} ->
               PTerm -> Core (List (Tok ((OpStr, FixityDeclarationInfo), Maybe (OperatorLHSInfo PTerm)) PTerm))
-  toTokList (POp fc opFC l opn r)
-      = do (precInfo, fixInfo) <- checkConflictingFixities False fc opn
+  toTokList (POp fc (MkFCVal lhsFC l) opn r)
+      = do (precInfo, fixInfo) <- checkConflictingFixities False opn
            unless (side == LHS) -- do not check for conflicting fixity on the LHS
                                 -- This is because we do not parse binders on the lhs
                                 -- and so, if we check, we will find uses of regular
                                 -- operator when binding is expected.
-                  (checkConflictingBinding opFC opn fixInfo l r)
+                  (checkConflictingBinding opn fixInfo l r)
            rtoks <- toTokList r
-           pure (Expr l.getLhs :: Op fc opFC ((opn, fixInfo), Just l) precInfo :: rtoks)
+           pure (Expr l.getLhs :: Op fc opn.fc ((opn.val, fixInfo), Just l) precInfo :: rtoks)
   toTokList (PPrefixOp fc opFC opn arg)
-      = do (precInfo, fixInfo) <- checkConflictingFixities True fc opn
+      = do (precInfo, fixInfo) <- checkConflictingFixities True (MkFCVal opFC opn)
            rtoks <- toTokList arg
            pure (Op fc opFC ((opn, fixInfo), Nothing) precInfo :: rtoks)
   toTokList t = pure [Expr t]
@@ -415,8 +415,8 @@ mutual
                      [apply (IVar fc (UN $ Basic "===")) [l', r'],
                       apply (IVar fc (UN $ Basic "~=~")) [l', r']]
   desugarB side ps (PBracketed fc e) = desugarB side ps e
-  desugarB side ps (POp fc opFC l op r)
-      = do ts <- toTokList side (POp fc opFC l op r)
+  desugarB side ps (POp fc l op r)
+      = do ts <- toTokList side (POp fc l op r)
            tree <- parseOps @{interpName} @{showWithLoc} ts
            unop <- desugarTree side ps (mapFst (\((x, _), y) => (x, y)) tree)
            desugarB side ps unop
@@ -433,12 +433,17 @@ mutual
                 [] =>
                     desugarB side ps
                         (PLam fc top Explicit (PRef fc (MN "arg" 0)) (PImplicit fc)
-                            (POp fc opFC (NoBinder (PRef fc (MN "arg" 0))) op arg))
+                            (POp fc (MkFCVal opFC $ NoBinder (PRef fc (MN "arg" 0)))
+                                    (MkFCVal opFC op) arg))
                 (prec :: _) => desugarB side ps (PPrefixOp fc opFC op arg)
   desugarB side ps (PSectionR fc opFC arg op)
       = desugarB side ps
           (PLam fc top Explicit (PRef fc (MN "arg" 0)) (PImplicit fc)
-              (POp fc opFC (NoBinder arg) op (PRef fc (MN "arg" 0))))
+              (POp fc (MkFCVal opFC $ NoBinder arg)
+                      (MkFCVal opFC op)
+                      (PRef fc (MN "arg" 0))
+              )
+          )
   desugarB side ps (PSearch fc depth) = pure $ ISearch fc depth
   desugarB side ps (PPrimVal fc (BI x))
       = case !fromIntegerName of

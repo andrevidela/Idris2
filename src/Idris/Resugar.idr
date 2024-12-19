@@ -47,7 +47,8 @@ mkOp tm@(PApp fc (PApp _ (PRef opFC kn) x) y)
        -- to know if the name is an operator or not, it's enough to check
        -- that the fixity context contains the name `(++)`
        let rootName = UN (Basic (nameRoot raw))
-       let asOp = POp fc opFC (NoBinder (unbracketApp x)) (pop kn) (unbracketApp y)
+       let asOp = POp fc (MkFCVal opFC
+                $ NoBinder (unbracketApp x)) (MkFCVal opFC (pop kn)) (unbracketApp y)
        if not (null (lookupName rootName (infixes syn)))
          then pure asOp
          else case dropNS raw of
@@ -600,8 +601,9 @@ cleanPTerm ptm
     cleanNode : IPTerm -> Core IPTerm
     cleanNode (PRef fc nm)    =
       PRef fc <$> cleanKindedName nm
-    cleanNode (POp fc opFC abi op y) =
-      (\ op => POp fc opFC abi op y) <$> traverseOp @{Functor.CORE} cleanKindedName op
+    cleanNode (POp fc abi op y) =
+      (\ op => POp fc abi op y)
+      <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
     cleanNode (PPrefixOp fc opFC op x) =
       (\ op => PPrefixOp fc opFC op x) <$> traverseOp @{Functor.CORE} cleanKindedName op
     cleanNode (PSectionL fc opFC op x) =

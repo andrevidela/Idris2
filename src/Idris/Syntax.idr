@@ -145,9 +145,9 @@ mutual
 
        -- Operators
 
-       POp : (full, opFC : FC) ->
-             (lhsInfo : OperatorLHSInfo (PTerm' nm)) ->
-             OpStr' nm -> (rhs : PTerm' nm) -> PTerm' nm
+       POp : (full : FC) ->
+             (lhsInfo : WithFC (OperatorLHSInfo (PTerm' nm))) ->
+             WithFC (OpStr' nm) -> (rhs : PTerm' nm) -> PTerm' nm
        PPrefixOp : (full, opFC : FC) -> OpStr' nm -> PTerm' nm -> PTerm' nm
        PSectionL : (full, opFC : FC) -> OpStr' nm -> PTerm' nm -> PTerm' nm
        PSectionR : (full, opFC : FC) -> PTerm' nm -> OpStr' nm -> PTerm' nm
@@ -215,7 +215,7 @@ mutual
   getPTermLoc (PDotted fc _) = fc
   getPTermLoc (PImplicit fc) = fc
   getPTermLoc (PInfer fc) = fc
-  getPTermLoc (POp fc _ _ _ _) = fc
+  getPTermLoc (POp fc _ _ _) = fc
   getPTermLoc (PPrefixOp fc _ _ _) = fc
   getPTermLoc (PSectionL fc _ _ _) = fc
   getPTermLoc (PSectionR fc _ _ _) = fc
@@ -959,14 +959,14 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPTermPrec d (PDotted _ p) = "." ++ showPTermPrec d p
   showPTermPrec _ (PImplicit _) = "_"
   showPTermPrec _ (PInfer _) = "?"
-  showPTermPrec d (POp _ _ (NoBinder left) op right)
-        = showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right
-  showPTermPrec d (POp _ _ (BindType nm left) op right)
-        = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
-  showPTermPrec d (POp _ _ (BindExpr nm left) op right)
-        = "(" ++ showPTermPrec d nm ++ " := " ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
-  showPTermPrec d (POp _ _ (BindExplicitType nm ty left) op right)
-        = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d ty ++ ":=" ++ showPTermPrec d left ++ " " ++ showOpPrec d op ++ " " ++ showPTermPrec d right ++ ")"
+  showPTermPrec d (POp _ (MkFCVal _ $ NoBinder left) op right)
+        = showPTermPrec d left ++ " " ++ showOpPrec d op.val ++ " " ++ showPTermPrec d right
+  showPTermPrec d (POp _ (MkFCVal _ $ BindType nm left) op right)
+        = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d left ++ " " ++ showOpPrec d op.val ++ " " ++ showPTermPrec d right ++ ")"
+  showPTermPrec d (POp _ (MkFCVal _ $ BindExpr nm left) op right)
+        = "(" ++ showPTermPrec d nm ++ " := " ++ showPTermPrec d left ++ " " ++ showOpPrec d op.val ++ " " ++ showPTermPrec d right ++ ")"
+  showPTermPrec d (POp _ (MkFCVal _ $ BindExplicitType nm ty left) op right)
+        = "(" ++ showPTermPrec d nm ++ " : " ++ showPTermPrec d ty ++ ":=" ++ showPTermPrec d left ++ " " ++ showOpPrec d op.val ++ " " ++ showPTermPrec d right ++ ")"
   showPTermPrec d (PPrefixOp _ _ op x) = showOpPrec d op ++ showPTermPrec d x
   showPTermPrec d (PSectionL _ _ op x) = "(" ++ showOpPrec d op ++ " " ++ showPTermPrec d x ++ ")"
   showPTermPrec d (PSectionR _ _ x op) = "(" ++ showPTermPrec d x ++ " " ++ showOpPrec d op ++ ")"

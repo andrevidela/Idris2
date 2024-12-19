@@ -361,16 +361,14 @@ mutual
 
   autobindOp : ParseOpts -> OriginDesc -> IndentInfo -> Rule PTerm
   autobindOp q fname indents
-      = do binder <- bounds $ parens fname (opBinder fname indents)
-           continue indents
-           op <- bounds iOperator
-           commit
-           e <- bounds (expr q fname indents)
-           pure (POp (boundToFC fname $ mergeBounds binder e)
-                     (boundToFC fname op)
-                     binder.val
-                     op.val
-                     e.val)
+      = do b <- fcBounds $ do
+             binder <- fcBounds $ parens fname (opBinder fname indents)
+             continue indents
+             op <- fcBounds iOperator
+             commit
+             e <- expr q fname indents
+             pure (binder, op, e)
+           pure (POp b.fc (fst b.val) (fst (snd b.val)) (snd (snd b.val)))
 
   opExprBase : ParseOpts -> OriginDesc -> IndentInfo -> Rule PTerm
   opExprBase q fname indents
@@ -382,20 +380,20 @@ mutual
                        pure $
                          let fc = boundToFC fname (mergeBounds l r)
                              opFC = virtualiseFC fc -- already been highlighted: we don't care
-                         in POp fc opFC (NoBinder l.val) (OpSymbols $ UN $ Basic "=") r.val
+                         in POp fc (MkFCVal opFC (NoBinder l.val))
+                                   (MkFCVal opFC (OpSymbols $ UN $ Basic "=")) r.val
                else fail "= not allowed")
              <|>
              (do b <- bounds $ do
                         continue indents
-                        op <- bounds iOperator
+                        op <- fcBounds iOperator
                         e <- case op.val of
                                OpSymbols (UN (Basic "$")) => typeExpr q fname indents
                                _ => expr q fname indents
                         pure (op, e)
                  (op, r) <- pure b.val
                  let fc = boundToFC fname (mergeBounds l b)
-                 let opFC = boundToFC fname op
-                 pure (POp fc opFC (NoBinder l.val) op.val r))
+                 pure (POp fc (mapFC NoBinder l.withFC) op r))
                <|> pure l.val
 
   opExpr : ParseOpts -> OriginDesc -> IndentInfo -> Rule PTerm
