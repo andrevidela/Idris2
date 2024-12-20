@@ -83,6 +83,10 @@ export
 mapWName : (ty -> sy) -> WithName ty -> WithName sy
 mapWName f = {val $= f}
 
+export
+traverseWName : (ty -> Core sy) -> WithName ty -> Core (WithName sy)
+traverseWName f (MkWithName name val) = MkWithName name <$> f val
+
 -------------------------------------------------------------------------------
 
 mutual
@@ -844,6 +848,8 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate : PFieldUpdate' nm -> String
   showPTermPrec : Prec -> PTerm' nm -> String
   showOpPrec : Prec -> OpStr' nm -> String
+  showPBinder : Prec -> PBinder' nm -> String
+  showBasicMultiBinder : BasicMultiBinder' nm -> String
 
   showPTerm : PTerm' nm -> String
   showPTerm = showPTermPrec Open
@@ -875,11 +881,22 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate (PSetField p v) = showSep "." p ++ " = " ++ showPTerm v
   showUpdate (PSetFieldApp p v) = showSep "." p ++ " $= " ++ showPTerm v
 
+  showBasicMultiBinder (MkBasicMultiBinder rig names type)
+        = "\{showCount rig} \{showNames}: \{showPTerm type}"
+        where
+          showNames : String
+          showNames = concat $ intersperse ", " $ map (show . val) (forget names)
+
+  showPBinder d (MkPBinder Implicit bind) = "{\{showBasicMultiBinder bind}}"
+  showPBinder d (MkPBinder Explicit bind) = "(\{showBasicMultiBinder bind})"
+  showPBinder d (MkPBinder AutoImplicit bind) = "{auto \{showBasicMultiBinder bind}}"
+  showPBinder d (MkPBinder (DefImplicit x) bind) = "{default \{showPTerm x} \{ showBasicMultiBinder bind}}"
+
   showPTermPrec d (PRef _ n) = showPrec d (toName n)
-  showPTermPrec d (Forall scope)
-        = ?showLater2
-  showPTermPrec d (NewPi scope)
-        = ?showLater
+  showPTermPrec d (Forall (MkFCVal _ (names, scope)))
+        = "forall " ++ concat (intersperse ", " (map (show . val) (forget names))) ++ " . " ++ showPTermPrec d scope
+  showPTermPrec d (NewPi (MkFCVal _ (MkPBinderScope binder scope)))
+        = showPBinder d binder ++ " -> "  ++ showPTermPrec d scope
   showPTermPrec d (PPi _ rig Explicit Nothing arg ret)
         = showPTermPrec d arg ++ " -> " ++ showPTermPrec d ret
   showPTermPrec d (PPi _ rig Explicit (Just n) arg ret)

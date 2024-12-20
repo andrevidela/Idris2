@@ -18,9 +18,9 @@ mapPTermM f = goPTerm where
     goPTerm : PTerm' nm -> Core (PTerm' nm)
     goPTerm t@(PRef _ _) = f t
     goPTerm (NewPi x) =
-      ?gonext -- NewPi fc <$> goPBinder args <*> goPTerm scope
+      NewPi <$> traverseFC goPBinderScope x
     goPTerm (Forall x) =
-      ?gonext2 -- NewPi fc <$> goPBinder args <*> goPTerm scope
+      Forall <$> traverseFC (\(a, b) => MkPair a <$> goPTerm b) x
     goPTerm (PPi fc x info z argTy retTy) =
       PPi fc x <$> goPiInfo info
                <*> pure z
@@ -252,12 +252,19 @@ mapPTermM f = goPTerm where
                    <*> traverseFC goPTypeDecl tdecl
 
     goPlainBinder : PlainBinder' nm -> Core (PlainBinder' nm)
-
-    goBasicBinder : BasicBinder' nm -> Core (BasicBinder' nm)
+    goPlainBinder = traverseWName f
 
     goBasicMultiBinder : BasicMultiBinder' nm -> Core (BasicMultiBinder' nm)
+    goBasicMultiBinder (MkBasicMultiBinder rig names type)
+      = MkBasicMultiBinder rig names <$> goPTerm type
 
     goPBinder : PBinder' nm -> Core (PBinder' nm)
+    goPBinder (MkPBinder info bind)
+      = MkPBinder <$> goPiInfo info <*> goBasicMultiBinder bind
+
+    goPBinderScope : PBinderScope' nm -> Core (PBinderScope' nm)
+    goPBinderScope (MkPBinderScope binder scope)
+      = MkPBinderScope <$> goPBinder binder <*> goPTerm scope
 
     -- goParamArgs :
 
@@ -423,9 +430,9 @@ mapPTerm f = goPTerm where
     goPTerm : PTerm' nm -> PTerm' nm
     goPTerm t@(PRef _ _) = f t
     goPTerm (Forall binderScope)
-      = ?dunno2
+      = Forall (mapFC (mapSnd f) binderScope)
     goPTerm (NewPi binderScope)
-      = ?dunno
+      = NewPi (mapFC goPBinderScope binderScope)
     goPTerm (PPi fc x info z argTy retTy)
       = f $ PPi fc x (goPiInfo info) z (goPTerm argTy) (goPTerm retTy)
     goPTerm (PLam fc x info z argTy scope)
@@ -556,6 +563,10 @@ mapPTerm f = goPTerm where
     goPlainBinder : PlainBinder' nm -> PlainBinder' nm
     goPlainBinder = mapWName goPTerm
 
+    goPBinderScope : PBinderScope' nm -> PBinderScope' nm
+    goPBinderScope (MkPBinderScope binder scope)
+      = MkPBinderScope (goPBinder binder) (goPTerm scope)
+
     goPDecl : PDecl' nm -> PDecl' nm
     goPDecl (PClaim claim)
       = PClaim $ mapFC goPClaim claim
@@ -588,6 +599,8 @@ mapPTerm f = goPTerm where
     goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (goBasicMultiBinder bind)
 
     goBasicMultiBinder : BasicMultiBinder' nm -> BasicMultiBinder' nm
+    goBasicMultiBinder (MkBasicMultiBinder rig names type)
+      = MkBasicMultiBinder rig names (goPTerm type)
 
     goBasicBinder : BasicBinder' nm -> BasicBinder' nm
     goBasicBinder (MkBasicBinder rig name type)
