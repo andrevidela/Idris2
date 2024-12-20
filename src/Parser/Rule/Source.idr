@@ -264,6 +264,14 @@ pragma n =
       _ => Nothing
 
 export
+cgDirective : Rule String
+cgDirective =
+  terminal "Expected CG directive" $
+    \case
+      CGDirective d => Just d
+      _ => Nothing
+
+export
 builtinType : Rule BuiltinType
 builtinType =
     BuiltinNatural <$ exactIdent "Natural"
