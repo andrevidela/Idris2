@@ -663,6 +663,9 @@ mutual
                                        (decoratedSymbol fname ":" *> opExpr pdef fname indents)
                               pure (rig, pat, ty))
 
+  ||| A list of names bound to the same type
+  ||| BNF:
+  ||| pibindListName := qty name (, name)* ':' typeExpr
   pibindListName : OriginDesc -> IndentInfo ->
                    Rule BasicMultiBinder
   pibindListName fname indents
@@ -679,11 +682,17 @@ mutual
       binderName = decoratedSimpleBinderUName fname
                <|> decorate fname Bound (UN <$> symbol "_" $> Underscore)
 
+  ||| The arrow used after an explicit binder
+  ||| BNF:
+  ||| bindSymbol := '->' | '=>'
   bindSymbol : OriginDesc -> Rule (PiInfo PTerm)
   bindSymbol fname
       = (decoratedSymbol fname "->" $> Explicit)
     <|> (decoratedSymbol fname "=>" $> AutoImplicit)
 
+  ||| An explicit pi-type
+  ||| BNF:
+  ||| explicitPi := '(' pibindListName ')' bindSymbol typeExpr
   explicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   explicitPi fname indents
       = NewPi <$> fcBounds (do
@@ -693,6 +702,9 @@ mutual
            scope <- mustWork $ typeExpr pdef fname indents
            pure (MkPBinderScope (MkPBinder exp b.val) scope))
 
+  ||| An auto-implicit pi-type
+  ||| BNF:
+  ||| autoImplicitPi := '{' 'auto' pibindListName '}' '->' typeExpr
   autoImplicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   autoImplicitPi fname indents
       = NewPi <$> fcBounds (do
@@ -707,6 +719,9 @@ mutual
            pure (MkPBinderScope (MkPBinder AutoImplicit b.val) scope)
            )
 
+  ||| An default implicit pi-type
+  ||| BNF:
+  ||| defaultImplicitPi := '{' 'default' simpleExpr pibindListName '}' '->' typeExpr
   defaultImplicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   defaultImplicitPi fname indents
       = NewPi <$> fcBounds (do
@@ -722,6 +737,9 @@ mutual
            pure (MkPBinderScope b.val scope)
            )
 
+  ||| Forall definition that automatically binds the names
+  ||| BNF:
+  ||| forall_ := 'forall' name (, name)* '.' typeExpr
   forall_ : OriginDesc -> IndentInfo -> Rule PTerm
   forall_ fname indents
       = Forall <$> fcBounds (do
@@ -737,6 +755,9 @@ mutual
            scope <- mustWork $ typeExpr pdef fname indents
            pure (b.val, scope))
 
+  ||| implicit pi-type
+  ||| BNF:
+  ||| implicitPi := '{' pibindListName '}' '->' typeExpr
   implicitPi : OriginDesc -> IndentInfo -> Rule PTerm
   implicitPi fname indents
       = NewPi <$> fcBounds (do
@@ -1843,6 +1864,9 @@ recordDecl fname indents
                          recordBody fname indents doc vis mbtot col n paramss)
          pure (b.val (boundToFC fname b))
 
+||| Parameter blocks
+||| BNF:
+||| paramDecls := 'parameters' (oldParamDecls | newParamDecls) indentBlockDefs
 paramDecls : OriginDesc -> IndentInfo -> Rule PDecl
 paramDecls fname indents = do
          startCol <- column
