@@ -1184,12 +1184,18 @@ exportVisibility fname
     = (specified <$> visOption fname)
   <|> pure defaulted
 
+||| A binder with only one name and one type
+||| BNF:
+||| plainBinder := name ':' typeExpr
 plainBinder : (fname : OriginDesc) => (indents : IndentInfo) => Rule PlainBinder
 plainBinder = do name <- fcBounds (decoratedSimpleBinderUName fname)
                  decoratedSymbol fname ":"
                  ty <- typeExpr pdef fname indents
                  pure $ MkWithName name ty
 
+||| A binder with multiple names and one type
+||| BNF:
+||| basicMultiBinder := name (, name)* ':' typeExpr
 basicMultiBinder : (fname : OriginDesc) => (indents : IndentInfo) => Rule BasicMultiBinder
 basicMultiBinder
   = do rig <- multiplicity fname
@@ -1816,7 +1822,10 @@ parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
            decoratedSymbol fname "}"
            pure $ MkPBinder info params
 
-  recordParam : Rule (PBinder)
+  ||| Record parameter, can be either a typed binder or a name
+  ||| BNF:
+  ||| recordParam := typedArg | name
+  recordParam : Rule PBinder
   recordParam
       = typedArg
     <|> do n <- fcBounds (decoratedSimpleBinderUName fname)
@@ -1873,11 +1882,6 @@ parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
       newParamDecls = some typedArg
 
 
-  -- topLevelClaim is for claims appearing at the top-level of the file
-  -- localClaim is for claims appearing in nested positions, like `let` or `record` in the future
-  topLevelClaim : Rule PDeclNoFC
-  topLevelClaim = PClaim <$> localClaim
-
   definition : Rule PDeclNoFC
   definition
       = do nd <- clause 0 Nothing fname indents
@@ -1901,6 +1905,9 @@ parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
                        )
            pure (mapFC PFixity b)
 
+-- The compiler cannot infer the values for c1 and c2 so I had to write it
+-- this way.
+-- - Andre
 cgDirectiveDecl : Rule PDeclNoFC
 cgDirectiveDecl
   = (>>=) {c1 = True, c2 = False} cgDirective $ \dir =>
@@ -1916,7 +1923,7 @@ topDecl fname indents
     = do id <- anyReservedIdent
          the (Rule PDecl) $ fatalLoc id.bounds "Cannot begin a declaration with a reserved identifier"
   <|> fcBounds dataDecl
-  <|> fcBounds topLevelClaim
+  <|> fcBounds (PClaim <$> localClaim)
   <|> fcBounds (PDirective <$> directive)
   <|> fcBounds implDecl
   <|> fcBounds definition
