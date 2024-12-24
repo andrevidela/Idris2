@@ -1020,25 +1020,35 @@ mutual
            pure $ MkImpLater fc n !(bindTypeNames fc (usingImpl syn)
                                                   ps !(desugar AnyExpr ps tycon))
 
-  desugarField : {auto s : Ref Syn SyntaxInfo} ->
-                 {auto c : Ref Ctxt Defs} ->
-                 {auto u : Ref UST UState} ->
-                 {auto m : Ref MD Metadata} ->
-                 {auto o : Ref ROpts REPLOpts} ->
-                 List Name -> Namespace -> PField ->
-                 Core (List IField)
-  desugarField ps ns (MkFCVal fc $ MkRecordField doc rig p names ty)
-      = flip Core.traverse names $ \n : Name => do
-           addDocStringNS ns n doc
-           addDocStringNS ns (toRF n) doc
-           syn <- get Syn
-           pure (MkIField fc rig !(traverse (desugar AnyExpr ps) p )
-                          n !(bindTypeNames fc (usingImpl syn)
-                          ps !(desugar AnyExpr ps ty)))
-        where
-          toRF : Name -> Name
-          toRF (UN (Basic n)) = UN (Field n)
-          toRF n = n
+
+  parameters
+      {auto s : Ref Syn SyntaxInfo}
+      {auto c : Ref Ctxt Defs}
+      {auto u : Ref UST UState}
+      {auto m : Ref MD Metadata}
+      {auto o : Ref ROpts REPLOpts}
+      (ps : List Name)
+      (ns : Namespace)
+
+    desugarField : PField -> Core (List IField)
+    desugarField (MkFCVal fc $ MkRecordField doc rig p names ty)
+        = flip Core.traverse names $ \n : Name => do
+             addDocStringNS ns n doc
+             addDocStringNS ns (toRF n) doc
+             syn <- get Syn
+             pure (MkIField fc rig !(traverse (desugar AnyExpr ps) p )
+                            n !(bindTypeNames fc (usingImpl syn)
+                            ps !(desugar AnyExpr ps ty)))
+          where
+            toRF : Name -> Name
+            toRF (UN (Basic n)) = UN (Field n)
+            toRF n = n
+
+    desugarRecordLet : List1 PRecordDeclLet -> Core (List IField)
+
+    desugarRecordBodyDecl : RecordBodyDecl -> Core (List IField)
+    desugarRecordBodyDecl (MkRecordBodyLet xs) = desugarRecordLet xs
+    desugarRecordBodyDecl (MkRecordBodyField x) = desugarField ?argg
 
   export
   desugarFnOpt : {auto s : Ref Syn SyntaxInfo} ->
@@ -1244,7 +1254,12 @@ mutual
                              pure allBinders)
                         params
            let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) params'
-           let fnames = concat $ map getfname fields
+           let extractFields : RecordBodyDecl -> Maybe RecordField
+               extractFields (MkRecordBodyField x) = Just x
+               extractFields _                     = Nothing
+               allFields := concatMap {t=List} ?huuu fields
+
+           let fnames = concat $ map (getfname . ?dhuah) fields
            let paramNames = concatMap (map val . forget . names . bind) params
            let _ = the (List Name) fnames
            -- Look for bindable names in the parameters
@@ -1259,9 +1274,8 @@ mutual
            let paramsb = map (\ (n, c, p, tm) => (n, c, p, doBind bnames tm)) params'
            let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) paramsb
            let recName = nameRoot tn
-           fields' <- traverse (desugarField (ps ++ fnames ++ paramNames
-                                             ) (mkNamespace recName))
-                               fields
+           fields' <- traverse (desugarRecordBodyDecl (ps ++ fnames ++ paramNames) (mkNamespace recName))
+                               (map val fields)
            let _ = the (List $ List IField) fields'
            let conname = maybe (mkConName tn) snd conname_in
            whenJust (fst <$> conname_in) (addDocString conname)

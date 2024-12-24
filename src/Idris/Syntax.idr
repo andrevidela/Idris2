@@ -88,6 +88,22 @@ traverseWName : (ty -> Core sy) -> WithName ty -> Core (WithName sy)
 traverseWName f (MkWithName name val) = MkWithName name <$> f val
 
 -------------------------------------------------------------------------------
+-- With Doc functor to documentation with a payload
+public export
+record WithDoc (ty : Type) where
+  constructor MkWithDoc
+  name : String
+  val : ty
+
+export
+mapWDoc : (ty -> sy) -> WithDoc ty -> WithDoc sy
+mapWDoc f = {val $= f}
+
+export
+traverseWDoc : (ty -> Core sy) -> WithDoc ty -> Core (WithDoc sy)
+traverseWDoc f (MkWithDoc name val) = MkWithDoc name <$> f val
+
+-------------------------------------------------------------------------------
 
 mutual
 
@@ -419,7 +435,7 @@ mutual
                    (params : List (PBinder' nm)) ->
                    (opts : List DataOpt) ->
                    (conName : Maybe (String, Name)) ->
-                   (decls : List (PField' nm)) ->
+                   (decls : List (WithFC (RecordBodyDecl' nm))) ->
                    PRecordDecl' nm
        MkPRecordLater : (tyname : Name) ->
                         (params : List (PBinder' nm)) ->
@@ -491,6 +507,14 @@ mutual
        -- There is no nm on Directive
        ForeignImpl : Name -> List PTerm -> Directive
 
+  public export
+  RecordBodyDecl : Type
+  RecordBodyDecl = RecordBodyDecl' Name
+
+  public export
+  data RecordBodyDecl' : (nm : Type) -> Type where
+    MkRecordBodyLet : List1 (PRecordDeclLet' nm) -> RecordBodyDecl' nm
+    MkRecordBodyField : RecordField' nm -> RecordBodyDecl' nm
 
   public export
   record RecordField' (nm : Type) where
@@ -500,6 +524,10 @@ mutual
     piInfo : PiInfo (PTerm' nm)
     names : List Name -- See #3409
     type : PTerm' nm
+
+  public export
+  RecordField : Type
+  RecordField = RecordField' Name
 
   public export
   PField : Type
@@ -515,8 +543,8 @@ mutual
 
   public export
   data PRecordDeclLet' : Type -> Type where
-    RecordClaim : WithFC (PClaimData' nm) -> PRecordDeclLet' nm
-    RecordClause : WithFC (PClause' nm) -> PRecordDeclLet' nm
+    RecordClaim : PClaimData' nm -> PRecordDeclLet' nm
+    RecordClause : PClause' nm -> PRecordDeclLet' nm
 
   -- For noting the pass we're in when desugaring a mutual block
   -- TODO: Decide whether we want mutual blocks!

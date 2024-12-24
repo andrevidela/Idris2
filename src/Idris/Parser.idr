@@ -83,6 +83,12 @@ decoratedSimpleNamedArg fname
   = decorate fname Bound unqualifiedName
   <|> parens fname (decorate fname Bound unqualifiedOperatorName)
 
+decoratedFieldName : OriginDesc -> Rule Name
+decoratedFieldName fname
+  = (decorate fname Function name
+  <|> (do b <- bounds (symbol "_")
+          fatalLoc {c = True} b.bounds "Fields have to be named"))
+
 -- Forward declare since they're used in the parser
 topDecl : OriginDesc -> IndentInfo -> Rule PDecl
 collectDefs : List PDecl -> List PDecl
@@ -1719,33 +1725,43 @@ implBinds fname indents namedImpl = concatMap (map adjust) <$> go where
           pure (ns :: more)
     <|> pure []
 
-fieldDecl : (fname : OriginDesc) => IndentInfo -> Rule PField
-fieldDecl indents
-      = do doc <- optDocumentation fname
-           decoratedSymbol fname "{"
-           commit
-           impl <- option Implicit (autoImplicitField fname indents <|> defImplicitField fname indents)
-           fs <- fieldBody doc impl
-           decoratedSymbol fname "}"
-           atEnd indents
-           pure fs
-    <|> do doc <- optDocumentation fname
-           fs <- fieldBody doc Explicit
-           atEnd indents
-           pure fs
-  where
-    fieldBody : String -> PiInfo PTerm -> Rule (PField)
-    fieldBody doc p
-        = do b <- bounds (do
-                    rig <- multiplicity fname
-                    ns <- sepBy1 (decoratedSymbol fname ",")
-                            (decorate fname Function name
-                               <|> (do b <- bounds (symbol "_")
-                                       fatalLoc {c = True} b.bounds "Fields have to be named"))
-                    decoratedSymbol fname ":"
-                    ty <- typeExpr pdef fname indents
-                    pure (MkRecordField doc rig p (forget ns) ty))
-             pure b.withFC
+parameters {auto fname : OriginDesc}
+  ||| A record's field declaration
+  recordBodyField : IndentInfo -> Rule RecordField
+  recordBodyField indents
+        = do doc <- optDocumentation fname
+             decoratedSymbol fname "{"
+             commit
+             impl <- option Implicit (autoImplicitField fname indents <|> defImplicitField fname indents)
+             fs <- fieldBody doc impl
+             decoratedSymbol fname "}"
+             atEnd indents
+             pure fs
+      <|> do doc <- optDocumentation fname
+             fs <- fieldBody doc Explicit
+             atEnd indents
+             pure fs
+    where
+
+      ||| A record field, requires already knowing about its binding information and the
+      ||| bound name.
+      fieldBody : String -> PiInfo PTerm -> Rule RecordField
+      fieldBody doc p
+          = do rig <- multiplicity fname
+               ns <- sepBy1 (decoratedSymbol fname ",") (decoratedFieldName fname)
+               decoratedSymbol fname ":"
+               ty <- typeExpr pdef fname indents
+               pure (MkRecordField doc rig p (forget ns) ty)
+
+  recordBodyLet : IndentInfo -> Rule (List1 PRecordDeclLet)
+
+  ||| The body of a record declaration
+  ||| BNF:
+  ||| recordBodyDecl := recordBodyLet | recordBodyField
+  recordBodyDecl : (indents : IndentInfo) -> Rule RecordBodyDecl
+  recordBodyDecl indents
+      = MkRecordBodyLet <$> recordBodyLet indents
+    <|> MkRecordBodyField <$> recordBodyField indents
 
 parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
 
@@ -1832,22 +1848,19 @@ parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
            pure (MkFullBinder Explicit top n $ PInfer n.fc)
 
   -- A record without a where is a forward declaration
-  recordBody : String -> WithDefault Visibility Private ->
-               Maybe TotalReq ->
-               Int ->
+  recordBody : Int ->
                Name ->
                List PBinder ->
-               EmptyRule PDeclNoFC
-  recordBody doc vis mbtot col n params
+               EmptyRule (PRecordDecl' Name)
+  recordBody col n params
       = do atEndIndent indents
-           pure (PRecord doc vis mbtot (MkPRecordLater n params))
+           pure (MkPRecordLater n params)
     <|> do mustWork $ decoratedKeyword fname "where"
            opts <- dataOpts fname
-           dcflds <- blockWithOptHeaderAfter col
+           (header, body) <- blockWithOptHeaderAfter col
                        (\ idt => recordConstructor fname <* atEnd idt)
-                       fieldDecl
-           pure (PRecord doc vis mbtot
-                  (MkPRecord n params opts (fst dcflds) (snd dcflds)))
+                       (fcBounds . recordBodyDecl )
+           pure (MkPRecord n params opts header body)
 
   recordDecl : Rule PDeclNoFC
   recordDecl
@@ -1857,7 +1870,7 @@ parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
            decoratedKeyword fname "record"
            n       <- mustWork (decoratedDataTypeName fname)
            paramss <- many (continue indents >> recordParam)
-           recordBody doc vis mbtot col n paramss
+           PRecord doc vis mbtot <$> recordBody col n paramss
 
   ||| Parameter blocks
   ||| BNF:

@@ -227,8 +227,8 @@ mapPTermM f = goPTerm where
     goPDo (DoRewrite fc t) = DoRewrite fc <$> goPTerm t
 
     goPRecordDeclLet : PRecordDeclLet' nm -> Core (PRecordDeclLet' nm)
-    goPRecordDeclLet (RecordClaim x) = RecordClaim <$> traverseFC goPClaim x
-    goPRecordDeclLet (RecordClause x) = RecordClause <$> traverseFC goPClause x
+    goPRecordDeclLet (RecordClaim x) = RecordClaim <$> ?thing -- traverseFC goPClaim x
+    goPRecordDeclLet (RecordClause x) = RecordClause <$> ?otherTHIng -- traverseFC goPClause x
 
     goPClause : PClause' nm -> Core (PClause' nm)
     goPClause (MkPatClause fc lhs rhs wh) =
@@ -300,7 +300,7 @@ mapPTermM f = goPTerm where
       pure $ PRecord doc v tot !(MkPRecord n <$> traverse goPBinder nts
                                              <*> pure opts
                                              <*> pure mn
-                                             <*> goPFields fs)
+                                             <*> ?precbody)
     goPDecl (PRecord doc v tot (MkPRecordLater n nts)) =
       pure $ PRecord doc v tot (MkPRecordLater n !(traverse goPBinder nts))
     goPDecl (PFail msg ps) = PFail msg <$> goPDecls ps
@@ -582,8 +582,8 @@ mapPTerm f = goPTerm where
       = PImplementation v opts p (goImplicits is) (goPairedPTerms cs)
            n (goPTerm <$> ts) mn ns (map (mapFC goPDecl <$>) mps)
     goPDecl (PRecord doc v tot (MkPRecord n nts opts mn fs))
-      = PRecord doc v tot
-          (MkPRecord n (map goPBinder nts) opts mn (map (mapFC goRecordField) fs))
+      = PRecord doc v tot ?dbdab
+          -- (MkPRecord n (map goPBinder nts) opts mn ?rec ?bbd)-- (map (mapFC goRecordField) fs))
     goPDecl (PRecord doc v tot (MkPRecordLater n nts))
       = PRecord doc v tot (MkPRecordLater n (goPBinder <$> nts ))
     goPDecl (PFail msg ps) = PFail msg $ mapFC goPDecl <$> ps
@@ -615,8 +615,8 @@ mapPTerm f = goPTerm where
     goPDataDecl (MkPLater fc n t) = MkPLater fc n $ goPTerm t
 
     goPRecordDeclLet : PRecordDeclLet' nm -> PRecordDeclLet' nm
-    goPRecordDeclLet (RecordClaim claim) = RecordClaim $ mapFC goPClaim claim
-    goPRecordDeclLet (RecordClause clause) = RecordClause $ mapFC goPClause clause
+    goPRecordDeclLet (RecordClaim claim) = RecordClaim $ ?dbbdbd
+    goPRecordDeclLet (RecordClause clause) = RecordClause $ ?hduidi
 
     goRecordField : RecordField' nm -> RecordField' nm
     goRecordField (MkRecordField doc c info n t)
