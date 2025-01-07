@@ -553,7 +553,6 @@ mutual
                = MkFullBinder info rig (NoFC n) ty
                               --        ^^^^
                               -- we should know this location
-
   toPDecl (IFail fc msg ds)
       = do ds' <- traverse toPDecl ds
            pure (Just (MkFCVal fc $ PFail msg (catMaybes ds')))

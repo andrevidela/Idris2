@@ -433,8 +433,7 @@ mutual
                 [] =>
                     desugarB side ps
                         (PLam fc top Explicit (PRef fc (MN "arg" 0)) (PImplicit fc)
-                            (POp fc (MkFCVal fc $ NoBinder (PRef fc (MN "arg" 0)))
-                                    op arg))
+                            (POp fc (MkFCVal op.fc (NoBinder (PRef fc (MN "arg" 0)))) op arg))
                 (prec :: _) => desugarB side ps (PPrefixOp fc op arg)
   desugarB side ps (PSectionR fc arg op)
       = desugarB side ps
@@ -1079,13 +1078,13 @@ mutual
                 {auto m : Ref MD Metadata} ->
                 {auto o : Ref ROpts REPLOpts} ->
                 List Name -> PDecl -> Core (List ImpDecl)
-  desugarDecl ps (MkFCVal fc $ PClaim (MkPClaim rig vis fnopts ty))
+  desugarDecl ps (MkFCVal fc (PClaim (MkPClaim rig vis fnopts ty)))
       = do opts <- traverse (desugarFnOpt ps) fnopts
            types <- desugarType ps ty
            pure $ flip (map {f = List, b = ImpDecl}) types $ \ty' =>
                       IClaim (MkFCVal fc $ MkIClaimData rig vis opts ty')
 
-  desugarDecl ps (MkFCVal fc $ PDef clauses)
+  desugarDecl ps (MkFCVal fc (PDef clauses))
   -- The clauses won't necessarily all be from the same function, so split
   -- after desugaring, by function name, using collectDefs from RawImp
       = do ncs <- traverse (desugarClause ps False) clauses
@@ -1131,7 +1130,6 @@ mutual
               i' <- traverse (desugar AnyExpr ps) info
               let allbinders = map (\nn => (nn.val, rig, i', tm')) n
               pure allbinders) params
-
   desugarDecl ps (MkFCVal fc $ PUsing uimpls uds)
       = do syn <- get Syn
            let oldu = usingImpl syn

@@ -312,7 +312,6 @@ mapPTermM f = goPTerm where
     goPDecl (PDirective d) = pure (PDirective d)
     goPDecl p@(PBuiltin _ _) = pure p
 
-
     goPTypeDecl : PTypeDeclData' nm -> Core (PTypeDeclData' nm)
     goPTypeDecl (MkPTy n d t) = MkPTy n d <$> goPTerm t
 
@@ -403,7 +402,7 @@ mapPTermM f = goPTerm where
 
     goPDecls : List (PDecl' nm) -> Core (List (PDecl' nm))
     goPDecls []          = pure []
-    goPDecls (MkFCVal fc d :: ds) = (::) <$> (MkFCVal fc <$> goPDecl d) <*> goPDecls ds
+    goPDecls (d :: ds) = (::) <$> traverseFC goPDecl d <*> goPDecls ds
 
     goPFieldUpdates : List (PFieldUpdate' nm) -> Core (List (PFieldUpdate' nm))
     goPFieldUpdates []          = pure []
@@ -442,7 +441,7 @@ mapPTerm f = goPTerm where
     goPTerm (PCase fc opts x xs)
       = f $ PCase fc (goPFnOpt <$>  opts) (goPTerm x) (goPClause <$> xs)
     goPTerm (PLocal fc xs scope)
-      = f $ PLocal fc (map (mapFC goPDecl) xs) (goPTerm scope)
+      = f $ PLocal fc (mapFC goPDecl <$> xs) (goPTerm scope)
     goPTerm (PUpdate fc xs)
       = f $ PUpdate fc (goPFieldUpdate <$> xs)
     goPTerm (PApp fc x y)
@@ -465,7 +464,7 @@ mapPTerm f = goPTerm where
       = f $ PQuote fc $ goPTerm x
     goPTerm t@(PQuoteName _ _) = f t
     goPTerm (PQuoteDecl fc x)
-      = f $ PQuoteDecl fc (map (mapFC goPDecl) x)
+      = f $ PQuoteDecl fc (mapFC goPDecl <$> x)
     goPTerm (PUnquote fc x)
       = f $ PUnquote fc $ goPTerm x
     goPTerm (PRunElab fc x)
@@ -544,7 +543,7 @@ mapPTerm f = goPTerm where
       = DoLet fc lhsFC n c (goPTerm t) (goPTerm scope)
     goPDo (DoLetPat fc pat t scope cls)
       = DoLetPat fc (goPTerm pat) (goPTerm t) (goPTerm scope) (goPClause <$> cls)
-    goPDo (DoLetLocal fc decls) = DoLetLocal fc $ map (mapFC goPDecl) decls
+    goPDo (DoLetLocal fc decls) = DoLetLocal fc $ mapFC goPDecl <$> decls
     goPDo (DoRewrite fc t) = DoRewrite fc $ goPTerm t
 
     goPWithProblem : PWithProblem' nm -> PWithProblem' nm
@@ -552,7 +551,7 @@ mapPTerm f = goPTerm where
 
     goPClause : PClause' nm -> PClause' nm
     goPClause (MkPatClause fc lhs rhs wh)
-      = MkPatClause fc (goPTerm lhs) (goPTerm rhs) (map (mapFC goPDecl) wh)
+      = MkPatClause fc (goPTerm lhs) (goPTerm rhs) (mapFC goPDecl <$> wh)
     goPClause (MkWithClause fc lhs wps flags cls)
       = MkWithClause fc (goPTerm lhs) (goPWithProblem <$> wps) flags (goPClause <$> cls)
     goPClause (MkImpossible fc lhs) = MkImpossible fc $ goPTerm lhs

@@ -365,8 +365,9 @@ mutual
                        pure $
                          let fc = boundToFC fname (mergeBounds l r)
                              opFC = virtualiseFC fc -- already been highlighted: we don't care
-                         in POp fc (MkFCVal opFC (NoBinder l.val))
-                                   (MkFCVal opFC (OpSymbols $ UN $ Basic "=")) r.val
+                         in POp fc (mapFC NoBinder l.withFC)
+                                   (MkFCVal opFC (OpSymbols $ UN $ Basic "="))
+                                   r.val
                else fail "= not allowed")
              <|>
              (do b <- bounds $ do
