@@ -292,13 +292,14 @@ idiomise fc dons mns fn
 
 data Bang : Type where
 
-mutual
-  desugarB : {auto s : Ref Syn SyntaxInfo} ->
-             {auto b : Ref Bang BangData} ->
-             {auto c : Ref Ctxt Defs} ->
-             {auto m : Ref MD Metadata} ->
-             {auto u : Ref UST UState} ->
-             {auto o : Ref ROpts REPLOpts} ->
+parameters {auto s : Ref Syn SyntaxInfo}
+           {auto c : Ref Ctxt Defs}
+           {auto u : Ref UST UState}
+           {auto m : Ref MD Metadata}
+           {auto o : Ref ROpts REPLOpts}
+ mutual
+
+  desugarB : {auto b : Ref Bang BangData} ->
              Side -> List Name -> PTerm -> Core RawImp
   desugarB side ps (PRef fc x) = do
     let ns = mbNamespace !(get Bang)
@@ -619,12 +620,7 @@ mutual
   desugarUpdate side ps (PSetFieldApp p v)
       = pure (ISetFieldApp p !(desugarB side ps v))
 
-  expandList : {auto s : Ref Syn SyntaxInfo} ->
-               {auto b : Ref Bang BangData} ->
-               {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto m : Ref MD Metadata} ->
-               {auto o : Ref ROpts REPLOpts} ->
+  expandList : {auto b : Ref Bang BangData} ->
                Side -> List Name ->
                (nilFC : FC) -> List (FC, PTerm) -> Core RawImp
   expandList side ps nilFC [] = pure (IVar nilFC (UN $ Basic "Nil"))
@@ -632,15 +628,10 @@ mutual
       = pure $ apply (IVar consFC (UN $ Basic "::"))
                 [!(desugarB side ps x), !(expandList side ps nilFC xs)]
 
-  expandSnocList
-             : {auto s : Ref Syn SyntaxInfo} ->
-               {auto b : Ref Bang BangData} ->
-               {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto m : Ref MD Metadata} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               Side -> List Name -> (nilFC : FC) ->
-               SnocList (FC, PTerm) -> Core RawImp
+  expandSnocList :
+      {auto b : Ref Bang BangData} ->
+      Side -> List Name -> (nilFC : FC) ->
+      SnocList (FC, PTerm) -> Core RawImp
   expandSnocList side ps nilFC [<] = pure (IVar nilFC (UN $ Basic "Lin"))
   expandSnocList side ps nilFC (xs :< (consFC, x))
       = pure $ apply (IVar consFC (UN $ Basic ":<"))
@@ -752,12 +743,7 @@ mutual
               \case StrLiteral fc str => StrLiteral fc (fst $ break isNL str)
                     other => other
 
-  expandDo : {auto s : Ref Syn SyntaxInfo} ->
-             {auto c : Ref Ctxt Defs} ->
-             {auto u : Ref UST UState} ->
-             {auto m : Ref MD Metadata} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             Side -> List Name -> FC -> Maybe Namespace -> List PDo -> Core RawImp
+  expandDo : Side -> List Name -> FC -> Maybe Namespace -> List PDo -> Core RawImp
   expandDo side ps fc ns [] = throw (GenericMsg fc "Do block cannot be empty")
   expandDo side ps _ ns [DoExp fc tm] = desugarDo side ps ns tm
   expandDo side ps fc ns [e]
@@ -829,12 +815,7 @@ mutual
            pure $ IRewrite fc rule' rest'
 
   -- Replace all operator by function application
-  desugarTree : {auto s : Ref Syn SyntaxInfo} ->
-                {auto b : Ref Bang BangData} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto u : Ref UST UState} ->
-                {auto m : Ref MD Metadata} ->
-                {auto o : Ref ROpts REPLOpts} ->
+  desugarTree : {auto b : Ref Bang BangData} ->
                 Side -> List Name -> Tree (OpStr, Maybe $ OperatorLHSInfo PTerm) PTerm ->
                 Core PTerm
   desugarTree side ps (Infix loc eqFC (OpSymbols $ UN $ Basic "=", _) l r) -- special case since '=' is special syntax
@@ -902,12 +883,7 @@ mutual
            pure (PApp loc (PRef opFC op.toName) arg')
   desugarTree side ps (Leaf t) = pure t
 
-  desugarType : {auto s : Ref Syn SyntaxInfo} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto u : Ref UST UState} ->
-                {auto m : Ref MD Metadata} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                List Name -> PTypeDecl -> Core (List ImpTy)
+  desugarType : List Name -> PTypeDecl -> Core (List ImpTy)
   desugarType ps (MkFCVal fc $ MkPTy names d ty)
       = flip Core.traverse (forget names) $ \(doc, n) : (String, WithFC Name) =>
           do addDocString n.val (d ++ doc)
@@ -926,12 +902,7 @@ mutual
   getClauseFn (INamedApp _ f _ _) = getClauseFn f
   getClauseFn tm = throw $ GenericMsg (getFC tm) "Head term in pattern must be a function name"
 
-  desugarLHS : {auto s : Ref Syn SyntaxInfo} ->
-               {auto c : Ref Ctxt Defs} ->
-               {auto m : Ref MD Metadata} ->
-               {auto u : Ref UST UState} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               List Name -> (arg : Bool) -> PTerm ->
+  desugarLHS : List Name -> (arg : Bool) -> PTerm ->
                Core (IMaybe (not arg) Name, List Name, RawImp)
                   -- ^ we only look for the head name of the expression...
                   --   if we are actually looking at a headed thing!
@@ -952,22 +923,12 @@ mutual
        pure (inm, bound, blhs)
 
   desugarWithProblem :
-    {auto s : Ref Syn SyntaxInfo} ->
-    {auto c : Ref Ctxt Defs} ->
-    {auto u : Ref UST UState} ->
-    {auto m : Ref MD Metadata} ->
-    {auto o : Ref ROpts REPLOpts} ->
-    List Name -> PWithProblem ->
-    Core (RigCount, RawImp, Maybe (RigCount, Name))
+      List Name -> PWithProblem ->
+      Core (RigCount, RawImp, Maybe (RigCount, Name))
   desugarWithProblem ps (MkPWithProblem rig wval mnm)
-    = (rig,,mnm) <$> desugar AnyExpr ps wval
+      = (rig,,mnm) <$> desugar AnyExpr ps wval
 
-  desugarClause : {auto s : Ref Syn SyntaxInfo} ->
-                  {auto c : Ref Ctxt Defs} ->
-                  {auto u : Ref UST UState} ->
-                  {auto m : Ref MD Metadata} ->
-                  {auto o : Ref ROpts REPLOpts} ->
-                  List Name -> (arg : Bool) -> PClause ->
+  desugarClause : List Name -> (arg : Bool) -> PClause ->
                   Core (IMaybe (not arg) Name, ImpClause)
   desugarClause ps arg (MkPatClause fc lhs rhs wheres)
       = do ws <- traverse (desugarDecl ps) wheres
@@ -992,12 +953,7 @@ mutual
       = do (nm, _, lhs') <- desugarLHS ps arg lhs
            pure (nm, ImpossibleClause fc lhs')
 
-  desugarData : {auto s : Ref Syn SyntaxInfo} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto u : Ref UST UState} ->
-                {auto m : Ref MD Metadata} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                List Name -> (doc : String) ->
+  desugarData : List Name -> (doc : String) ->
                 PDataDecl -> Core ImpData
   desugarData ps doc (MkPData fc n tycon opts datacons)
       = do addDocString n doc
@@ -1015,12 +971,7 @@ mutual
            pure $ MkImpLater fc n !(bindTypeNames fc (usingImpl syn)
                                                   ps !(desugar AnyExpr ps tycon))
 
-  desugarField : {auto s : Ref Syn SyntaxInfo} ->
-                 {auto c : Ref Ctxt Defs} ->
-                 {auto u : Ref UST UState} ->
-                 {auto m : Ref MD Metadata} ->
-                 {auto o : Ref ROpts REPLOpts} ->
-                 List Name -> Namespace -> PField ->
+  desugarField : List Name -> Namespace -> PField ->
                  Core (List IField)
   desugarField ps ns (MkFCVal fc $ MkRecordField doc rig p names ty)
       = flip Core.traverse names $ \n : Name => do
@@ -1051,12 +1002,7 @@ mutual
            pure (ForeignExport tms')
 
   %inline
-  mapDesugarPiInfo : {auto s : Ref Syn SyntaxInfo} ->
-                     {auto c : Ref Ctxt Defs} ->
-                     {auto u : Ref UST UState} ->
-                     {auto m : Ref MD Metadata} ->
-                     {auto o : Ref ROpts REPLOpts} ->
-                     List Name -> PiInfo PTerm -> Core (PiInfo RawImp)
+  mapDesugarPiInfo : List Name -> PiInfo PTerm -> Core (PiInfo RawImp)
   mapDesugarPiInfo ps = PiInfo.traverse (desugar AnyExpr ps)
 
   displayFixity : Maybe Visibility -> BindingModifier -> Fixity -> Nat -> OpStr -> String
@@ -1065,8 +1011,7 @@ mutual
   displayFixity (Just vis) NotBinding fix prec op = "\{show vis} \{show fix} \{show  prec} \{show op}"
   displayFixity (Just vis) bind fix prec op = "\{show vis} \{show bind} \{show fix} \{show  prec} \{show op}"
 
-  verifyTotalityModifiers : {auto c : Ref Ctxt Defs} ->
-                            FC -> List FnOpt -> Core ()
+  verifyTotalityModifiers : FC -> List FnOpt -> Core ()
   verifyTotalityModifiers fc opts =
     when (count isTotalityReq opts > 1) $ do
       let totalities = sort $ mapMaybe extractTotality opts
@@ -1099,15 +1044,18 @@ mutual
           "Remove modifiers " ++ showModifiers totalities ++
           ", resulting in the default totality of " ++ showModifiers [def]
 
+  getBinderList : List Name -> PBinder ->
+                  Core (List (Name, ZeroOneOmega, PiInfo (RawImp' Name), RawImp' Name))
+  getBinderList ps (MkPBinder info (MkBasicMultiBinder rig names tm)) = do
+      tm' <- desugar AnyExpr ps tm
+      p'  <- mapDesugarPiInfo ps info
+      let allBinders = map (\nn => (nn.val, rig, p', tm')) (forget names)
+      pure allBinders
+
   -- Given a high level declaration, return a list of TTImp declarations
   -- which process it, and update any necessary state on the way.
   export
-  desugarDecl : {auto s : Ref Syn SyntaxInfo} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto u : Ref UST UState} ->
-                {auto m : Ref MD Metadata} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                List Name -> PDecl -> Core (List ImpDecl)
+  desugarDecl : List Name -> PDecl -> Core (List ImpDecl)
   desugarDecl ps (MkFCVal fc (PClaim (MkPClaim rig vis fnopts ty)))
       = do opts <- traverse (desugarFnOpt ps) fnopts
            verifyTotalityModifiers fc opts
@@ -1157,11 +1105,7 @@ mutual
               ty' <- desugar AnyExpr ps ty
               pure (n.val, top, Explicit, ty')) params
         getArgs (Right params)
-          = join <$> traverseList1 (\(MkPBinder info (MkBasicMultiBinder rig n ntm)) => do
-              tm' <- desugar AnyExpr ps ntm
-              i' <- traverse (desugar AnyExpr ps) info
-              let allbinders = map (\nn => (nn.val, rig, i', tm')) n
-              pure allbinders) params
+          = join <$> traverseList1 getBinderList params
 
   desugarDecl ps (MkFCVal fc $ PUsing uimpls uds)
       = do syn <- get Syn
@@ -1270,12 +1214,7 @@ mutual
         = PPi fc c p (Just n.val) t (mkRecType (MkPBinder p (MkBasicMultiBinder c (x ::: xs) t) :: ts))
   desugarDecl ps (MkFCVal fc $ PRecord doc vis mbtot (MkPRecord tn params opts conname_in fields))
       = do addDocString tn doc
-           params' <- concat <$> traverse (\ (MkPBinder info (MkBasicMultiBinder rig names tm)) =>
-                          do tm' <- desugar AnyExpr ps tm
-                             p'  <- mapDesugarPiInfo ps info
-                             let allBinders = map (\nn => (nn.val, rig, p', tm')) (forget names)
-                             pure allBinders)
-                        params
+           params' <- concat <$> traverse getBinderList params
            ?sorryWhat
            -- let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) params'
            -- let fnames = concat $ map getfname fields
@@ -1448,12 +1387,7 @@ mutual
   desugarDecl ps (MkFCVal fc $ PBuiltin type name) = pure [MkFCVal fc $ IBuiltin type name]
 
   export
-  desugarDo : {auto s : Ref Syn SyntaxInfo} ->
-              {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              Side -> List Name -> Maybe Namespace -> PTerm -> Core RawImp
+  desugarDo : Side -> List Name -> Maybe Namespace -> PTerm -> Core RawImp
   desugarDo s ps doNamespace tm
       = do b <- newRef Bang (initBangs doNamespace)
            tm' <- desugarB s ps tm
@@ -1461,11 +1395,5 @@ mutual
            pure $ bindBangs (bangNames bd) doNamespace tm'
 
   export
-  desugar : {auto s : Ref Syn SyntaxInfo} ->
-            {auto c : Ref Ctxt Defs} ->
-            {auto m : Ref MD Metadata} ->
-            {auto u : Ref UST UState} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            Side -> List Name -> PTerm -> Core RawImp
-
+  desugar : Side -> List Name -> PTerm -> Core RawImp
   desugar s ps tm = desugarDo s ps Nothing tm
