@@ -148,7 +148,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
              -- we don't use MkImpLater because users may have already declared the record ahead of time
              let dt = MkImpData fc tn (Just dataTy) opts []
              log "declare.record" 10 $ "Pre-declare record data type: \{show dt}"
-             processDecl [] nest env (IData fc def_vis mbtot dt)
+             processDecl [] nest env (MkFCVal fc $ IData def_vis mbtot dt)
              defs <- get Ctxt
              Just ty <- lookupTyExact tn (gamma defs)
                | Nothing => throw (InternalError "Missing data type \{show tn}, despite having just declared it!")
@@ -224,7 +224,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
                        !(bindTypeNames fc [] boundNames conty)
              let dt = MkImpData fc tn Nothing opts [con]
              log "declare.record" 5 $ "Record data type " ++ show dt
-             processDecl [] nest env (IData fc def_vis mbtot dt)
+             processDecl [] nest env (MkFCVal fc $ IData def_vis mbtot dt)
 
     countExp : Term vs -> Nat
     countExp (Bind _ _ (Pi _ _ Explicit _) sc) = S (countExp sc)
@@ -272,7 +272,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
                    let fc' = virtualiseFC fc
                    let mkProjClaim = \ nm =>
                           let ty = MkImpTy fc' (MkFCVal fc' nm) projTy
-                          in IClaim (MkFCVal bfc (MkIClaimData rig isVis [Inline] ty))
+                          in MkFCVal bfc (IClaim (MkIClaimData rig isVis [Inline] ty))
 
                    log "declare.record.projection.claim" 5 $
                       "Projection " ++ show rfNameNS ++ " : " ++ show projTy
@@ -308,7 +308,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
 
                    log "declare.record.projection.clause" 5 $ "Projection " ++ show lhs ++ " = " ++ show rhs
                    processDecl [] nest env
-                       (IDef bfc rfNameNS [PatClause bfc lhs rhs])
+                       (MkFCVal bfc $ IDef rfNameNS [PatClause bfc lhs rhs])
 
                    -- Make prefix projection aliases if requested
                    when !isPrefixRecordProjections $ do  -- beware: `!` is NOT boolean `not`!
@@ -324,7 +324,7 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
                      log "declare.record.projection.prefix" 5 $
                        "Prefix projection " ++ show lhs ++ " = " ++ show rhs
                      processDecl [] nest env
-                         (IDef bfc unNameNS [PatClause bfc lhs rhs])
+                         (MkFCVal bfc $ IDef unNameNS [PatClause bfc lhs rhs])
 
                    -- Move on to the next getter.
                    --

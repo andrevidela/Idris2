@@ -834,6 +834,10 @@ traverseList1_ f xxs
 traverseFC : (a -> Core b) -> WithFC a -> Core (WithFC b)
 traverseFC f (MkFCVal fc x) = MkFCVal fc <$> f x
 
+%inline export
+traverseFCMaybe : (a -> Core (Maybe b)) -> WithFC a -> Core (Maybe (WithFC b))
+traverseFCMaybe f (MkFCVal fc x) = map (MkFCVal fc) <$> f x
+
 namespace PiInfo
   export
   traverse : (a -> Core b) -> PiInfo a -> Core (PiInfo b)

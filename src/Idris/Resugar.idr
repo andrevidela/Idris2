@@ -339,7 +339,7 @@ mutual
               else tm
       mkIf tm = tm
   toPTerm p (ILocal fc ds sc)
-      = do ds' <- traverse toPDecl ds
+      = do ds' <- traverse (traverseFCMaybe toPDecl) ds
            sc' <- toPTerm startPrec sc
            bracket p startPrec (PLocal fc (catMaybes ds') sc')
   toPTerm p (ICaseLocal fc _ _ _ sc) = toPTerm p sc
@@ -388,7 +388,7 @@ mutual
   toPTerm p (IQuote fc tm) = pure (PQuote fc !(toPTerm argPrec tm))
   toPTerm p (IQuoteName fc n) = pure (PQuoteName fc n)
   toPTerm p (IQuoteDecl fc ds)
-      = do ds' <- traverse toPDecl ds
+      = do ds' <- traverse (traverseFCMaybe toPDecl) ds
            pure $ PQuoteDecl fc (catMaybes ds')
   toPTerm p (IUnquote fc tm) = pure (PUnquote fc !(toPTerm argPrec tm))
   toPTerm p (IRunElab fc _ tm) = pure (PRunElab fc !(toPTerm argPrec tm))
@@ -526,25 +526,26 @@ mutual
 
   toPDecl : {auto c : Ref Ctxt Defs} ->
             {auto s : Ref Syn SyntaxInfo} ->
-            ImpDecl' KindedName -> Core (Maybe (PDecl' KindedName))
-  toPDecl (IClaim (MkFCVal fc $ MkIClaimData rig vis opts ty))
+            ImpDecl'' KindedName -> Core (Maybe (PDeclNoFC' KindedName))
+  toPDecl (IClaim (MkIClaimData rig vis opts ty))
       = do opts' <- traverse toPFnOpt opts
-           pure (Just (MkFCVal fc $ PClaim (MkPClaim rig vis opts' !(toPTypeDecl ty))))
-  toPDecl (IData fc vis mbtot d)
-      = pure (Just (MkFCVal fc $ PData "" vis mbtot !(toPData d)))
-  toPDecl (IDef fc n cs)
-      = pure (Just (MkFCVal fc $ PDef !(traverse toPClause cs)))
-  toPDecl (IParameters fc ps ds)
-      = do ds' <- traverse toPDecl ds
+           pure (Just (PClaim (MkPClaim rig vis opts' !(toPTypeDecl ty))))
+  toPDecl (IData vis mbtot d)
+      = pure (Just (PData "" vis mbtot !(toPData d)))
+  toPDecl (IDef n cs)
+      = pure (Just (PDef !(traverse toPClause cs)))
+  toPDecl (IParameters ps ds)
+      = do ds' <- traverse (traverseFCMaybe toPDecl) ds
            args <-
              traverseList1 (\(n, rig, info, tpe) =>
                  do info' <- traverse (toPTerm startPrec) info
                     type' <- toPTerm startPrec tpe
                     pure (MkFullBinder info' rig (NoFC n) type')) ps
-           pure (Just (MkFCVal fc (PParameters (Right args) (catMaybes ds'))))
-  toPDecl (IRecord fc _ vis mbtot r)
+           pure (Just (PParameters (Right args) (catMaybes ds')))
+  toPDecl (IRecord _ vis mbtot r)
       = do (n, ps, opts, con, fs) <- toPRecord r
-           pure (Just (MkFCVal fc $ PRecord "" vis mbtot (MkPRecord n (map toBinder ps) opts con fs)))
+           ?resugarRecord
+           -- pure (Just (MkFCVal fc $ PRecord "" vis mbtot (MkPRecord n (map toBinder ps) opts con fs)))
            where
              toBinder : (Name, ZeroOneOmega, PiInfo (PTerm' KindedName), PTerm' KindedName) -> PBinder' KindedName
              toBinder (n, rig, info, ty)
@@ -552,21 +553,21 @@ mutual
                               --        ^^^^
                               -- we should know this location
 
-  toPDecl (IFail fc msg ds)
-      = do ds' <- traverse toPDecl ds
-           pure (Just (MkFCVal fc $ PFail msg (catMaybes ds')))
-  toPDecl (INamespace fc ns ds)
-      = do ds' <- traverse toPDecl ds
-           pure (Just (MkFCVal fc $ PNamespace ns (catMaybes ds')))
-  toPDecl (ITransform fc n lhs rhs)
-      = pure (Just (MkFCVal fc $ PTransform (show n)
-                                  !(toPTerm startPrec lhs)
-                                  !(toPTerm startPrec rhs)))
-  toPDecl (IRunElabDecl fc tm)
-      = pure (Just (MkFCVal fc $ PRunElabDecl !(toPTerm startPrec tm)))
-  toPDecl (IPragma _ _ _) = pure Nothing
+  toPDecl (IFail msg ds)
+      = do ds' <- traverse (traverseFCMaybe toPDecl) ds
+           pure (Just (PFail msg (catMaybes ds')))
+  toPDecl (INamespace ns ds)
+      = do ds' <- traverse (traverseFCMaybe toPDecl) ds
+           pure (Just (PNamespace ns (catMaybes ds')))
+  toPDecl (ITransform n lhs rhs)
+      = pure (Just (PTransform (show n)
+                               !(toPTerm startPrec lhs)
+                               !(toPTerm startPrec rhs)))
+  toPDecl (IRunElabDecl tm)
+      = pure (Just (PRunElabDecl !(toPTerm startPrec tm)))
+  toPDecl (IPragma _ _) = pure Nothing
   toPDecl (ILog _) = pure Nothing
-  toPDecl (IBuiltin fc type name) = pure $ Just $ MkFCVal fc $ PBuiltin type name
+  toPDecl (IBuiltin type name) = pure $ Just $ PBuiltin type name
 
 export
 cleanPTerm : {auto c : Ref Ctxt Defs} ->

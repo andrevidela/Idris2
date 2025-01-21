@@ -54,7 +54,7 @@ processParams {vars} {c} {m} {u} nest env fc ps ds
          -- Treat the names in the block as 'nested names' so that we expand
          -- the applications as we need to
          defs <- get Ctxt
-         let defNames = definedInBlock (currentNS defs) ds
+         let defNames = definedInBlock (currentNS defs) (map val ds)
          names' <- traverse (applyEnv env') defNames
          let nestBlock = { names $= (names' ++) } nest'
          traverse_ (processDecl [] nestBlock env') ds

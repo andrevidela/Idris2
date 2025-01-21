@@ -116,6 +116,10 @@ export
 setFC : FC -> WithFC a -> WithFC a
 setFC x = { fc := x }
 
+export
+[ShowVal] Show a => Show (WithFC a) where
+  show = show . val
+
 ------------------------------------------------------------------------
 -- Conversion between NonEmptyFC and FC
 

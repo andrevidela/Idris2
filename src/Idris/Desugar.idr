@@ -1114,7 +1114,7 @@ mutual
 
            types <- desugarType ps ty
            pure $ flip (map {f = List, b = ImpDecl}) types $ \ty' =>
-                      IClaim (MkFCVal fc $ MkIClaimData rig vis opts ty')
+                      MkFCVal fc (IClaim (MkIClaimData rig vis opts ty'))
 
   desugarDecl ps (MkFCVal fc (PDef clauses))
   -- The clauses won't necessarily all be from the same function, so split
@@ -1125,14 +1125,14 @@ mutual
     where
       toIDef : Name -> ImpClause -> Core ImpDecl
       toIDef nm (PatClause fc lhs rhs)
-          = pure $ IDef fc nm [PatClause fc lhs rhs]
+          = pure $ MkFCVal fc $ IDef nm [PatClause fc lhs rhs]
       toIDef nm (WithClause fc lhs rig rhs prf flags cs)
-          = pure $ IDef fc nm [WithClause fc lhs rig rhs prf flags cs]
+          = pure $ MkFCVal fc $ IDef nm [WithClause fc lhs rig rhs prf flags cs]
       toIDef nm (ImpossibleClause fc lhs)
-          = pure $ IDef fc nm [ImpossibleClause fc lhs]
+          = pure $ MkFCVal fc $ IDef nm [ImpossibleClause fc lhs]
 
   desugarDecl ps (MkFCVal fc $ PData doc vis mbtot ddecl)
-      = pure [IData fc vis mbtot !(desugarData ps doc ddecl)]
+      = pure [MkFCVal fc $ IData vis mbtot !(desugarData ps doc ddecl)]
 
   desugarDecl ps (MkFCVal fc $ PParameters params pds)
       = do
@@ -1147,7 +1147,7 @@ mutual
 
            let paramsb = map (\(n, rig, info, tm) =>
                                  (n, rig, info, doBind pnames tm)) params'
-           pure [IParameters fc paramsb (concat pds')]
+           pure [MkFCVal fc $ IParameters paramsb (concat pds')]
       where
         getArgs : Either (List1 PlainBinder)
                          (List1 PBinder) ->
@@ -1200,7 +1200,7 @@ mutual
            let consb = map (\ (nm, tm) => (nm, doBind bnames tm)) cons'
 
            body' <- traverse (desugarDecl (ps ++ mnames ++ paramNames)) body
-           pure [IPragma fc (maybe [tn] (\n => [tn, snd n]) conname)
+           pure [MkFCVal fc $ IPragma (maybe [tn] (\n => [tn, snd n]) conname)
                             (\nest, env =>
                               elabInterface fc vis env nest consb
                                             tn paramsb det conname
@@ -1248,7 +1248,7 @@ mutual
            -- given.
            let impname = maybe (mkImplName fc tn paramsb) id impln
 
-           pure [IPragma fc [impname]
+           pure [MkFCVal fc $ IPragma [impname]
                             (\nest, env =>
                                elabImplementation fc vis opts pass env nest isb consb
                                                   tn paramsb (isNamed impln)
@@ -1276,31 +1276,32 @@ mutual
                              let allBinders = map (\nn => (nn.val, rig, p', tm')) (forget names)
                              pure allBinders)
                         params
-           let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) params'
-           let fnames = concat $ map getfname fields
-           let paramNames = concatMap (map val . forget . names . bind) params
-           let _ = the (List Name) fnames
-           -- Look for bindable names in the parameters
+           ?sorryWhat
+           -- let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) params'
+           -- let fnames = concat $ map getfname fields
+           -- let paramNames = concatMap (map val . forget . names . bind) params
+           -- let _ = the (List Name) fnames
+           -- -- Look for bindable names in the parameters
 
-           let bnames = if !isUnboundImplicits
-                        then concatMap (findBindableNames True
-                                         (ps ++ fnames ++ paramNames) [])
-                                       (map (\(_,_,_,d) => d) params')
-                        else []
-           let _ = the (List (String, String)) bnames
+           -- let bnames = if !isUnboundImplicits
+           --              then concatMap (findBindableNames True
+           --                               (ps ++ fnames ++ paramNames) [])
+           --                             (map (\(_,_,_,d) => d) params')
+           --              else []
+           -- let _ = the (List (String, String)) bnames
 
-           let paramsb = map (\ (n, c, p, tm) => (n, c, p, doBind bnames tm)) params'
-           let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) paramsb
-           let recName = nameRoot tn
-           fields' <- traverse (desugarField (ps ++ fnames ++ paramNames
-                                             ) (mkNamespace recName))
-                               fields
-           let _ = the (List $ List IField) fields'
-           let conname = maybe (mkConName tn) snd conname_in
-           whenJust (fst <$> conname_in) (addDocString conname)
-           let _ = the Name conname
-           pure [IRecord fc (Just recName)
-                         vis mbtot (MkImpRecord fc tn paramsb opts conname (concat fields'))]
+           -- let paramsb = map (\ (n, c, p, tm) => (n, c, p, doBind bnames tm)) params'
+           -- let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) paramsb
+           -- let recName = nameRoot tn
+           -- fields' <- traverse (desugarField (ps ++ fnames ++ paramNames
+           --                                   ) (mkNamespace recName))
+           --                     ?getTheField
+           -- let _ = the (List $ List IField) fields'
+           -- let conname = maybe (mkConName tn) snd conname_in
+           -- whenJust (fst <$> conname_in) (addDocString conname)
+           -- let _ = the Name conname
+           -- pure [IRecord fc (Just recName)
+           --               vis mbtot (MkImpRecord fc tn paramsb opts conname (concat fields'))]
     where
       getfname : PField -> List Name
       getfname x = x.val.names
@@ -1381,7 +1382,7 @@ mutual
            put Ctxt defs
            -- either fail or return the block that should fail during the elab phase
            case the (Either (Maybe Error) (List ImpDecl)) result of
-             Right ds => [IFail fc mmsg ds] <$ log "desugar.failing" 20 "Success"
+             Right ds => [MkFCVal fc $ IFail mmsg ds] <$ log "desugar.failing" 20 "Success"
              Left Nothing => [] <$ log "desugar.failing" 20 "Correctly failed"
              Left (Just err) => throw err
   desugarDecl ps (MkFCVal fc $ PMutual ds)
@@ -1391,49 +1392,49 @@ mutual
   desugarDecl ps (MkFCVal fc $ PNamespace ns decls)
       = withExtendedNS ns $ do
            ds <- traverse (desugarDecl ps) decls
-           pure [INamespace fc ns (concat ds)]
+           pure [MkFCVal fc $ INamespace ns (concat ds)]
   desugarDecl ps (MkFCVal fc $ PTransform n lhs rhs)
       = do (bound, blhs) <- bindNames False !(desugar LHS ps lhs)
            rhs' <- desugar AnyExpr (bound ++ ps) rhs
-           pure [ITransform fc (UN $ Basic n) blhs rhs']
+           pure [MkFCVal fc $ ITransform (UN $ Basic n) blhs rhs']
   desugarDecl ps (MkFCVal fc $ PRunElabDecl tm)
       = do tm' <- desugar AnyExpr ps tm
-           pure [IRunElabDecl fc tm']
+           pure [MkFCVal fc $ IRunElabDecl tm']
   desugarDecl ps (MkFCVal fc $ PDirective d)
       = case d of
-             Hide (HideName n) => pure [IPragma fc [] (\nest, env => hide fc n)]
-             Hide (HideFixity fx n) => pure [IPragma fc [] (\_, _ => removeFixity fc fx n)]
-             Unhide n => pure [IPragma fc [] (\nest, env => unhide fc n)]
-             Logging i => pure [ILog ((\ i => (topics i, verbosity i)) <$> i)]
-             LazyOn a => pure [IPragma fc [] (\nest, env => lazyActive a)]
+             Hide (HideName n) => pure [MkFCVal fc $ IPragma [] (\nest, env => hide fc n)]
+             Hide (HideFixity fx n) => pure [MkFCVal fc $ IPragma [] (\_, _ => removeFixity fc fx n)]
+             Unhide n => pure [MkFCVal fc $ IPragma [] (\nest, env => unhide fc n)]
+             Logging i => pure [MkFCVal fc $ ILog ((\ i => (topics i, verbosity i)) <$> i)]
+             LazyOn a => pure [MkFCVal fc $ IPragma [] (\nest, env => lazyActive a)]
              UnboundImplicits a => do
                setUnboundImplicits a
-               pure [IPragma fc [] (\nest, env => setUnboundImplicits a)]
+               pure [MkFCVal fc $ IPragma [] (\nest, env => setUnboundImplicits a)]
              PrefixRecordProjections b => do
-               pure [IPragma fc [] (\nest, env => setPrefixRecordProjections b)]
-             AmbigDepth n => pure [IPragma fc [] (\nest, env => setAmbigLimit n)]
-             TotalityDepth n => pure [IPragma fc [] (\next, env => setTotalLimit n)]
-             AutoImplicitDepth n => pure [IPragma fc [] (\nest, env => setAutoImplicitLimit n)]
-             NFMetavarThreshold n => pure [IPragma fc [] (\nest, env => setNFThreshold n)]
-             SearchTimeout n => pure [IPragma fc [] (\nest, env => setSearchTimeout n)]
-             PairNames ty f s => pure [IPragma fc [] (\nest, env => setPair fc ty f s)]
-             RewriteName eq rw => pure [IPragma fc [] (\nest, env => setRewrite fc eq rw)]
-             PrimInteger n => pure [IPragma fc [] (\nest, env => setFromInteger n)]
-             PrimString n => pure [IPragma fc [] (\nest, env => setFromString n)]
-             PrimChar n => pure [IPragma fc [] (\nest, env => setFromChar n)]
-             PrimDouble n => pure [IPragma fc [] (\nest, env => setFromDouble n)]
-             PrimTTImp n => pure [IPragma fc [] (\nest, env => setFromTTImp n)]
-             PrimName n => pure [IPragma fc [] (\nest, env => setFromName n)]
-             PrimDecls n => pure [IPragma fc [] (\nest, env => setFromDecls n)]
-             CGAction cg dir => pure [IPragma fc [] (\nest, env => addDirective cg dir)]
-             Names n ns => pure [IPragma fc [] (\nest, env => addNameDirective fc n ns)]
-             StartExpr tm => pure [IPragma fc [] (\nest, env => throw (InternalError "%start not implemented"))] -- TODO!
-             Overloadable n => pure [IPragma fc [] (\nest, env => setNameFlag fc n Overloadable)]
-             Extension e => pure [IPragma fc [] (\nest, env => setExtension e)]
-             DefaultTotality tot => pure [IPragma fc [] (\_, _ => setDefaultTotalityOption tot)]
+               pure [MkFCVal fc $ IPragma [] (\nest, env => setPrefixRecordProjections b)]
+             AmbigDepth n => pure [MkFCVal fc $ IPragma [] (\nest, env => setAmbigLimit n)]
+             TotalityDepth n => pure [MkFCVal fc $ IPragma [] (\next, env => setTotalLimit n)]
+             AutoImplicitDepth n => pure [MkFCVal fc $ IPragma [] (\nest, env => setAutoImplicitLimit n)]
+             NFMetavarThreshold n => pure [MkFCVal fc $ IPragma [] (\nest, env => setNFThreshold n)]
+             SearchTimeout n => pure [MkFCVal fc $ IPragma [] (\nest, env => setSearchTimeout n)]
+             PairNames ty f s => pure [MkFCVal fc $ IPragma [] (\nest, env => setPair fc ty f s)]
+             RewriteName eq rw => pure [MkFCVal fc $ IPragma [] (\nest, env => setRewrite fc eq rw)]
+             PrimInteger n => pure [MkFCVal fc $ IPragma [] (\nest, env => setFromInteger n)]
+             PrimString n => pure [MkFCVal fc $ IPragma [] (\nest, env => setFromString n)]
+             PrimChar n => pure [MkFCVal fc $ IPragma [] (\nest, env => setFromChar n)]
+             PrimDouble n => pure [MkFCVal fc $ IPragma [] (\nest, env => setFromDouble n)]
+             PrimTTImp n => pure [MkFCVal fc $ IPragma [] (\nest, env => setFromTTImp n)]
+             PrimName n => pure [MkFCVal fc $ IPragma [] (\nest, env => setFromName n)]
+             PrimDecls n => pure [MkFCVal fc $ IPragma [] (\nest, env => setFromDecls n)]
+             CGAction cg dir => pure [MkFCVal fc $ IPragma [] (\nest, env => addDirective cg dir)]
+             Names n ns => pure [MkFCVal fc $ IPragma [] (\nest, env => addNameDirective fc n ns)]
+             StartExpr tm => pure [MkFCVal fc $ IPragma [] (\nest, env => throw (InternalError "%start not implemented"))] -- TODO!
+             Overloadable n => pure [MkFCVal fc $ IPragma [] (\nest, env => setNameFlag fc n Overloadable)]
+             Extension e => pure [MkFCVal fc $ IPragma [] (\nest, env => setExtension e)]
+             DefaultTotality tot => pure [MkFCVal fc $ IPragma [] (\_, _ => setDefaultTotalityOption tot)]
              ForeignImpl n cs => do
                cs' <- traverse (desugar AnyExpr ps) cs
-               pure [IPragma fc [] (\nest, env => do
+               pure [MkFCVal fc $ IPragma [] (\nest, env => do
                       defs <- get Ctxt
                       calls <- traverse getFnString cs'
                       [(n',_,gdef)] <- lookupCtxtName n (gamma defs)
@@ -1444,7 +1445,7 @@ mutual
 
                       update Ctxt { options->foreignImpl $= (map (n',) calls ++) }
                     )]
-  desugarDecl ps (MkFCVal fc $ PBuiltin type name) = pure [IBuiltin fc type name]
+  desugarDecl ps (MkFCVal fc $ PBuiltin type name) = pure [MkFCVal fc $ IBuiltin type name]
 
   export
   desugarDo : {auto s : Ref Syn SyntaxInfo} ->

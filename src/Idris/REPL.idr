@@ -402,10 +402,10 @@ getItDecls
             Nothing => pure []
             Just n =>
               let it = UN $ Basic "it" in
-              pure [ IClaim
-                       (MkFCVal replFC $ MkIClaimData top Private []
+              pure (MkFCVal replFC <$> [ IClaim
+                       (MkIClaimData top Private []
                                        $ MkImpTy replFC (NoFC it) (Implicit replFC False))
-                  , IDef replFC it [PatClause replFC (IVar replFC it) (IVar replFC n)]]
+                  , IDef it [PatClause replFC (IVar replFC it) (IVar replFC n)]])
 
 ||| Produce the elaboration of a PTerm, along with its inferred type
 inferAndElab :

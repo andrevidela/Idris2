@@ -27,24 +27,24 @@ genUniqueStr xs x = if x `elem` xs then genUniqueStr xs (x ++ "'") else x
 
 -- Extract the RawImp pieces from a ImpDecl so they can be searched for unquotes
 -- Used in findBindableNames{,Quot}
-rawImpFromDecl : ImpDecl -> List RawImp
-rawImpFromDecl decl = case decl of
-    IClaim (MkFCVal fc1 $ MkIClaimData y z ys ty) => [ty.type]
-    IData fc1 y _ (MkImpData fc2 n tycon opts datacons)
+rawImpFromDecl : ImpDecl' Name -> List RawImp
+rawImpFromDecl decl = case decl.val of
+    IClaim (MkIClaimData y z ys ty) => [ty.type]
+    IData y _ (MkImpData fc2 n tycon opts datacons)
         => maybe id (::) tycon $ map type datacons
-    IData fc1 y _ (MkImpLater fc2 n tycon) => [tycon]
-    IDef fc1 y ys => getFromClause !ys
-    IParameters fc1 ys zs => rawImpFromDecl !zs ++ map getParamTy (forget ys)
-    IRecord fc1 y z _ (MkImpRecord fc n params opts conName fields) => do
+    IData y _ (MkImpLater fc2 n tycon) => [tycon]
+    IDef y ys => getFromClause !ys
+    IParameters ys zs => rawImpFromDecl !zs ++ map getParamTy (forget ys)
+    IRecord y z _ (MkImpRecord fc n params opts conName fields) => do
         (a, b) <- map (snd . snd) params
         getFromPiInfo a ++ [b] ++ getFromIField !fields
-    IFail fc1 msg zs => rawImpFromDecl !zs
-    INamespace fc1 ys zs => rawImpFromDecl !zs
-    ITransform fc1 y z w => [z, w]
-    IRunElabDecl fc1 y => [] -- Not sure about this either
-    IPragma _ _ f => []
+    IFail msg zs => rawImpFromDecl !zs
+    INamespace ys zs => rawImpFromDecl !zs
+    ITransform y z w => [z, w]
+    IRunElabDecl y => [] -- Not sure about this either
+    IPragma _ f => []
     ILog k => []
-    IBuiltin _ _ _ => []
+    IBuiltin _ _ => []
   where getParamTy : (a, b, c, RawImp) -> RawImp
         getParamTy (_, _, _, ty) = ty
         getFromClause : ImpClause -> List RawImp
@@ -322,8 +322,8 @@ mutual
           (substNames' bvar bound ps y) (substNames' bvar bound ps ty)
           (map (substNamesClause' bvar bound ps) xs)
   substNames' bvar bound ps (ILocal fc xs y)
-      = let bound' = definedInBlock emptyNS xs ++ bound in
-            ILocal fc (map (substNamesDecl' bvar bound ps) xs)
+      = let bound' = definedInBlock emptyNS (map val xs) ++ bound in
+            ILocal fc (map (mapFC $ substNamesDecl' bvar bound ps) xs)
                       (substNames' bvar bound' ps y)
   substNames' bvar bound ps (IApp fc fn arg)
       = IApp fc (substNames' bvar bound ps fn) (substNames' bvar bound ps arg)
@@ -383,17 +383,17 @@ mutual
       = MkImpLater fc n (substNames' bvar bound ps con)
 
   substNamesDecl' : Bool -> List Name -> List (Name, RawImp ) ->
-                   ImpDecl -> ImpDecl
+                   ImpDecl'' Name -> ImpDecl'' Name
   substNamesDecl' bvar bound ps (IClaim claim)
-      = IClaim $ mapFC {type $= substNamesTy' bvar bound ps} claim
-  substNamesDecl' bvar bound ps (IDef fc n cs)
-      = IDef fc n (map (substNamesClause' bvar bound ps) cs)
-  substNamesDecl' bvar bound ps (IData fc vis mbtot d)
-      = IData fc vis mbtot (substNamesData' bvar bound ps d)
-  substNamesDecl' bvar bound ps (IFail fc msg ds)
-      = IFail fc msg (map (substNamesDecl' bvar bound ps) ds)
-  substNamesDecl' bvar bound ps (INamespace fc ns ds)
-      = INamespace fc ns (map (substNamesDecl' bvar bound ps) ds)
+      = IClaim $ {type $= substNamesTy' bvar bound ps} claim
+  substNamesDecl' bvar bound ps (IDef n cs)
+      = IDef n (map (substNamesClause' bvar bound ps) cs)
+  substNamesDecl' bvar bound ps (IData vis mbtot d)
+      = IData vis mbtot (substNamesData' bvar bound ps d)
+  substNamesDecl' bvar bound ps (IFail msg ds)
+      = IFail msg (map (mapFC $ substNamesDecl' bvar bound ps) ds)
+  substNamesDecl' bvar bound ps (INamespace ns ds)
+      = INamespace ns (map (mapFC $ substNamesDecl' bvar bound ps) ds)
   substNamesDecl' bvar bound ps d = d
 
 export
@@ -429,7 +429,7 @@ mutual
       = ICase fc' opts (substLoc fc' y) (substLoc fc' ty)
                   (map (substLocClause fc') xs)
   substLoc fc' (ILocal fc xs y)
-      = ILocal fc' (map (substLocDecl fc') xs)
+      = ILocal fc' ?ahdhd
                    (substLoc fc' y)
   substLoc fc' (IApp fc fn arg)
       = IApp fc' (substLoc fc' fn) (substLoc fc' arg)
@@ -482,19 +482,6 @@ mutual
                         (map (substLocTy fc') dcons)
   substLocData fc' (MkImpLater fc n con)
       = MkImpLater fc' n (substLoc fc' con)
-
-  substLocDecl : FC -> ImpDecl -> ImpDecl
-  substLocDecl fc' (IClaim (MkFCVal _ $ MkIClaimData r vis opts td))
-      = IClaim (MkFCVal fc' $ MkIClaimData r vis opts (substLocTy fc' td))
-  substLocDecl fc' (IDef fc n cs)
-      = IDef fc' n (map (substLocClause fc') cs)
-  substLocDecl fc' (IData fc vis mbtot d)
-      = IData fc' vis mbtot (substLocData fc' d)
-  substLocDecl fc' (IFail fc msg ds)
-      = IFail fc' msg (map (substLocDecl fc') ds)
-  substLocDecl fc' (INamespace fc ns ds)
-      = INamespace fc' ns (map (substLocDecl fc') ds)
-  substLocDecl fc' d = d
 
 nameNum : String -> (String, Maybe Int)
 nameNum str = case span isDigit (reverse str) of

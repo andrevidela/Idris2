@@ -48,7 +48,7 @@ record RecData where
   lhsapp : Term localVars
 
 -- Additional definitions required to support the result
-ExprDefs : Type
+0 ExprDefs : Type
 ExprDefs = List ImpDecl
 
 export
@@ -583,8 +583,8 @@ makeHelper fc rig opts env letty targetty ((locapp, ds) :: next)
               | _ => do log "interaction.search" 10 "No results"
                         noResult
 
-         let helperdef = IDef fc helpern (snd helper)
-         log "interaction.search" 10 $ "Def: " ++ show helperdef
+         let helperdef = MkFCVal fc (IDef helpern (snd helper))
+         log "interaction.search" 10 $ "Def: " ++ let s = ShowVal in show helperdef
          pure ((::) (def, helperdef :: ds) -- plus helper
                       (do next' <- next
                           makeHelper fc rig opts env letty targetty next'))

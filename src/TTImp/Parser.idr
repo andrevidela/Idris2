@@ -10,7 +10,14 @@ import Data.List
 import Data.List1
 import Libraries.Data.WithDefault
 
-topDecl : OriginDesc -> IndentInfo -> Rule ImpDecl
+fcBounds : (fname : OriginDesc) => Rule a -> Rule (WithFC a)
+fcBounds parser = do
+  start <- location
+  val <- parser
+  end <- location
+  pure (MkFCVal (MkFC fname start end) val)
+
+topDecl : OriginDesc -> IndentInfo -> Rule (ImpDecl'' Name)
 -- All the clauses get parsed as one-clause definitions. Collect any
 -- neighbouring clauses with the same function name into one definition.
 export
@@ -367,7 +374,7 @@ mutual
                      ILet fc (boundToFC fname n) rig n.val (Implicit fc False) val scope)
     <|> do start <- location
            keyword "let"
-           ds <- block (topDecl fname)
+           ds <- block (fcBounds . topDecl fname)
            continue indents
            keyword "in"
            scope <- typeExpr fname indents
@@ -564,12 +571,10 @@ mutual
                end <- location
                pure (MkFC fname start end, tm)
 
-definition : OriginDesc -> IndentInfo -> Rule ImpDecl
+definition : OriginDesc -> IndentInfo -> Rule (ImpDecl'' Name)
 definition fname indents
-    = do start <- location
-         nd <- clause 0 fname indents
-         end <- location
-         pure (IDef (MkFC fname start end) (fst nd) [snd nd])
+    = do nd <- clause 0 fname indents
+         pure (IDef (fst nd) [snd nd])
 
 dataOpt : Rule DataOpt
 dataOpt
@@ -647,7 +652,7 @@ fieldDecl fname indents
              pure (map (\n => MkIField (MkFC fname start end)
                                        linear p (UN $ Basic n) ty) (forget ns))
 
-recordDecl : OriginDesc -> IndentInfo -> Rule ImpDecl
+recordDecl : OriginDesc -> IndentInfo -> Rule (ImpDecl'' Name)
 recordDecl fname indents
     = do start <- location
          (vis,mbtot) <- dataVisOpt
@@ -664,7 +669,7 @@ recordDecl fname indents
          flds <- assert_total (blockAfter col (fieldDecl fname))
          end <- location
          pure (let fc = MkFC fname start end in
-                   IRecord fc Nothing vis mbtot
+                   IRecord Nothing vis mbtot
                            (MkImpRecord fc n params opts dc (concat flds)))
 
 namespaceDecl : Rule Namespace
@@ -680,20 +685,18 @@ logLevel
            lvl <- intLit
            pure (Just (topic, fromInteger lvl))
 
-directive : OriginDesc -> IndentInfo -> Rule ImpDecl
+directive : OriginDesc -> IndentInfo -> Rule (ImpDecl'' Name)
 directive fname indents
     = do pragma "logging"
          commit
          lvl <- logLevel
          atEnd indents
          pure (ILog lvl)
-  <|> do b <- bounds (do pragma "builtin"
-                         commit
-                         t <- builtinType
-                         n <- name
-                         pure (t, n))
-         (t, n) <- pure b.val
-         pure $ IBuiltin (boundToFC fname b) t n
+  <|> do pragma "builtin"
+         commit
+         t <- builtinType
+         n <- name
+         pure $ IBuiltin t n
 
          {- Can't do IPragma due to lack of Ref Ctxt. Should we worry about this?
   <|> do pragma "pair"
@@ -715,37 +718,31 @@ directive fname indents
                    IPragma (\c, nest, env => setRewrite {c} fc eq rw))
     -}
 -- Declared at the top
--- topDecl : OriginDesc -> IndentInfo -> Rule ImpDecl
+-- topDecl : OriginDesc -> IndentInfo -> Rule (ImpDecl'' Name)
 topDecl fname indents
-    = do start <- location
-         (vis,mbtot) <- dataVisOpt
+    = do (vis,mbtot) <- dataVisOpt
          dat <- dataDecl fname indents
-         end <- location
-         pure (IData (MkFC fname start end) vis mbtot dat)
-  <|> do start <- location
-         ns <- namespaceDecl
-         ds <- assert_total (nonEmptyBlock (topDecl fname))
-         end <- location
-         pure (INamespace (MkFC fname start end) ns (forget ds))
-  <|> do start <- location
-         visOpts <- many visOpt
+         pure (IData vis mbtot dat)
+  -- <|> do ns <- namespaceDecl
+  --        ds <- assert_total (nonEmptyBlock ?defff)
+  --        pure (INamedApp ns ds)
+  <|> do visOpts <- many visOpt
          vis <- getVisibility Nothing visOpts
          let opts = mapMaybe getRight visOpts
          m <- multiplicity
          rig <- getMult m
          claim <- tyDecl fname indents
-         end <- location
-         pure (IClaim (MkFCVal (MkFC fname start end) $ MkIClaimData  rig vis opts claim))
+         pure (IClaim $ MkIClaimData rig vis opts claim)
   <|> recordDecl fname indents
   <|> directive fname indents
   <|> definition fname indents
 
 -- Declared at the top
--- collectDefs : List ImpDecl -> List ImpDecl
+-- collectDefs : List (ImpDecl'' Name) -> List (ImpDecl'' Name)
 collectDefs [] = []
-collectDefs (IDef loc fn cs :: ds)
+collectDefs (MkFCVal fc (IDef fn cs) :: ds)
     = let (cs', rest) = spanMap (isClause fn) ds in
-          IDef loc fn (cs ++ cs') :: assert_total (collectDefs rest)
+          MkFCVal fc (IDef fn (cs ++ cs')) :: assert_total (collectDefs rest)
   where
     spanMap : (a -> Maybe (List b)) -> List a -> (List b, List a)
     spanMap f [] = ([], [])
@@ -755,13 +752,13 @@ collectDefs (IDef loc fn cs :: ds)
                                               (ys, zs) => (y ++ ys, zs)
 
     isClause : Name -> ImpDecl -> Maybe (List ImpClause)
-    isClause n (IDef _ n' cs)
+    isClause n (MkFCVal fc (IDef n' cs))
         = if n == n' then Just cs else Nothing
     isClause n _ = Nothing
-collectDefs (INamespace loc ns nds :: ds)
-    = INamespace loc ns (collectDefs nds) :: collectDefs ds
-collectDefs (IFail loc msg nds :: ds)
-    = IFail loc msg (collectDefs nds) :: collectDefs ds
+collectDefs (MkFCVal fc (INamespace ns nds) :: ds)
+    = MkFCVal fc (INamespace ns (collectDefs nds)) :: collectDefs ds
+collectDefs (MkFCVal fc (IFail msg nds) :: ds)
+    = MkFCVal fc (IFail msg (collectDefs nds)) :: collectDefs ds
 collectDefs (d :: ds)
     = d :: collectDefs ds
 
@@ -769,8 +766,8 @@ collectDefs (d :: ds)
 export
 prog : OriginDesc -> Rule (List ImpDecl)
 prog fname
-    = do ds <- nonEmptyBlock (topDecl fname)
-         pure (collectDefs $ forget ds)
+    = do ds <- nonEmptyBlock (fcBounds . topDecl fname)
+         pure (collectDefs (forget ds))
 
 -- TTImp REPL commands
 export

@@ -118,30 +118,30 @@ process : {vars : _} ->
           {auto o : Ref ROpts REPLOpts} ->
           List ElabOpt ->
           NestedNames vars -> Env Term vars -> ImpDecl -> Core ()
-process eopts nest env (IClaim (MkFCVal fc (MkIClaimData rig vis opts ty)))
+process eopts nest env (MkFCVal fc $ IClaim (MkIClaimData rig vis opts ty))
     = processType eopts nest env fc rig vis opts ty
-process eopts nest env (IData fc vis mbtot ddef)
+process eopts nest env (MkFCVal fc $ IData vis mbtot ddef)
     = processData eopts nest env fc vis mbtot ddef
-process eopts nest env (IDef fc fname def)
+process eopts nest env (MkFCVal fc $ IDef fname def)
     = processDef eopts nest env fc fname def
-process eopts nest env (IParameters fc ps decls)
+process eopts nest env (MkFCVal fc $ IParameters ps decls)
     = processParams nest env fc (forget ps) decls
-process eopts nest env (IRecord fc ns vis mbtot rec)
+process eopts nest env (MkFCVal fc $ IRecord ns vis mbtot rec)
     = processRecord eopts nest env ns vis mbtot rec
-process eopts nest env (IFail fc msg decls)
+process eopts nest env (MkFCVal fc $ IFail msg decls)
     = processFailing eopts nest env fc msg decls
-process eopts nest env (INamespace fc ns decls)
+process eopts nest env (MkFCVal fc $ INamespace ns decls)
     = withExtendedNS ns $
          traverse_ (processDecl eopts nest env) decls
-process eopts nest env (ITransform fc n lhs rhs)
+process eopts nest env (MkFCVal fc $ ITransform n lhs rhs)
     = processTransform eopts nest env fc n lhs rhs
-process eopts nest env (IRunElabDecl fc tm)
+process eopts nest env (MkFCVal fc $ IRunElabDecl tm)
     = processRunElab eopts nest env fc tm
-process eopts nest env (IPragma _ _ act)
+process eopts nest env (MkFCVal fc $ IPragma _ act)
     = act nest env
-process eopts nest env (ILog lvl)
+process eopts nest env (MkFCVal fc $ ILog lvl)
     = addLogLevel (uncurry unsafeMkLogLevel <$> lvl)
-process eopts nest env (IBuiltin fc type name)
+process eopts nest env (MkFCVal fc $ IBuiltin type name)
     = processBuiltin nest env fc type name
 
 TTImp.Elab.Check.processDecl = process
@@ -186,12 +186,12 @@ processTTImpDecls {vars} nest env decls
 
     -- bind implicits to make raw TTImp source a bit friendlier
     bindNames : ImpDecl -> Core ImpDecl
-    bindNames (IClaim (MkFCVal fc (MkIClaimData c vis opts (MkImpTy tfc n ty))))
+    bindNames (MkFCVal fc $ IClaim (MkIClaimData c vis opts (MkImpTy tfc n ty)))
         = do ty' <- bindTypeNames fc [] vars ty
-             pure (IClaim (MkFCVal fc (MkIClaimData c vis opts (MkImpTy tfc n ty'))))
-    bindNames (IData fc vis mbtot d)
+             pure (MkFCVal fc $ IClaim (MkIClaimData c vis opts (MkImpTy tfc n ty')))
+    bindNames (MkFCVal fc $ IData vis mbtot d)
         = do d' <- bindDataNames d
-             pure (IData fc vis mbtot d')
+             pure (MkFCVal fc $ IData vis mbtot d')
     bindNames d = pure d
 
 export

@@ -309,7 +309,7 @@ mkSpecDef {vars} fc gdef pename sargs fn stk
            log "specialise" 5 $ "New patterns for " ++ show pename ++ ":\n" ++
                     showSep "\n" (map showPat newpats)
            processDecl [InPartialEval] (MkNested []) []
-                       (IDef fc (Resolved peidx) newpats)
+                       (MkFCVal fc $ IDef (Resolved peidx) newpats)
            setAllPublic False
            pure peapp)
            -- If the partially evaluated definition fails, just use the initial

@@ -40,7 +40,7 @@ mutual
                 !(getUnquote sc) !(getUnquote ty)
                 !(traverse getUnquoteClause cs)
   getUnquote (ILocal fc ds sc)
-      = pure $ ILocal fc !(traverse getUnquoteDecl ds) !(getUnquote sc)
+      = pure $ ILocal fc !(traverse (traverseFC getUnquoteDecl) ds) !(getUnquote sc)
   getUnquote (IUpdate fc ds sc)
       = pure $ IUpdate fc !(traverse getUnquoteUpdate ds) !(getUnquote sc)
   getUnquote (IApp fc f a)
@@ -146,27 +146,26 @@ mutual
   getUnquoteDecl : {auto c : Ref Ctxt Defs} ->
                    {auto q : Ref Unq (List (Name, FC, RawImp))} ->
                    {auto u : Ref UST UState} ->
-                   ImpDecl ->
-                   Core ImpDecl
-  getUnquoteDecl (IClaim (MkFCVal fc (MkIClaimData c v opts ty)))
-      = pure $ IClaim (MkFCVal fc (MkIClaimData c v opts !(getUnquoteTy ty)))
-  getUnquoteDecl (IData fc v mbt d)
-      = pure $ IData fc v mbt !(getUnquoteData d)
-  getUnquoteDecl (IDef fc v d)
-      = pure $ IDef fc v !(traverse getUnquoteClause d)
-  getUnquoteDecl (IParameters fc ps ds)
-      = pure $ IParameters fc
-                           !(traverseList1 unqTuple ps)
-                           !(traverse getUnquoteDecl ds)
+                   ImpDecl'' Name ->
+                   Core (ImpDecl'' Name)
+  getUnquoteDecl (IClaim (MkIClaimData c v opts ty))
+      = pure $ IClaim ((MkIClaimData c v opts !(getUnquoteTy ty)))
+  getUnquoteDecl (IData v mbt d)
+      = pure $ IData v mbt !(getUnquoteData d)
+  getUnquoteDecl (IDef v d)
+      = pure $ IDef v !(traverse getUnquoteClause d)
+  getUnquoteDecl (IParameters ps ds)
+      = pure $ IParameters !(traverseList1 unqTuple ps)
+                           !(traverse (traverseFC getUnquoteDecl) ds)
     where
       unqTuple : (Name, RigCount, PiInfo RawImp, RawImp) -> Core (Name, RigCount, PiInfo RawImp, RawImp)
       unqTuple (n, rig, i, t) = pure (n, rig, i, !(getUnquote t))
-  getUnquoteDecl (IRecord fc ns v mbt d)
-      = pure $ IRecord fc ns v mbt !(getUnquoteRecord d)
-  getUnquoteDecl (INamespace fc ns ds)
-      = pure $ INamespace fc ns !(traverse getUnquoteDecl ds)
-  getUnquoteDecl (ITransform fc n l r)
-      = pure $ ITransform fc n !(getUnquote l) !(getUnquote r)
+  getUnquoteDecl (IRecord ns v mbt d)
+      = pure $ IRecord ns v mbt !(getUnquoteRecord d)
+  getUnquoteDecl (INamespace ns ds)
+      = pure $ INamespace ns !(traverse (traverseFC getUnquoteDecl) ds)
+  getUnquoteDecl (ITransform n l r)
+      = pure $ ITransform n !(getUnquote l) !(getUnquote r)
   getUnquoteDecl d = pure d
 
 bindUnqs : {vars : _} ->
@@ -250,7 +249,7 @@ checkQuoteDecl : {vars : _} ->
 checkQuoteDecl rig elabinfo nest env fc ds exp
     = do defs <- get Ctxt
          q <- newRef Unq []
-         ds' <- traverse getUnquoteDecl ds
+         ds' <- traverse (traverseFC getUnquoteDecl) ds
          qds <- reflect fc defs (onLHS (elabMode elabinfo)) env ds'
          unqs <- get Unq
          qd <- getCon fc defs (reflectionttimp "Decl")

@@ -19,7 +19,7 @@ mutual
     map f (ICase fc opts sc ty cls)
       = ICase fc (map (map f) opts) (map f sc) (map f ty) (map (map f) cls)
     map f (ILocal fc ds sc)
-      = ILocal fc (map (map f) ds) (map f sc)
+      = ILocal fc (map (mapFC (map f)) ds) (map f sc)
     map f (ICaseLocal fc userN intN args sc)
       = ICaseLocal fc userN intN args (map f sc)
     map f (IUpdate fc upds rec)
@@ -59,7 +59,7 @@ mutual
     map f (IQuoteName fc nm)
       = IQuoteName fc nm
     map f (IQuoteDecl fc ds)
-      = IQuoteDecl fc (map (map f) ds)
+      = IQuoteDecl fc (map (mapFC (map f)) ds)
     map f (IUnquote fc t)
       = IUnquote fc (map f t)
     map f (IRunElab fc re t)
@@ -92,28 +92,28 @@ mutual
       = MkIClaimData rig vis (map (map f) opts) (map f ty)
 
   export
-  Functor ImpDecl' where
+  Functor ImpDecl'' where
     map f (IClaim c)
-      = IClaim (mapFC (map f) c)
-    map f (IData fc vis mbtot dt)
-      = IData fc vis mbtot (map f dt)
-    map f (IDef fc nm cls)
-      = IDef fc nm (map (map f) cls)
-    map f (IParameters fc ps ds)
-      = IParameters fc (map (map  {f = ImpParameter'} f) ps) (map (map f) ds)
-    map f (IRecord fc cs vis mbtot rec)
-      = IRecord fc cs vis mbtot (map f rec)
-    map f (IFail fc msg ds)
-      = IFail fc msg (map (map f) ds)
-    map f (INamespace fc ns ds)
-      = INamespace fc ns (map (map f) ds)
-    map f (ITransform fc n lhs rhs)
-      = ITransform fc n (map f lhs) (map f rhs)
-    map f (IRunElabDecl fc t)
-      = IRunElabDecl fc (map f t)
-    map f (IPragma fc xs k) = IPragma fc xs k
+      = IClaim (map f c)
+    map f (IData vis mbtot dt)
+      = IData vis mbtot (map f dt)
+    map f (IDef nm cls)
+      = IDef nm (map (map f) cls)
+    map f (IParameters ps ds)
+      = IParameters (map (map  {f = ImpParameter'} f) ps) (map (mapFC (map f)) ds)
+    map f (IRecord cs vis mbtot rec)
+      = IRecord cs vis mbtot (map f rec)
+    map f (IFail msg ds)
+      = IFail msg (map (mapFC (map f)) ds)
+    map f (INamespace ns ds)
+      = INamespace ns (map (mapFC (map f)) ds)
+    map f (ITransform n lhs rhs)
+      = ITransform n (map f lhs) (map f rhs)
+    map f (IRunElabDecl t)
+      = IRunElabDecl (map f t)
+    map f (IPragma xs k) = IPragma xs k
     map f (ILog x) = ILog x
-    map f (IBuiltin fc ty n) = IBuiltin fc ty n
+    map f (IBuiltin ty n) = IBuiltin ty n
 
   export
   Functor FnOpt' where

@@ -378,60 +378,59 @@ mutual
              pure $ MkIClaimData rig vis opts type
 
   export
-  TTC ImpDecl where
+  TTC (ImpDecl'' Name) where
     toBuf b (IClaim claim)
         = do tag 0; toBuf b claim
-    toBuf b (IData fc vis mbtot d)
-        = do tag 1; toBuf b fc; toBuf b vis; toBuf b mbtot; toBuf b d
-    toBuf b (IDef fc n xs)
-        = do tag 2; toBuf b fc; toBuf b n; toBuf b xs
-    toBuf b (IParameters fc vis d)
-        = do tag 3; toBuf b fc; toBuf b vis; toBuf b d
-    toBuf b (IRecord fc ns vis mbtot r)
-        = do tag 4; toBuf b fc; toBuf b ns; toBuf b vis; toBuf b mbtot; toBuf b r
-    toBuf b (INamespace fc xs ds)
-        = do tag 5; toBuf b fc; toBuf b xs; toBuf b ds
-    toBuf b (ITransform fc n lhs rhs)
-        = do tag 6; toBuf b fc; toBuf b n; toBuf b lhs; toBuf b rhs
-    toBuf b (IRunElabDecl fc tm)
-        = do tag 7; toBuf b fc; toBuf b tm
-    toBuf b (IPragma _ _ f) = throw (InternalError "Can't write Pragma")
+    toBuf b (IData vis mbtot d)
+        = do tag 1; toBuf b vis; toBuf b mbtot; toBuf b d
+    toBuf b (IDef n xs)
+        = do tag 2; toBuf b n; toBuf b xs
+    toBuf b (IParameters vis d)
+        = do tag 3; toBuf b vis; toBuf b d
+    toBuf b (IRecord ns vis mbtot r)
+        = do tag 4; toBuf b ns; toBuf b vis; toBuf b mbtot; toBuf b r
+    toBuf b (INamespace xs ds)
+        = do tag 5; toBuf b xs; toBuf b ds
+    toBuf b (ITransform n lhs rhs)
+        = do tag 6; toBuf b n; toBuf b lhs; toBuf b rhs
+    toBuf b (IRunElabDecl tm)
+        = do tag 7; toBuf b tm
+    toBuf b (IPragma _ f) = throw (InternalError "Can't write Pragma")
     toBuf b (ILog n)
         = do tag 8; toBuf b n
-    toBuf b (IBuiltin fc type name)
-        = do tag 9; toBuf b fc; toBuf b type; toBuf b name
-    toBuf b (IFail _ _ _)
+    toBuf b (IBuiltin type name)
+        = do tag 9; toBuf b type; toBuf b name
+    toBuf b (IFail _ _)
         = pure ()
 
     fromBuf b
         = case !getTag of
                0 => do claimData <- fromBuf b
                        pure (IClaim claimData)
-               1 => do fc <- fromBuf b; vis <- fromBuf b
+               1 => do vis <- fromBuf b
                        mbtot <- fromBuf b; d <- fromBuf b
-                       pure (IData fc vis mbtot d)
-               2 => do fc <- fromBuf b; n <- fromBuf b
+                       pure (IData vis mbtot d)
+               2 => do n <- fromBuf b
                        xs <- fromBuf b
-                       pure (IDef fc n xs)
-               3 => do fc <- fromBuf b; vis <- fromBuf b
+                       pure (IDef n xs)
+               3 => do vis <- fromBuf b
                        d <- fromBuf b
-                       pure (IParameters fc vis d)
-               4 => do fc <- fromBuf b; ns <- fromBuf b;
+                       pure (IParameters vis d)
+               4 => do ns <- fromBuf b;
                        vis <- fromBuf b; mbtot <- fromBuf b;
                        r <- fromBuf b
-                       pure (IRecord fc ns vis mbtot r)
-               5 => do fc <- fromBuf b; xs <- fromBuf b
+                       pure (IRecord ns vis mbtot r)
+               5 => do xs <- fromBuf b
                        ds <- fromBuf b
-                       pure (INamespace fc xs ds)
-               6 => do fc <- fromBuf b; n <- fromBuf b
+                       pure (INamespace xs ds)
+               6 => do n <- fromBuf b
                        lhs <- fromBuf b; rhs <- fromBuf b
-                       pure (ITransform fc n lhs rhs)
-               7 => do fc <- fromBuf b; tm <- fromBuf b
-                       pure (IRunElabDecl fc tm)
+                       pure (ITransform n lhs rhs)
+               7 => do tm <- fromBuf b
+                       pure (IRunElabDecl tm)
                8 => do n <- fromBuf b
                        pure (ILog n)
-               9 => do fc <- fromBuf b
-                       type <- fromBuf b
+               9 => do type <- fromBuf b
                        name <- fromBuf b
-                       pure (IBuiltin fc type name)
+                       pure (IBuiltin type name)
                _ => corrupt "ImpDecl"

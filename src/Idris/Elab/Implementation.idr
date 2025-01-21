@@ -87,12 +87,12 @@ addDefaults fc impName params allms defs body
                     let mupdates = params ++ map specialiseMeth allms
                         cs' = map (substNamesClause [] mupdates) cs in
                         extendBody ms ns
-                             (IDef fc n (map (substLocClause fc) cs') :: body)
+                             (MkFCVal fc (IDef n (map (substLocClause fc) cs')) :: body)
 
     -- Find which names are missing from the body
     dropGot : List Name -> List ImpDecl -> List Name
     dropGot ms [] = ms
-    dropGot ms (IDef _ n _ :: ds)
+    dropGot ms (MkFCVal _ (IDef n _) :: ds)
         = dropGot (filter (/= n) ms) ds
     dropGot ms (_ :: ds) = dropGot ms ds
 
@@ -182,7 +182,7 @@ elabImplementation {vars} ifc vis opts_in pass env nest is cons iname ps named i
          let impTy = doBind paramBinds initTy
 
          let impTyDecl
-             = IClaim (MkFCVal vfc $ MkIClaimData top vis opts (MkImpTy EmptyFC (NoFC impName) impTy))
+             = MkFCVal vfc $ IClaim (MkIClaimData top vis opts (MkImpTy EmptyFC (NoFC impName) impTy))
 
          log "elab.implementation" 5 $ "Implementation type: " ++ show impTy
 
@@ -223,7 +223,7 @@ elabImplementation {vars} ifc vis opts_in pass env nest is cons iname ps named i
                                       (map (dropNS . name) (methods cdata))
                                       (defaults cdata) body_in
 
-               log "elab.implementation" 5 $ "Added defaults: body is " ++ show body
+               log "elab.implementation" 5 $ "Added defaults: body is " ++ show (map val body)
                log "elab.implementation" 5 $ "Missing methods: " ++ show missing
                when (not (isNil missing)) $
                  throw (GenericMsg ifc ("Missing methods in " ++ show iname ++ ": "
@@ -257,7 +257,7 @@ elabImplementation {vars} ifc vis opts_in pass env nest is cons iname ps named i
                log "elab.implementation" 5 $ "Field types " ++ show fldTys
                let irhs = apply (autoImpsApply (IVar vfc con) $ map (const (ISearch vfc 500)) (parents cdata))
                                   (map (mkMethField methImps fldTys) fns)
-               let impFn = IDef vfc impName [PatClause vfc ilhs irhs]
+               let impFn = IDef impName [PatClause vfc ilhs irhs]
                log "elab.implementation" 5 $ "Implementation record: " ++ show impFn
 
                -- If it's a named implementation, add it as a global hint while
@@ -273,7 +273,7 @@ elabImplementation {vars} ifc vis opts_in pass env nest is cons iname ps named i
                names' <- traverse applyEnv (impName :: mtops)
                let nest' = { names $= (names' ++) } nest
 
-               traverse_ (processDecl [] nest' env) [impFn]
+               traverse_ (processDecl [] nest' env) [MkFCVal vfc impFn]
                unsetFlag vfc impName BlockedHint
 
                setFlag vfc impName TCInline
@@ -287,7 +287,7 @@ elabImplementation {vars} ifc vis opts_in pass env nest is cons iname ps named i
                let upds = map methNameUpdate fns
                body' <- traverse (updateBody upds) body
 
-               log "elab.implementation" 10 $ "Implementation body: " ++ show body'
+               log "elab.implementation" 10 $ "Implementation body: " ++ show (map val body')
                traverse_ (processDecl [] nest' env) body'
 
                -- 6. Add transformation rules for top level methods
@@ -469,7 +469,7 @@ elabImplementation {vars} ifc vis opts_in pass env nest is cons iname ps named i
         = do let opts = if isJust $ findTotality opts_in
                           then opts_in
                           else maybe opts_in (\t => Totality t :: opts_in) treq
-             IClaim $ MkFCVal vfc $ MkIClaimData c vis opts $ MkImpTy EmptyFC (NoFC n) mty
+             MkFCVal vfc $ IClaim $ MkIClaimData c vis opts $ MkImpTy EmptyFC (NoFC n) mty
 
     -- Given the method type (result of topMethType) return the mapping from
     -- top level method name to current implementation's method name
@@ -520,13 +520,13 @@ elabImplementation {vars} ifc vis opts_in pass env nest is cons iname ps named i
              pure (ImpossibleClause fc lhs')
 
     updateBody : List (Name, Name) -> ImpDecl -> Core ImpDecl
-    updateBody ns (IDef fc n cs)
+    updateBody ns (MkFCVal fc $ IDef n cs)
         = do cs' <- traverse (updateClause ns) cs
              n' <- findMethName ns fc n
              log "ide-mode.highlight" 1 $ show (n, n', fc)
-             pure (IDef fc n' cs')
+             pure (MkFCVal fc $ IDef n' cs')
     updateBody ns e
-        = throw (GenericMsg (getFC e)
+        = throw (GenericMsg e.fc
                    "Implementation body can only contain definitions")
 
     addTransform : Name -> List (Name, Name) ->
@@ -545,7 +545,7 @@ elabImplementation {vars} ifc vis opts_in pass env nest is cons iname ps named i
              log "elab.implementation" 5 $ show lhs ++ " ==> " ++ show rhs
              handleUnify
                  (processDecl [] nest env
-                     (ITransform vfc (UN $ Basic (show meth.name ++ " " ++ show iname)) lhs rhs))
+                     (MkFCVal vfc $ ITransform (UN $ Basic (show meth.name ++ " " ++ show iname)) lhs rhs))
                  (\err =>
                      log "elab.implementation" 5 $ "Can't add transform " ++
                                 show lhs ++ " ==> " ++ show rhs ++

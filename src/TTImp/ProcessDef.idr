@@ -619,7 +619,7 @@ checkClause {vars} mult vis totreq hashit n opts nest env
          nestname <- applyEnv env wname
          let nest'' = { names $= (nestname ::) } nest
 
-         let wdef = IDef ifc wname cs'
+         let wdef = MkFCVal ifc (IDef wname cs')
          processDecl [] nest'' env wdef
 
          pure (Right (MkClause env' lhspat rhs))

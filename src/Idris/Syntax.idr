@@ -419,7 +419,7 @@ mutual
                    (params : List (PBinder' nm)) ->
                    (opts : List DataOpt) ->
                    (conName : Maybe (String, Name)) ->
-                   (decls : List (PField' nm)) ->
+                   (decls : List (WithFC (PRecordBodyDecl' nm))) ->
                    PRecordDecl' nm
        MkPRecordLater : (tyname : Name) ->
                         (params : List (PBinder' nm)) ->
@@ -510,13 +510,26 @@ mutual
   PField' nm = WithFC (RecordField' nm)
 
   public export
-  0 PRecordDeclLet : Type
-  PRecordDeclLet = PRecordDeclLet' Name
+  data PRecordBodyDecl' nm
+      = LetDecl (List1 (WithFC $ PRecordDeclLet'' nm))
+      | FieldDecl (RecordField' nm)
 
   public export
-  data PRecordDeclLet' : Type -> Type where
-    RecordClaim : WithFC (PClaimData' nm) -> PRecordDeclLet' nm
-    RecordClause : WithFC (PClause' nm) -> PRecordDeclLet' nm
+  PRecordBodyDecl : Type
+  PRecordBodyDecl = WithFC (PRecordBodyDecl' Name)
+
+  public export
+  0 PRecordDeclLet : Type
+  PRecordDeclLet = (PRecordDeclLet' Name)
+
+  public export
+  0 PRecordDeclLet' : Type -> Type
+  PRecordDeclLet' ty = WithFC (PRecordDeclLet' ty)
+
+  public export
+  data PRecordDeclLet'' : Type -> Type where
+    RecordClaim : PClaimData' nm -> PRecordDeclLet'' nm
+    RecordClause : PClause' nm -> PRecordDeclLet'' nm
 
   -- For noting the pass we're in when desugaring a mutual block
   -- TODO: Decide whether we want mutual blocks!

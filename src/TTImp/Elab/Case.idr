@@ -266,7 +266,7 @@ caseBlock {vars} rigc elabinfo fc nest env opts scr scrtm scrty caseRig alts exp
          -- we come out again, so save them
          let olddelayed = delayedElab ust
          put UST ({ delayedElab := [] } ust)
-         processDecl [InCase] nest' [] (IDef fc casen alts')
+         processDecl [InCase] nest' [] (MkFCVal fc $ IDef casen alts')
 
          -- If there's no duplication of the scrutinee in the block,
          -- flag it as inlinable.

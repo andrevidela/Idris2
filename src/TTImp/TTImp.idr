@@ -118,7 +118,7 @@ mutual
        -- Quasiquoting
        IQuote : FC -> RawImp' nm -> RawImp' nm
        IQuoteName : FC -> Name -> RawImp' nm
-       IQuoteDecl : FC -> List (ImpDecl' nm) -> RawImp' nm
+       IQuoteDecl : FC -> List (WithFC (ImpDecl'' nm)) -> RawImp' nm
        IUnquote : FC -> RawImp' nm -> RawImp' nm
        IRunElab : FC -> (requireExtension : Bool) -> RawImp' nm -> RawImp' nm
 
@@ -174,7 +174,7 @@ mutual
       show (ICase _ _ scr scrty alts)
          = "(%case (" ++ show scr ++ " : " ++ show scrty ++ ") " ++ show alts ++ ")"
       show (ILocal _ def scope)
-         = "(%local (" ++ show def ++ ") " ++ show scope ++ ")"
+         = "(%local (" ++ ?what ++ ") " ++ show scope ++ ")"
       show (ICaseLocal _ uname iname args sc)
          = "(%caselocal (" ++ show uname ++ " " ++ show iname
                ++ " " ++ show args ++ ") " ++ show sc ++ ")"
@@ -206,7 +206,7 @@ mutual
       show (IForce fc tm) = "(%force " ++ show tm ++ ")"
       show (IQuote fc tm) = "(%quote " ++ show tm ++ ")"
       show (IQuoteName fc tm) = "(%quotename " ++ show tm ++ ")"
-      show (IQuoteDecl fc tm) = "(%quotedecl " ++ show tm ++ ")"
+      show (IQuoteDecl fc tm) = "(%quotedecl " ++ ?noway ++ ")"
       show (IUnquote fc tm) = "(%unquote " ++ show tm ++ ")"
       show (IRunElab fc _ tm) = "(%runelab " ++ show tm ++ ")"
       show (IPrimVal fc c) = show c
@@ -457,9 +457,13 @@ mutual
     show (ImpossibleClause fc lhs)
        = show lhs ++ " impossible"
 
-  public export
+  public export 0
   ImpDecl : Type
-  ImpDecl = ImpDecl' Name
+  ImpDecl = WithFC (ImpDecl'' Name)
+
+  public export 0
+  ImpDecl' : Type -> Type
+  ImpDecl' ty = WithFC (ImpDecl'' ty)
 
   public export
   record IClaimData (nm : Type) where
@@ -470,61 +474,59 @@ mutual
     type : ImpTy' nm
 
   public export
-  data ImpDecl' : Type -> Type where
-       IClaim : WithFC (IClaimData nm) -> ImpDecl' nm
-       IData : FC -> WithDefault Visibility Private ->
-               Maybe TotalReq -> ImpData' nm -> ImpDecl' nm
-       IDef : FC -> Name -> List (ImpClause' nm) -> ImpDecl' nm
-       IParameters : FC ->
-                     List1 (ImpParameter' nm) ->
-                     List (ImpDecl' nm) -> ImpDecl' nm
-       IRecord : FC ->
-                 Maybe String -> -- nested namespace
+  data ImpDecl'' : Type -> Type where
+       IClaim : IClaimData nm -> ImpDecl'' nm
+       IData :  WithDefault Visibility Private ->
+               Maybe TotalReq -> ImpData' nm -> ImpDecl'' nm
+       IDef : Name -> List (ImpClause' nm) -> ImpDecl'' nm
+       IParameters : List1 (ImpParameter' nm) ->
+                     List (WithFC (ImpDecl'' nm)) -> ImpDecl'' nm
+       IRecord : Maybe String -> -- nested namespace
                  WithDefault Visibility Private ->
                  Maybe TotalReq ->
-                 ImpRecord' nm -> ImpDecl' nm
-       IFail : FC -> Maybe String -> List (ImpDecl' nm) -> ImpDecl' nm
-       INamespace : FC -> Namespace -> List (ImpDecl' nm) -> ImpDecl' nm
-       ITransform : FC -> Name -> RawImp' nm -> RawImp' nm -> ImpDecl' nm
-       IRunElabDecl : FC -> RawImp' nm -> ImpDecl' nm
-       IPragma : FC -> List Name -> -- pragmas might define names that wouldn't
-                                    -- otherwise be spotted in 'definedInBlock' so they
-                                    -- can be flagged here.
+                 ImpRecord' nm -> ImpDecl'' nm
+       IFail : Maybe String -> List (WithFC (ImpDecl'' nm)) -> ImpDecl'' nm
+       INamespace : Namespace -> List (WithFC (ImpDecl'' nm)) -> ImpDecl'' nm
+       ITransform : Name -> RawImp' nm -> RawImp' nm -> ImpDecl'' nm
+       IRunElabDecl : RawImp' nm -> ImpDecl'' nm
+       IPragma : List Name -> -- pragmas might define names that wouldn't
+                              -- otherwise be spotted in 'definedInBlock' so they
+                              -- can be flagged here.
                  ({vars : _} ->
                   NestedNames vars -> Env Term vars -> Core ()) ->
-                 ImpDecl' nm
-       ILog : Maybe (List String, Nat) -> ImpDecl' nm
-       IBuiltin : FC -> BuiltinType -> Name -> ImpDecl' nm
+                 ImpDecl'' nm
+       ILog : Maybe (List String, Nat) -> ImpDecl'' nm
+       IBuiltin : BuiltinType -> Name -> ImpDecl'' nm
 
-  %name ImpDecl' decl
+  %name ImpDecl'' decl
 
   export
   covering
-  Show nm => Show (ImpDecl' nm) where
-    show (IClaim (MkFCVal _ $ MkIClaimData c _ opts ty))
+  Show nm => Show (ImpDecl'' nm) where
+    show (IClaim (MkIClaimData c _ opts ty))
         = show opts ++ " " ++ show c ++ " " ++ show ty
-    show (IData _ _ _ d) = show d
-    show (IDef _ n cs) = "(%def " ++ show n ++ " " ++ show cs ++ ")"
-    show (IParameters _ ps ds)
+    show (IData _ _ d) = show d
+    show (IDef n cs) = "(%def " ++ show n ++ " " ++ show cs ++ ")"
+    show (IParameters ps ds)
         = "parameters " ++ show ps ++ "\n\t" ++
-          showSep "\n\t" (assert_total $ map show ds)
-    show (IRecord _ _ _ _ d) = show d
-    show (IFail _ msg decls)
+          showSep "\n\t" (assert_total $ map (show . val) ds)
+    show (IRecord _ _ _ d) = show d
+    show (IFail msg decls)
         = "fail" ++ maybe "" ((" " ++) . show) msg ++ "\n" ++
-          showSep "\n" (assert_total $ map (("  " ++) . show) decls)
-    show (INamespace _ ns decls)
+          showSep "\n" (assert_total $ map (("  " ++) . show . val) decls)
+    show (INamespace ns decls)
         = "namespace " ++ show ns ++
-          showSep "\n" (assert_total $ map show decls)
-    show (ITransform _ n lhs rhs)
+          showSep "\n" (assert_total $ map (show . val) decls)
+    show (ITransform n lhs rhs)
         = "%transform " ++ show n ++ " " ++ show lhs ++ " ==> " ++ show rhs
-    show (IRunElabDecl _ tm)
+    show (IRunElabDecl tm)
         = "%runElab " ++ show tm
-    show (IPragma _ _ _) = "[externally defined pragma]"
+    show (IPragma _ _) = "[externally defined pragma]"
     show (ILog Nothing) = "%logging off"
     show (ILog (Just (topic, lvl))) = "%logging " ++ case topic of
       [] => show lvl
       _  => concat (intersperse "." topic) ++ " " ++ show lvl
-    show (IBuiltin _ type name) = "%builtin " ++ show type ++ " " ++ show name
+    show (IBuiltin type name) = "%builtin " ++ show type ++ " " ++ show name
 
 
 export
@@ -805,7 +807,7 @@ implicitsAs n defs ns tm
 ||| receive the additional arguments introduced by a Parameters directive
 export
 definedInBlock : Namespace -> -- namespace to resolve names
-                 List ImpDecl -> List Name
+                 List (ImpDecl'' Name) -> List Name
 definedInBlock ns decls =
     Prelude.toList $ foldl (defName ns) empty decls
   where
@@ -823,16 +825,16 @@ definedInBlock ns decls =
            DN _ _ => NS ns n
            _ => n
 
-    defName : Namespace -> SortedSet Name -> ImpDecl -> SortedSet Name
-    defName ns acc (IClaim c) = insert (expandNS ns (getName c.val.type)) acc
-    defName ns acc (IDef _ nm _) = insert (expandNS ns nm) acc
-    defName ns acc (IData _ _ _ (MkImpData _ n _ _ cons))
+    defName : Namespace -> SortedSet Name -> ImpDecl'' Name -> SortedSet Name
+    defName ns acc (IClaim c) = insert (expandNS ns (getName c.type)) acc
+    defName ns acc (IDef nm _) = insert (expandNS ns nm) acc
+    defName ns acc (IData _ _ (MkImpData _ n _ _ cons))
         = foldl (flip insert) acc $ expandNS ns n :: map (expandNS ns . getName) cons
-    defName ns acc (IData _ _ _ (MkImpLater _ n _)) = insert (expandNS ns n) acc
-    defName ns acc (IParameters _ _ pds) = foldl (defName ns) acc pds
-    defName ns acc (IFail _ _ nds) = foldl (defName ns) acc nds
-    defName ns acc (INamespace _ n nds) = foldl (defName (ns <.> n)) acc nds
-    defName ns acc (IRecord _ fldns _ _ (MkImpRecord _ n _ opts con flds))
+    defName ns acc (IData _ _ (MkImpLater _ n _)) = insert (expandNS ns n) acc
+    defName ns acc (IParameters _ pds) = foldl (defName ns) acc (map val pds)
+    defName ns acc (IFail _ nds) = foldl (defName ns) acc (map val nds)
+    defName ns acc (INamespace n nds) = foldl (defName (ns <.> n)) acc (map val nds)
+    defName ns acc (IRecord fldns _ _ (MkImpRecord _ n _ opts con flds))
         = foldl (flip insert) acc $ expandNS ns con :: all
       where
         fldns' : Namespace
@@ -858,7 +860,7 @@ definedInBlock ns decls =
         all : List Name
         all = expandNS ns n :: map (expandNS fldns') (fnsRF ++ fnsUN)
 
-    defName ns acc (IPragma _ pns _) = foldl (flip insert) acc $ map (expandNS ns) pns
+    defName ns acc (IPragma pns _) = foldl (flip insert) acc $ map (expandNS ns) pns
     defName _ acc _ = acc
 
 export
@@ -907,23 +909,6 @@ getFC (IRunElab x _ _) = x
 getFC (IAs x _ _ _ _) = x
 getFC (Implicit x _) = x
 getFC (IWithUnambigNames x _ _) = x
-
-namespace ImpDecl
-
-  public export
-  getFC : ImpDecl' nm -> FC
-  getFC (IClaim c) = c.fc
-  getFC (IData fc _ _ _) = fc
-  getFC (IDef fc _ _) = fc
-  getFC (IParameters fc _ _) = fc
-  getFC (IRecord fc _ _ _ _) = fc
-  getFC (IFail fc _ _) = fc
-  getFC (INamespace fc _ _) = fc
-  getFC (ITransform fc _ _ _) = fc
-  getFC (IRunElabDecl fc _) = fc
-  getFC (IPragma fc _ _) = fc
-  getFC (ILog _) = EmptyFC
-  getFC (IBuiltin fc _ _) = fc
 
 public export
 data Arg' nm

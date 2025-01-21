@@ -44,17 +44,17 @@ localHelper {vars} nest env nestdecls_in func
          -- to be public too
          let nestdeclsVis =
                if vis == Public
-                  then map setPublic nestdecls_in
+                  then map (mapFC setPublic) nestdecls_in
                   else nestdecls_in
 
          -- If the parent function is erased, then the nested definitions
          -- will be erased too
-         let nestdeclsMult =
+         let nestdeclsMult : List ImpDecl =
            if mult == erased
-              then map setErased nestdeclsVis
+              then mapFC setErased <$> nestdeclsVis
               else nestdeclsVis
 
-         let defNames = definedInBlock emptyNS nestdeclsMult
+         let defNames = definedInBlock emptyNS (map val nestdeclsMult)
          names' <- traverse (applyEnv f) defNames
          let nest' = { names $= (names' ++) } nest
          let env' = dropLinear env
@@ -69,8 +69,8 @@ localHelper {vars} nest env nestdecls_in func
          -- everything
          let oldhints = localHints defs
 
-         let nestdecls = map (updateName nest') nestdeclsMult
-         log "elab.def.local" 20 $ show nestdecls
+         let nestdecls = map (mapFC (updateName nest')) nestdeclsMult
+         log "elab.def.local" 20 $ show (map val nestdecls)
 
          traverse_ (processDecl [] nest' env') nestdecls
          update UST { delayedElab := olddelayed }
@@ -131,35 +131,35 @@ localHelper {vars} nest env nestdecls_in func
     updateRecordNS _    Nothing   = Nothing
     updateRecordNS nest (Just ns) = Just $ show $ mapNestedName nest (UN $ mkUserName ns)
 
-    updateName : NestedNames vars -> ImpDecl -> ImpDecl
+    updateName : NestedNames vars -> ImpDecl'' Name -> ImpDecl'' Name
     updateName nest (IClaim claim)
-         = IClaim $ mapFC {type $= updateTyName nest} claim
-    updateName nest (IDef loc' n cs)
-         = IDef loc' (mapNestedName nest n) cs
-    updateName nest (IData loc' vis mbt d)
-         = IData loc' vis mbt (updateDataName nest d)
-    updateName nest (IRecord loc' ns vis mbt imprecord)
-         = IRecord loc' (updateRecordNS nest ns) vis mbt (updateRecordName nest imprecord)
+         = IClaim $ {type $= updateTyName nest} claim
+    updateName nest (IDef n cs)
+         = IDef (mapNestedName nest n) cs
+    updateName nest (IData vis mbt d)
+         = IData vis mbt (updateDataName nest d)
+    updateName nest (IRecord ns vis mbt imprecord)
+         = IRecord (updateRecordNS nest ns) vis mbt (updateRecordName nest imprecord)
     updateName nest i = i
 
-    setPublic : ImpDecl -> ImpDecl
+    setPublic : ImpDecl'' Name -> ImpDecl'' Name
     setPublic (IClaim claim)
-        = IClaim $ mapFC {vis := Public} claim
-    setPublic (IData fc _ mbt d) = IData fc (specified Public) mbt d
-    setPublic (IRecord fc c _ mbt r) = IRecord fc c (specified Public) mbt r
-    setPublic (IParameters fc ps decls)
-        = IParameters fc ps (map setPublic decls)
-    setPublic (INamespace fc ps decls)
-        = INamespace fc ps (map setPublic decls)
+        = IClaim $ {vis := Public} claim
+    setPublic (IData _ mbt d) = IData (specified Public) mbt d
+    setPublic (IRecord c _ mbt r) = IRecord c (specified Public) mbt r
+    setPublic (IParameters ps decls)
+        = IParameters ps (mapFC setPublic <$> decls)
+    setPublic (INamespace ps decls)
+        = INamespace ps (mapFC setPublic <$> decls)
     setPublic d = d
 
-    setErased : ImpDecl -> ImpDecl
+    setErased : ImpDecl'' Name -> ImpDecl'' Name
     setErased (IClaim claim)
-        = IClaim $ mapFC {rig := erased} claim
-    setErased (IParameters fc ps decls)
-        = IParameters fc ps (map setErased decls)
-    setErased (INamespace fc ps decls)
-        = INamespace fc ps (map setErased decls)
+        = IClaim $ {rig := erased} claim
+    setErased (IParameters ps decls)
+        = IParameters ps (mapFC setErased <$> decls)
+    setErased (INamespace ps decls)
+        = INamespace ps (mapFC setErased <$> decls)
     setErased d = d
 
 export

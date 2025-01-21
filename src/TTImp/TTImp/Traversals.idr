@@ -62,20 +62,20 @@ parameters (f : RawImp' nm -> RawImp' nm)
 
 
   export
-  mapImpDecl : ImpDecl' nm -> ImpDecl' nm
-  mapImpDecl (IClaim (MkFCVal fc (MkIClaimData rig vis opts ty)))
-    = IClaim (MkFCVal fc (MkIClaimData rig vis (map mapFnOpt opts) (mapImpTy ty)))
-  mapImpDecl (IData fc vis mtreq dat) = IData fc vis mtreq (mapImpData dat)
-  mapImpDecl (IDef fc n cls) = IDef fc n (map mapImpClause cls)
-  mapImpDecl (IParameters fc params xs) = IParameters fc params (assert_total $ map mapImpDecl xs)
-  mapImpDecl (IRecord fc mstr x y rec) = IRecord fc mstr x y (mapImpRecord rec)
-  mapImpDecl (IFail fc mstr xs) = IFail fc mstr (assert_total $ map mapImpDecl xs)
-  mapImpDecl (INamespace fc mi xs) = INamespace fc mi (assert_total $ map mapImpDecl xs)
-  mapImpDecl (ITransform fc n t u) = ITransform fc n (mapTTImp t) (mapTTImp u)
-  mapImpDecl (IRunElabDecl fc t) = IRunElabDecl fc (mapTTImp t)
-  mapImpDecl (IPragma fc ns g) = IPragma fc ns g
+  mapImpDecl : ImpDecl'' nm -> ImpDecl'' nm
+  mapImpDecl (IClaim (MkIClaimData rig vis opts ty))
+    = IClaim ((MkIClaimData rig vis (map mapFnOpt opts) (mapImpTy ty)))
+  mapImpDecl (IData vis mtreq dat) = IData vis mtreq (mapImpData dat)
+  mapImpDecl (IDef n cls) = IDef n (map mapImpClause cls)
+  mapImpDecl (IParameters params xs) = IParameters params (assert_total $ map (mapFC mapImpDecl) xs)
+  mapImpDecl (IRecord mstr x y rec) = IRecord mstr x y (mapImpRecord rec)
+  mapImpDecl (IFail mstr xs) = IFail mstr (assert_total $ map (mapFC mapImpDecl) xs)
+  mapImpDecl (INamespace mi xs) = INamespace mi (assert_total $ map (mapFC mapImpDecl) xs)
+  mapImpDecl (ITransform n t u) = ITransform n (mapTTImp t) (mapTTImp u)
+  mapImpDecl (IRunElabDecl t) = IRunElabDecl (mapTTImp t)
+  mapImpDecl (IPragma ns g) = IPragma ns g
   mapImpDecl (ILog x) = ILog x
-  mapImpDecl (IBuiltin fc x n) = IBuiltin fc x n
+  mapImpDecl (IBuiltin x n) = IBuiltin x n
 
   export
   mapIFieldUpdate : IFieldUpdate' nm -> IFieldUpdate' nm
@@ -98,7 +98,7 @@ parameters (f : RawImp' nm -> RawImp' nm)
   mapTTImp (ICase fc opts t ty cls)
     = f $ ICase fc opts (mapTTImp t) (mapTTImp ty) (assert_total $ map mapImpClause cls)
   mapTTImp (ILocal fc xs t)
-    = f $ ILocal fc (assert_total $ map mapImpDecl xs) (mapTTImp t)
+    = f $ ILocal fc (assert_total $ map (mapFC mapImpDecl) xs) (mapTTImp t)
   mapTTImp (ICaseLocal fc unm inm args t) = f $ ICaseLocal fc unm inm args (mapTTImp t)
   mapTTImp (IUpdate fc upds t) = f $ IUpdate fc (assert_total map mapIFieldUpdate upds) (mapTTImp t)
   mapTTImp (IApp fc t u) = f $ IApp fc (mapTTImp t) (mapTTImp u)
@@ -118,7 +118,7 @@ parameters (f : RawImp' nm -> RawImp' nm)
   mapTTImp (IForce fc t) = f $ IForce fc (mapTTImp t)
   mapTTImp (IQuote fc t) = f $ IQuote fc (mapTTImp t)
   mapTTImp (IQuoteName fc n) = f $ IQuoteName fc n
-  mapTTImp (IQuoteDecl fc xs) = f $ IQuoteDecl fc (assert_total $ map mapImpDecl xs)
+  mapTTImp (IQuoteDecl fc xs) = f $ IQuoteDecl fc (assert_total $ map (mapFC mapImpDecl) xs)
   mapTTImp (IUnquote fc t) = f $ IUnquote fc (mapTTImp t)
   mapTTImp (IRunElab fc re t) = f $ IRunElab fc re (mapTTImp t)
   mapTTImp (IPrimVal fc c) = f $ IPrimVal fc c

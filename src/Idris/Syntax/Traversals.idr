@@ -226,9 +226,9 @@ mapPTermM f = goPTerm where
     goPDo (DoLetLocal fc decls) = DoLetLocal fc <$> goPDecls decls
     goPDo (DoRewrite fc t) = DoRewrite fc <$> goPTerm t
 
-    goPRecordDeclLet : PRecordDeclLet' nm -> Core (PRecordDeclLet' nm)
-    goPRecordDeclLet (RecordClaim x) = RecordClaim <$> traverseFC goPClaim x
-    goPRecordDeclLet (RecordClause x) = RecordClause <$> traverseFC goPClause x
+    goPRecordDeclLet : PRecordDeclLet'' nm -> Core (PRecordDeclLet'' nm)
+    -- goPRecordDeclLet (RecordClaim x) = RecordClaim <$> traverseFC goPClaim x
+    -- goPRecordDeclLet (RecordClause x) = RecordClause <$> traverseFC goPClause x
 
     goPClause : PClause' nm -> Core (PClause' nm)
     goPClause (MkPatClause fc lhs rhs wh) =
@@ -300,7 +300,7 @@ mapPTermM f = goPTerm where
       pure $ PRecord doc v tot !(MkPRecord n <$> traverse goPBinder nts
                                              <*> pure opts
                                              <*> pure mn
-                                             <*> goPFields fs)
+                                             <*> ?ahah)
     goPDecl (PRecord doc v tot (MkPRecordLater n nts)) =
       pure $ PRecord doc v tot (MkPRecordLater n !(traverse goPBinder nts))
     goPDecl (PFail msg ps) = PFail msg <$> goPDecls ps
@@ -582,7 +582,7 @@ mapPTerm f = goPTerm where
            n (goPTerm <$> ts) mn ns (map (mapFC goPDecl <$>) mps)
     goPDecl (PRecord doc v tot (MkPRecord n nts opts mn fs))
       = PRecord doc v tot
-          (MkPRecord n (map goPBinder nts) opts mn (map (mapFC goRecordField) fs))
+          (MkPRecord n (map goPBinder nts) opts mn ?latest)--(map (mapFC goRecordField) fs))
     goPDecl (PRecord doc v tot (MkPRecordLater n nts))
       = PRecord doc v tot (MkPRecordLater n (goPBinder <$> nts ))
     goPDecl (PFail msg ps) = PFail msg $ mapFC goPDecl <$> ps
@@ -613,9 +613,9 @@ mapPTerm f = goPTerm where
       = MkPData fc n (map goPTerm t) opts (mapFC goPTypeDecl <$> tdecls)
     goPDataDecl (MkPLater fc n t) = MkPLater fc n $ goPTerm t
 
-    goPRecordDeclLet : PRecordDeclLet' nm -> PRecordDeclLet' nm
-    goPRecordDeclLet (RecordClaim claim) = RecordClaim $ mapFC goPClaim claim
-    goPRecordDeclLet (RecordClause clause) = RecordClause $ mapFC goPClause clause
+    goPRecordDeclLet : PRecordDeclLet'' nm -> PRecordDeclLet'' nm
+    -- goPRecordDeclLet (RecordClaim claim) = RecordClaim $ mapFC goPClaim claim
+    -- goPRecordDeclLet (RecordClause clause) = RecordClause $ mapFC goPClause clause
 
     goRecordField : RecordField' nm -> RecordField' nm
     goRecordField (MkRecordField doc c info n t)

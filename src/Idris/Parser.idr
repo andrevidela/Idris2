@@ -1720,7 +1720,21 @@ implBinds fname indents namedImpl = concatMap (map adjust) <$> go where
           pure (ns :: more)
     <|> pure []
 
-fieldDecl : (fname : OriginDesc) => IndentInfo -> Rule PField
+-- A single line from a let-declaration in a record, could be either a clause or a claim.
+recordLetDeclLine : (fname : OriginDesc) => IndentInfo -> Rule (PRecordDeclLet'' Name)
+recordLetDeclLine indent
+    = ?hello
+--     = RecordClaim <$> ?eitherClauseOrCLaim
+--   <|> RecordClause <$> ?bebbebe
+
+recordLetDecl : (fname : OriginDesc) => IndentInfo -> Rule (List1 (WithFC $ PRecordDeclLet'' Name))
+recordLetDecl indents
+    = do decoratedKeyword fname "let"
+         commit
+         col <- column
+         nonEmptyBlockAfter col (fcBounds . recordLetDeclLine)
+
+fieldDecl : (fname : OriginDesc) => IndentInfo -> Rule (RecordField' Name)
 fieldDecl indents
       = do doc <- optDocumentation fname
            decoratedSymbol fname "{"
@@ -1735,20 +1749,25 @@ fieldDecl indents
            atEnd indents
            pure fs
   where
-    fieldBody : String -> PiInfo PTerm -> Rule (PField)
+    fieldBody : String -> PiInfo PTerm -> Rule (RecordField' Name)
     fieldBody doc p
-        = do b <- bounds (do
-                    rig <- multiplicity fname
-                    ns <- sepBy1 (decoratedSymbol fname ",")
-                            (decorate fname Function name
-                               <|> (do b <- bounds (symbol "_")
-                                       fatalLoc {c = True} b.bounds "Fields have to be named"))
-                    decoratedSymbol fname ":"
-                    ty <- typeExpr pdef fname indents
-                    pure (MkRecordField doc rig p (forget ns) ty))
-             pure b.withFC
+        = do rig <- multiplicity fname
+             ns <- sepBy1 (decoratedSymbol fname ",")
+                     (decorate fname Function name
+                        <|> (do b <- bounds (symbol "_")
+                                fatalLoc {c = True} b.bounds "Fields have to be named"))
+             decoratedSymbol fname ":"
+             ty <- typeExpr pdef fname indents
+             pure (MkRecordField doc rig p (forget ns) ty)
+
+recordBodyDecl : (fname : OriginDesc) => (indents : IndentInfo) -> Rule (PRecordBodyDecl' Name)
+recordBodyDecl indents
+    = (LetDecl <$> recordLetDecl indents)
+  <|> (FieldDecl <$> fieldDecl indents)
 
 parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
+
+
 
   ifaceParam : Rule BasicMultiBinder
   ifaceParam
@@ -1846,7 +1865,7 @@ parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
            opts <- dataOpts fname
            dcflds <- blockWithOptHeaderAfter col
                        (\ idt => recordConstructor fname <* atEnd idt)
-                       fieldDecl
+                       (fcBounds . recordBodyDecl)
            pure (PRecord doc vis mbtot
                   (MkPRecord n params opts (fst dcflds) (snd dcflds)))
 
