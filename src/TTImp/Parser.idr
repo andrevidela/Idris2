@@ -606,13 +606,13 @@ dataDecl fname indents
          end <- location
          pure (MkImpData (MkFC fname start end) n (Just ty) opts cs)
 
-recordParam : OriginDesc -> IndentInfo -> Rule (List (Name, RigCount, PiInfo RawImp, RawImp))
+recordParam : OriginDesc -> IndentInfo -> Rule (List ImpParameter)
 recordParam fname indents
     = do symbol "("
          start <- location
          params <- pibindListName fname start indents
          symbol ")"
-         pure $ map (\(c, n, tm) => (n, c, Explicit, tm)) params
+         pure $ map (\(c, n, tm) => (?name, ?ahhaah)) params
   <|> do symbol "{"
          commit
          start <- location
@@ -624,11 +624,9 @@ recordParam fname indents
               <|> pure      Implicit)
          params <- pibindListName fname start indents
          symbol "}"
-         pure $ map (\(c, n, tm) => (n, c, info, tm)) params
-  <|> do start <- location
-         n <- name
-         end <- location
-         pure [(n, top, Explicit, Implicit (MkFC fname start end) False)]
+         pure $ map (\(c, n, tm) => (info, ?rest)) params
+  <|> do n <- fcBounds name
+         pure [ MkPair Explicit (MkBasicBinder top n (Implicit n.fc False)) ]
 
 fieldDecl : OriginDesc -> IndentInfo -> Rule (List IField)
 fieldDecl fname indents
@@ -661,7 +659,7 @@ recordDecl fname indents
          commit
          n <- name
          paramss <- many (recordParam fname indents)
-         let params = concat paramss
+         let params = ?hhhh
          keyword "where"
          opts <- dataOpts
          exactIdent "constructor"

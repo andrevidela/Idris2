@@ -25,6 +25,7 @@ Reify BindMode where
              _ => cantReify val "BindMode"
   reify deva val = cantReify val "BindMode"
 
+
 export
 Reflect BindMode where
   reflect fc defs lhs env (PI c)
@@ -83,7 +84,6 @@ Reflect DotReason where
       = getCon fc defs (reflectionttimp "UnknownDot")
   reflect fc defs lhs env UnderAppliedCon
       = getCon fc defs (reflectionttimp "UnderAppliedCon")
-
 
 mutual
   export

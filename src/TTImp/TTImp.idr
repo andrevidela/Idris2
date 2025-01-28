@@ -384,7 +384,7 @@ mutual
   -- TODO: turn into a proper datatype
   public export
   ImpParameter' : Type -> Type
-  ImpParameter' nm = (Name, RigCount, PiInfo (RawImp' nm), RawImp' nm)
+  ImpParameter' nm = (PiInfo (RawImp' nm), BasicBinder' (RawImp' nm))
 
   public export
   ImpRecord : Type
@@ -392,7 +392,8 @@ mutual
 
   public export
   data ImpRecord' : Type -> Type where
-       MkImpRecord : FC -> (n : Name) ->
+       MkImpRecord : FC ->
+                     (name : Name) ->
                      (params : List (ImpParameter' nm)) ->
                      (opts : List DataOpt) ->
                      (conName : Name) ->
@@ -476,25 +477,29 @@ mutual
   public export
   data ImpDecl'' : Type -> Type where
        IClaim : IClaimData nm -> ImpDecl'' nm
-       IData :  WithDefault Visibility Private ->
-               Maybe TotalReq -> ImpData' nm -> ImpDecl'' nm
+       IData :
+         WithDefault Visibility Private ->
+         Maybe TotalReq -> ImpData' nm -> ImpDecl'' nm
        IDef : Name -> List (ImpClause' nm) -> ImpDecl'' nm
-       IParameters : List1 (ImpParameter' nm) ->
-                     List (WithFC (ImpDecl'' nm)) -> ImpDecl'' nm
-       IRecord : Maybe String -> -- nested namespace
-                 WithDefault Visibility Private ->
-                 Maybe TotalReq ->
-                 ImpRecord' nm -> ImpDecl'' nm
+       IParameters :
+         List1 (ImpParameter' nm) ->
+         List (WithFC (ImpDecl'' nm)) -> ImpDecl'' nm
+       IRecord :
+         Maybe String -> -- nested namespace
+         WithDefault Visibility Private ->
+         Maybe TotalReq ->
+         ImpRecord' nm -> ImpDecl'' nm
        IFail : Maybe String -> List (WithFC (ImpDecl'' nm)) -> ImpDecl'' nm
        INamespace : Namespace -> List (WithFC (ImpDecl'' nm)) -> ImpDecl'' nm
        ITransform : Name -> RawImp' nm -> RawImp' nm -> ImpDecl'' nm
        IRunElabDecl : RawImp' nm -> ImpDecl'' nm
-       IPragma : List Name -> -- pragmas might define names that wouldn't
-                              -- otherwise be spotted in 'definedInBlock' so they
-                              -- can be flagged here.
-                 ({vars : _} ->
-                  NestedNames vars -> Env Term vars -> Core ()) ->
-                 ImpDecl'' nm
+       IPragma :
+         List Name -> -- pragmas might define names that wouldn't
+                      -- otherwise be spotted in 'definedInBlock' so they
+                      -- can be flagged here.
+         ({vars : _} ->
+         NestedNames vars -> Env Term vars -> Core ()) ->
+         ImpDecl'' nm
        ILog : Maybe (List String, Nat) -> ImpDecl'' nm
        IBuiltin : BuiltinType -> Name -> ImpDecl'' nm
 

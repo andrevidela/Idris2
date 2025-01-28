@@ -886,6 +886,26 @@ Reflect a => Reflect (WithFC a) where
            val' <- reflect fc defs lhs env val
            appCon fc defs (reflectiontt "MkFCVal") [Erased fc Placeholder, loc', val']
 
+export
+Reify a => Reify (BasicBinder' a) where
+  reify defs val@(NDCon _ n _ _ args)
+        = case (dropAllNS !(full (gamma defs) n), map snd args) of
+             (UN (Basic "MkBasicBinder"), [_, rig, nm, ty]) => do
+                 rigVal <- reify defs !(evalClosure defs rig)
+                 nameVal <- reify defs !(evalClosure defs nm)
+                 typeVal <- reify defs !(evalClosure defs ty)
+                 pure $ MkBasicBinder rigVal nameVal typeVal
+             _ => cantReify val "BasicBinder'"
+  reify defs val = cantReify val "BasicBinder'"
+
+export
+Reflect a => Reflect (BasicBinder' a) where
+  reflect fc defs lhs env (MkBasicBinder rig nm ty)
+      = do rig' <- reflect fc defs lhs env rig
+           nm' <- reflect fc defs lhs env nm
+           ty' <- reflect fc defs lhs env ty
+           appCon fc defs (reflectiontt "MkBasicBinder") [Erased fc Placeholder, rig', nm', ty']
+
 {-
 -- Reflection of well typed terms: We don't reify terms because that involves
 -- type checking, but we can reflect them

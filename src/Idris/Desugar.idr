@@ -1045,11 +1045,11 @@ parameters {auto s : Ref Syn SyntaxInfo}
           ", resulting in the default totality of " ++ showModifiers [def]
 
   getBinderList : List Name -> PBinder ->
-                  Core (List (Name, ZeroOneOmega, PiInfo (RawImp' Name), RawImp' Name))
+                  Core (List1 (Name, ZeroOneOmega, PiInfo (RawImp' Name), RawImp' Name))
   getBinderList ps (MkPBinder info (MkBasicMultiBinder rig names tm)) = do
       tm' <- desugar AnyExpr ps tm
       p'  <- mapDesugarPiInfo ps info
-      let allBinders = map (\nn => (nn.val, rig, p', tm')) (forget names)
+      let allBinders = map (\nn => (nn.val, rig, p', tm')) names
       pure allBinders
 
   -- Given a high level declaration, return a list of TTImp declarations
@@ -1105,7 +1105,7 @@ parameters {auto s : Ref Syn SyntaxInfo}
               ty' <- desugar AnyExpr ps ty
               pure (n.val, top, Explicit, ty')) params
         getArgs (Right params)
-          = join <$> traverseList1 getBinderList params
+          = join <$> traverseList1 (getBinderList ps) params
 
   desugarDecl ps (MkFCVal fc $ PUsing uimpls uds)
       = do syn <- get Syn
@@ -1214,11 +1214,9 @@ parameters {auto s : Ref Syn SyntaxInfo}
         = PPi fc c p (Just n.val) t (mkRecType (MkPBinder p (MkBasicMultiBinder c (x ::: xs) t) :: ts))
   desugarDecl ps (MkFCVal fc $ PRecord doc vis mbtot (MkPRecord tn params opts conname_in fields))
       = do addDocString tn doc
-           params' <- concat <$> traverse getBinderList params
-           ?sorryWhat
-           -- let _ = the (List (Name, RigCount, PiInfo RawImp, RawImp)) params'
-           -- let fnames = concat $ map getfname fields
-           -- let paramNames = concatMap (map val . forget . names . bind) params
+           params' <- concat <$> traverse (map forget . getBinderList ps) params
+           let paramNames = map fst params'
+           -- let paramsb = map (\ (n, c, p, tm) => (n, c, p, doBind bnames tm)) params'
            -- let _ = the (List Name) fnames
            -- -- Look for bindable names in the parameters
 
@@ -1227,6 +1225,11 @@ parameters {auto s : Ref Syn SyntaxInfo}
            --                               (ps ++ fnames ++ paramNames) [])
            --                             (map (\(_,_,_,d) => d) params')
            --              else []
+
+           pure $ singleton
+                $ MkFCVal fc
+                $ IRecord (Just (nameRoot tn)) vis mbtot
+                $ MkImpRecord fc {name = tn, params = ?ccc, opts = opts, conName = ?eee, fields = ?ff}
            -- let _ = the (List (String, String)) bnames
 
            -- let paramsb = map (\ (n, c, p, tm) => (n, c, p, doBind bnames tm)) params'

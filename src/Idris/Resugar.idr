@@ -498,15 +498,15 @@ mutual
               {auto s : Ref Syn SyntaxInfo} ->
               ImpRecord' KindedName ->
               Core ( Name
-                   , List (Name, RigCount, PiInfo IPTerm, IPTerm)
+                   , List (PiInfo IPTerm, BasicBinder' IPTerm)
                    , List DataOpt
                    , Maybe (String, Name)
                    , List (PField' KindedName))
   toPRecord (MkImpRecord fc n ps opts con fs)
-      = do ps' <- traverse (\ (n, c, p, ty) =>
+      = do ps' <- traverse (\ (p, MkBasicBinder c n ty) =>
                                    do ty' <- toPTerm startPrec ty
                                       p' <- mapPiInfo p
-                                      pure (n, c, p', ty')) ps
+                                      pure (p', MkBasicBinder c n ty')) ps
            fs' <- traverse toPField fs
            pure (n, ps', opts, Just ("", con), fs')
     where
@@ -537,21 +537,19 @@ mutual
   toPDecl (IParameters ps ds)
       = do ds' <- traverse (traverseFCMaybe toPDecl) ds
            args <-
-             traverseList1 (\(n, rig, info, tpe) =>
+             traverseList1 (\(info, MkBasicBinder rig n tpe) =>
                  do info' <- traverse (toPTerm startPrec) info
                     type' <- toPTerm startPrec tpe
-                    pure (MkFullBinder info' rig (NoFC n) type')) ps
+                    pure (MkFullBinder info' rig n type')) ps
            pure (Just (PParameters (Right args) (catMaybes ds')))
   toPDecl (IRecord _ vis mbtot r)
       = do (n, ps, opts, con, fs) <- toPRecord r
            ?resugarRecord
-           -- pure (Just (MkFCVal fc $ PRecord "" vis mbtot (MkPRecord n (map toBinder ps) opts con fs)))
+           pure (Just (PRecord "" vis mbtot (MkPRecord n (map toBinder ps) opts con ?huuu)))
            where
-             toBinder : (Name, ZeroOneOmega, PiInfo (PTerm' KindedName), PTerm' KindedName) -> PBinder' KindedName
-             toBinder (n, rig, info, ty)
-               = MkFullBinder info rig (NoFC n) ty
-                              --        ^^^^
-                              -- we should know this location
+             toBinder : (PiInfo IPTerm, BasicBinder' IPTerm) -> PBinder' KindedName
+             toBinder (info, MkBasicBinder rig n ty)
+               = MkFullBinder info rig n ty
 
   toPDecl (IFail msg ds)
       = do ds' <- traverse (traverseFCMaybe toPDecl) ds

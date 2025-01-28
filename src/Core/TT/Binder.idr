@@ -25,6 +25,7 @@ data PiInfo t =
   ||| passed explicitly
   DefImplicit t
 
+
 %name PiInfo pinfo
 
 namespace PiInfo

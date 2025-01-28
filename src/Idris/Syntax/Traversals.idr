@@ -601,7 +601,7 @@ mapPTerm f = goPTerm where
     goBasicMultiBinder (MkBasicMultiBinder rig names type)
       = MkBasicMultiBinder rig names (goPTerm type)
 
-    goBasicBinder : BasicBinder' nm -> BasicBinder' nm
+    goBasicBinder : BasicBinder' (PTerm' nm) -> BasicBinder' (PTerm' nm)
     goBasicBinder (MkBasicBinder rig name type)
       = MkBasicBinder rig name (goPTerm type)
 

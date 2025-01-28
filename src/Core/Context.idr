@@ -2673,3 +2673,4 @@ unhide fc n
          unless (isHidden nsn (gamma defs)) $ do
            recordWarning $ GenericWarn fc $
              "Trying to %unhide `" ++ show nsn ++ "`, which was not hidden in the first place"
+

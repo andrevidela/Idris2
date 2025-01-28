@@ -542,3 +542,23 @@ addRefs ua at ns (TType fc u) = ns
 export
 getRefs : (aTotal : Name) -> Term vars -> NameMap Bool
 getRefs at tm = addRefs False at empty tm
+
+------------------------------------------------------------------------
+-- The most basic form of binder: a name, a type and a quantity.
+
+||| A binder with quantity information attached
+||| basicBinder := qty plainBinder
+public export
+record BasicBinder' (ty : Type) where
+  constructor MkBasicBinder
+  rig : RigCount
+  name : WithFC Name
+  type : ty
+
+export
+Show ty => Show (BasicBinder' ty) where
+  show (MkBasicBinder rig nm ty) = "\{show rig} \{show nm.val} : \{show ty}"
+
+export
+Functor BasicBinder' where
+  map f (MkBasicBinder rig nm v) = MkBasicBinder rig nm (f v)

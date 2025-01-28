@@ -34,9 +34,9 @@ rawImpFromDecl decl = case decl.val of
         => maybe id (::) tycon $ map type datacons
     IData y _ (MkImpLater fc2 n tycon) => [tycon]
     IDef y ys => getFromClause !ys
-    IParameters ys zs => rawImpFromDecl !zs ++ map getParamTy (forget ys)
+    IParameters ys zs => rawImpFromDecl !zs ++ map (type . snd) (forget ys)
     IRecord y z _ (MkImpRecord fc n params opts conName fields) => do
-        (a, b) <- map (snd . snd) params
+        (a, b) <- map (\(i, x) => (i, type x)) params
         getFromPiInfo a ++ [b] ++ getFromIField !fields
     IFail msg zs => rawImpFromDecl !zs
     INamespace ys zs => rawImpFromDecl !zs
@@ -47,6 +47,7 @@ rawImpFromDecl decl = case decl.val of
     IBuiltin _ _ => []
   where getParamTy : (a, b, c, RawImp) -> RawImp
         getParamTy (_, _, _, ty) = ty
+
         getFromClause : ImpClause -> List RawImp
         getFromClause (PatClause fc1 lhs rhs) = [lhs, rhs]
         getFromClause (WithClause fc1 lhs rig wval prf flags ys) = [wval, lhs] ++ getFromClause !ys
