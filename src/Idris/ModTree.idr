@@ -24,6 +24,7 @@ import System.Directory
 
 import Libraries.Data.StringMap
 import Libraries.Data.String.Extra as Extra
+import Libraries.Utils.File
 
 %default covering
 
@@ -264,10 +265,13 @@ buildMod loc num len mod
                   = pretty0 mod.buildNS
                     <++> parens (pretty0 sourceFile)
               log "import.file" 10 $ "Processing " ++ sourceFile
-              process {u} {m} msgPrefix buildMsg sourceFile modNamespace
+              coreLift $ do
+                Right sourceFileData <- readFileData sourceFile
+                  | Left err => pure [FileErr sourceFile err]
+                process {u} {m} msgPrefix buildMsg sourceFileData modNamespace
 
         ws <- emitWarningsAndErrors (if null errs then ferrs else errs)
-        pure (ws ++ if null errs then ferrs else ferrs ++ errs)
+        pure (ws ++ ferrs ++ errs)
 
 export
 buildMods : {auto c : Ref Ctxt Defs} ->

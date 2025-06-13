@@ -604,6 +604,11 @@ coreRun : Core a ->
 coreRun (MkCore act) err ok
     = either err ok !act
 
+||| Convert all posible errors into valid values
+export
+coreCatch : (Error -> a) -> Core a -> IO a
+coreCatch f act = coreRun act (pure . f) pure
+
 export
 coreFail : Error -> Core a
 coreFail e = MkCore (pure (Left e))
