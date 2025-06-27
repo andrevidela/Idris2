@@ -105,6 +105,7 @@ modules =
     Core.Unify,
     Core.UnifyState,
     Core.Value,
+    Core.WithData,
 
     Core.SchemeEval.Builtins,
     Core.SchemeEval.Compile,
@@ -192,6 +193,7 @@ modules =
     Libraries.Data.NameMap.Traversable,
     Libraries.Data.Ordering.Extra,
     Libraries.Data.PosMap,
+    Libraries.Data.Record,
     Libraries.Data.SnocList.Extra,
     Libraries.Data.SnocList.HasLength,
     Libraries.Data.SnocList.LengthMatch,
@@ -209,6 +211,7 @@ modules =
     Libraries.Data.UserNameMap,
     Libraries.Data.Version,
     Libraries.Data.WithDefault,
+    Libraries.Data.WithData,
 
     Libraries.System.Directory.Tree,
 
@@ -292,6 +295,7 @@ modules =
     TTImp.Elab.App,
     TTImp.Elab.As,
     TTImp.Elab.Binders,
+    TTImp.Elab.BindingApp,
     TTImp.Elab.Case,
     TTImp.Elab.Check,
     TTImp.Elab.Delayed,
