@@ -122,12 +122,12 @@ mutual
   prettyAlt (MkImpossible _ lhs) =
       space <+> pipe <++> pretty lhs <++> impossible_ <+> semi
 
-  prettyPClause : PClause' KindedName -> Doc IdrisSyntax
-  prettyPClause (MkPatClause _ lhs rhs _) =
+  prettyPClause : PClauseBase KindedName -> Doc IdrisSyntax
+  prettyPClause (MkPatClause lhs rhs _) =
       pretty lhs <++> fatArrow <++> pretty rhs
-  prettyPClause (MkWithClause _ lhs wps flags _) =
+  prettyPClause (MkWithClause lhs wps flags _) =
       space <+> pipe <++> angles (angles (reflow "with alts not possible"))
-  prettyPClause (MkImpossible _ lhs) =
+  prettyPClause (MkImpossible lhs) =
       pretty lhs <++> impossible_
 
   prettyPStr : PStr' KindedName -> Doc IdrisSyntax
@@ -184,7 +184,11 @@ mutual
 
   export
   Pretty IdrisSyntax IPTerm where
-    prettyPrec d (PRef _ nm) = annotateM (kindAnn nm) $ cast $ prettyOp False nm.rawName
+    prettyPrec d x = prettyPrec {a = PTermBase KindedName} d (WithData.val ?aaww)
+
+  export
+  Pretty IdrisSyntax (PTermBase KindedName) where
+    prettyPrec d (PRef nm) = annotateM (kindAnn nm) $ cast $ prettyOp False nm.rawName
     prettyPrec d (NewPi (MkWithData fc (MkPBinderScope (MkPBinder Implicit bind) scope))) =
       lcurly <+> pretty bind <+> rcurly <++> arrow <++> prettyPrec d scope
     prettyPrec d (NewPi (MkWithData fc (MkPBinderScope (MkPBinder Explicit bind) scope))) =
@@ -197,29 +201,29 @@ mutual
     prettyPrec d (Forall (MkWithData fc (names, scope))) =
       parenthesise (d > startPrec) $ group $
         forall_ <++> commaSep (map (prettyBinder . val) (forget names)) <++> dot <++> pretty scope
-    prettyPrec d (PPi _ rig Explicit Nothing arg ret) =
+    prettyPrec d (PPi rig Explicit Nothing arg ret) =
       parenthesise (d > startPrec) $ group $
         branchVal
           (pretty arg <++> arrow <++> pretty ret)
           (parens (prettyRig rig <+> "_" <++> colon <++> pretty arg)
                   <++> arrow <+> softline <+> pretty ret)
           rig
-    prettyPrec d (PPi _ rig Explicit (Just n) arg ret) =
+    prettyPrec d (PPi rig Explicit (Just n) arg ret) =
       parenthesise (d > startPrec) $ group $
         parens (prettyRig rig <+> prettyBinder n
              <++> colon <++> pretty arg)
              <++> arrow <+> softline <+> pretty ret
-    prettyPrec d (PPi _ rig Implicit Nothing arg ret) =
+    prettyPrec d (PPi rig Implicit Nothing arg ret) =
       parenthesise (d > startPrec) $ group $
         braces (prettyRig rig <+> pretty0 Underscore
              <++> colon <++> pretty arg)
              <++> arrow <+> softline <+> pretty ret
-    prettyPrec d (PPi _ rig Implicit (Just n) arg ret) =
+    prettyPrec d (PPi rig Implicit (Just n) arg ret) =
       parenthesise (d > startPrec) $ group $
         braces (prettyRig rig <+> prettyBinder n
              <++> colon <++> pretty arg)
              <++> arrow <+> softline <+> pretty ret
-    prettyPrec d (PPi _ rig AutoImplicit Nothing arg ret) =
+    prettyPrec d (PPi rig AutoImplicit Nothing arg ret) =
       parenthesise (d > startPrec) $ group $
         branchVal
           (pretty arg <++> fatArrow <+> softline <+> pretty ret)
@@ -227,23 +231,23 @@ mutual
                 <++> colon <++> pretty arg)
                 <++> arrow <+> softline <+> pretty ret)
           rig
-    prettyPrec d (PPi _ rig AutoImplicit (Just n) arg ret) =
+    prettyPrec d (PPi rig AutoImplicit (Just n) arg ret) =
       parenthesise (d > startPrec) $ group $
         braces (auto_ <++> prettyRig rig <+> prettyBinder n
              <++> colon <++> pretty arg)
              <++> arrow <+> softline <+> pretty ret
-    prettyPrec d (PPi _ rig (DefImplicit t) Nothing arg ret) =
+    prettyPrec d (PPi rig (DefImplicit t) Nothing arg ret) =
       parenthesise (d > startPrec) $ group $
         braces (default_ <++> prettyPrec appPrec t <++> prettyRig rig <+> "_"
              <++> colon <++> pretty arg)
              <++> arrow <+> softline <+> pretty ret
-    prettyPrec d (PPi _ rig (DefImplicit t) (Just n) arg ret) =
+    prettyPrec d (PPi rig (DefImplicit t) (Just n) arg ret) =
       parenthesise (d > startPrec) $ group $
         braces (default_ <++> prettyPrec appPrec t
              <++> prettyRig rig <+> prettyBinder n
              <++> colon <++> pretty arg)
              <++> arrow <+> softline <+> pretty ret
-    prettyPrec d (PLam _ rig _ n ty sc) =
+    prettyPrec d (PLam rig _ n ty sc) =
       let (ns, sc) = getLamNames [(rig, n, ty)] sc in
           parenthesise (d > startPrec) $ group $
             backslash <+> prettyBindings ns <++> fatArrow <+> softline <+> pretty sc
@@ -251,7 +255,7 @@ mutual
       getLamNames : List (RigCount, IPTerm, IPTerm) ->
                     IPTerm ->
                     (List (RigCount, IPTerm, IPTerm), IPTerm)
-      getLamNames acc (PLam _ rig _ n ty sc) = getLamNames ((rig, n, ty) :: acc) sc
+      getLamNames acc (MkWithData _ $ PLam rig _ n ty sc) = getLamNames ((rig, n, ty) :: acc) sc
       getLamNames acc sc = (reverse acc, sc)
 
       prettyBindings : List (RigCount, IPTerm, IPTerm) -> Doc IdrisSyntax
@@ -310,7 +314,7 @@ mutual
       parenthesise (d > startPrec) $
         case_ <++> pretty tm <++> of_ <+> nest 2 (
         let punctuation = lcurly :: (semi <$ fromMaybe [] (tail' [1..length cs])) in
-        line <+> (vsep $ zipWith (<++>) punctuation (prettyPClause <$> cs) ++ [rcurly]))
+        line <+> (vsep $ zipWith (<++>) punctuation (prettyPClause . val <$> cs) ++ [rcurly]))
     prettyPrec d (PLocal _ ds sc) =
       parenthesise (d > startPrec) $ group $ align $
         let_ <++> braces (angles (angles "definitions")) <+> line <+> in_ <++> pretty sc
