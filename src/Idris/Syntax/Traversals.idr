@@ -10,13 +10,14 @@ import TTImp.TTImp
 %default covering
 
 export
-mapPTermM : (PTerm' nm -> Core (PTerm' nm)) -> PTerm' nm -> Core (PTerm' nm)
+mapPTermM : (PTermBase nm -> Core (PTermBase nm)) -> PTerm' nm -> Core (PTerm' nm)
+{-
 mapPTermM f = goPTerm where
 
   mutual
 
-    goPTerm : PTerm' nm -> Core (PTerm' nm)
-    goPTerm t@(PRef _ _) = f t
+    goPTerm : PTermBase nm -> Core (PTermBase nm)
+    goPTerm t@(PRef _) = f t
     goPTerm (NewPi x) =
       NewPi <$> traverseData goPBinderScope x
     goPTerm (Forall x) =

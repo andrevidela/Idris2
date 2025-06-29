@@ -29,14 +29,14 @@ import Libraries.Data.WithData
 -- type check (in fact it probably won't due to tidying up names for
 -- readability).
 
-unbracketApp : PTerm' nm -> PTerm' nm
-unbracketApp (PBracketed _ tm@(PApp _ _ _)) = tm
+unbracketApp : PTermBase nm -> PTermBase nm
+unbracketApp (PBracketed tm@(MkWithData _ $ PApp {})) = tm.val
 unbracketApp tm = tm
 
 -- TODO: Deal with precedences
 mkOp : {auto s : Ref Syn SyntaxInfo} ->
        IPTerm -> Core IPTerm
-mkOp tm@(PApp fc (PApp _ (PRef opFC kn) x) y)
+mkOp tm@(MkWithData _ $ PApp (MkWithData _ $ PApp op@(MkWithData _ $ PRef kn) x) y)
   = do syn <- get Syn
        let raw = rawName kn
        let pop = if isOpName raw then OpSymbols else Backticked
@@ -48,14 +48,14 @@ mkOp tm@(PApp fc (PApp _ (PRef opFC kn) x) y)
        -- to know if the name is an operator or not, it's enough to check
        -- that the fixity context contains the name `(++)`
        let rootName = UN (Basic (nameRoot raw))
-       let asOp = POp fc (MkFCVal opFC
-                $ NoBinder (unbracketApp x)) (MkFCVal opFC (pop kn)) (unbracketApp y)
+       let asOp = POp (MkFCVal op.fc
+                $ NoBinder (mapData unbracketApp x)) (MkFCVal op.fc (pop kn)) (mapData unbracketApp y)
        if not (null (lookupName rootName (infixes syn)))
-         then pure asOp
+         then pure (MkFCVal tm.fc asOp)
          else case dropNS raw of
            DN str _ => pure $ ifThenElse (isOpUserName (Basic str)) asOp tm
            _ => pure tm
-mkOp tm@(PApp fc (PRef opFC kn) x)
+mkOp tm@(MkWithData [_ :- fc] $ PApp (PRef opFC kn) x)
   = do syn <- get Syn
        let n = rawName kn
        let asOp = PSectionR fc (unbracketApp x) (MkFCVal opFC $ OpSymbols kn)
@@ -577,7 +577,7 @@ cleanPTerm : {auto c : Ref Ctxt Defs} ->
              IPTerm -> Core IPTerm
 cleanPTerm ptm
    = do pp <- getPPrint
-        if showMachineNames pp then pure ptm else mapPTermM cleanNode ptm
+        if showMachineNames pp then pure ptm else traverseData mapPTermM cleanNode ptm
 
   where
 

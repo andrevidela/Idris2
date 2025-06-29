@@ -177,7 +177,7 @@ mutual
        -- with-disambiguation
        PWithUnambigNames : List (FC, Name) -> PTerm' nm -> PTermBase nm
 
-  export
+  public export
   PTerm' : Type -> Type
   PTerm' = WithFC . PTermBase
 
