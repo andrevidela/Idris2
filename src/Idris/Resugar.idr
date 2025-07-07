@@ -85,8 +85,9 @@ mkSectionL tm@(PLam rig info (MkWithData _ $ PRef bd) ty
 mkSectionL tm = pure tm
 
 export
-addBracket : PTerm' nm -> PTermBase nm
-addBracket tm = if needed tm.val then PBracketed tm else tm.val
+addBracket : PTermBase nm -> PTermBase nm
+addBracket tm = if needed tm then PBracketed (MkDef tm)  -- we give no location to the brackets
+                             else tm
   where
     needed : PTermBase nm -> Bool
     needed (PBracketed {}) = False
@@ -222,25 +223,25 @@ mutual
   sugarAppM tm =
   -- refolding natural numbers if the expression is a constant
     let Nothing = extractNat 0 tm
-          | Just k => pure $ PPrimVal (getPTermLoc tm) (BI (cast k))
+          | Just k => pure $ PPrimVal (BI (cast k))
         Nothing = extractInteger tm
-          | Just k => pure $ PPrimVal (getPTermLoc tm) (BI k)
+          | Just k => pure $ PPrimVal (BI k)
         Nothing = extractDouble tm
-          | Just d => pure $ PPrimVal (getPTermLoc tm) (Db d)
+          | Just d => pure $ PPrimVal (Db d)
     in case tm of
-        PRef fc (MkKindedName nt (NS ns nm) rn) =>
+        PRef (MkKindedName nt (NS ns nm) rn) =>
           if builtinNS == ns
              then case nameRoot nm of
-               "Unit"   => pure $ PUnit fc
-               "MkUnit" => pure $ PUnit fc
+               "Unit"   => pure $ PUnit
+               "MkUnit" => pure $ PUnit
                _           => Nothing
              else case nameRoot nm of
-               "Nil" => pure $ PList fc fc []
-               "Lin" => pure $ PSnocList fc fc [<]
+               "Nil" => pure $ PList ?aa []
+               "Lin" => pure $ PSnocList ?bbb [<]
                _     => Nothing
-        PApp fc (PRef _ (MkKindedName nt (NS ns nm) rn)) arg =>
+        PApp (MkWithData _ $ PRef (MkKindedName nt (NS ns nm) rn)) arg =>
           case nameRoot nm of
-            "rangeFrom" => pure $ PRangeStream fc (unbracket arg) Nothing
+            "rangeFrom" => pure $ PRangeStream (mapData unbracket arg) Nothing
             _           => Nothing
         _ => Nothing
 
@@ -256,35 +257,35 @@ sugarName (PV n _) = sugarName n
 sugarName (DN n _) = n
 sugarName x = show x
 
-toPRef : FC -> KindedName -> Core IPTermBase
-toPRef fc (MkKindedName nt fn nm) = case dropNS nm of
-  MN n i     => pure (sugarApp (PRef (MkKindedName nt fn $ MN n i)))
-  PV n _     => pure (sugarApp (PRef (MkKindedName nt fn $ n)))
-  DN n _     => pure (sugarApp (PRef (MkKindedName nt fn $ UN $ Basic n)))
-  Nested _ n => toPRef fc (MkKindedName nt fn n)
-  n          => pure (sugarApp (PRef (MkKindedName nt fn n)))
+toPRef : KindedName -> IPTermBase
+toPRef (MkKindedName nt fn nm) = case dropNS nm of
+  MN n i     => sugarApp (PRef (MkKindedName nt fn $ MN n i))
+  PV n _     => sugarApp (PRef (MkKindedName nt fn $ n))
+  DN n _     => sugarApp (PRef (MkKindedName nt fn $ UN $ Basic n))
+  Nested _ n => toPRef (MkKindedName nt fn n)
+  n          => sugarApp (PRef (MkKindedName nt fn n))
 
 mutual
   toPTerm : {auto c : Ref Ctxt Defs} ->
             {auto s : Ref Syn SyntaxInfo} ->
             (prec : Nat) -> IRawImp -> Core IPTerm
   toPTerm p (IVar fc nm) = do
-    t <- if fullNamespace !(getPPrint)
-      then pure $ PRef nm
-      else toPRef fc nm
+    let t = if fullNamespace !(getPPrint)
+                then PRef nm
+                else toPRef nm
     log "resugar.var" 70 $
       unwords [ "Resugaring", show @{Raw} nm.rawName, "to", show t]
-    pure t
+    pure (MkFCVal fc t)
   toPTerm p (IPi fc rig Implicit n arg ret)
       = do imp <- showImplicits
            if imp
               then do arg' <- toPTerm tyPrec arg
                       ret' <- toPTerm tyPrec ret
-                      bracket p tyPrec (PPi fc rig Implicit n arg' ret')
+                      MkFCVal fc <$> bracket p tyPrec (PPi rig Implicit n arg' ret')
               else if needsBind n
                       then do arg' <- toPTerm tyPrec arg
                               ret' <- toPTerm tyPrec ret
-                              bracket p tyPrec (PPi fc rig Implicit n arg' ret')
+                              MkFCVal fc <$> bracket p tyPrec (PPi rig Implicit n arg' ret')
                       else toPTerm p ret
     where
       needsBind : Maybe Name -> Bool
