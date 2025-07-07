@@ -35,8 +35,8 @@ unbracketApp tm = tm
 
 -- TODO: Deal with precedences
 mkOp : {auto s : Ref Syn SyntaxInfo} ->
-       IPTerm -> Core IPTerm
-mkOp tm@(MkWithData _ $ PApp (MkWithData _ $ PApp op@(MkWithData _ $ PRef kn) x) y)
+       IPTermBase -> Core IPTermBase
+mkOp tm@(PApp (MkWithData _ $ PApp op@(MkWithData _ $ PRef kn) x) y)
   = do syn <- get Syn
        let raw = rawName kn
        let pop = if isOpName raw then OpSymbols else Backticked
@@ -51,14 +51,14 @@ mkOp tm@(MkWithData _ $ PApp (MkWithData _ $ PApp op@(MkWithData _ $ PRef kn) x)
        let asOp = POp (MkFCVal op.fc
                 $ NoBinder (mapData unbracketApp x)) (MkFCVal op.fc (pop kn)) (mapData unbracketApp y)
        if not (null (lookupName rootName (infixes syn)))
-         then pure (MkFCVal tm.fc asOp)
+         then pure asOp
          else case dropNS raw of
            DN str _ => pure $ ifThenElse (isOpUserName (Basic str)) asOp tm
            _ => pure tm
-mkOp tm@(MkWithData [_ :- fc] $ PApp (PRef opFC kn) x)
+mkOp tm@(PApp (MkWithData opFC $ PRef kn) x)
   = do syn <- get Syn
        let n = rawName kn
-       let asOp = PSectionR fc (unbracketApp x) (MkFCVal opFC $ OpSymbols kn)
+       let asOp = PSectionR (mapData unbracketApp x) (MkWithData opFC $ OpSymbols kn)
        if not (null $ lookupName (UN $ Basic (nameRoot n)) (infixes syn))
          then pure asOp
          else case dropNS n of
@@ -68,15 +68,15 @@ mkOp tm = pure tm
 
 mkSectionL : {auto c : Ref Ctxt Defs} ->
              {auto s : Ref Syn SyntaxInfo} ->
-             IPTerm -> Core IPTerm
-mkSectionL tm@(PLam fc rig info (PRef _ bd) ty
-                 (PApp _ (PApp _ (PRef opFC kn) (PRef _ (MkKindedName (Just Bound) nm _))) x))
+             IPTermBase -> Core IPTermBase
+mkSectionL tm@(PLam rig info (MkWithData _ $ PRef bd) ty
+                 (MkWithData _ $ PApp (MkWithData _ $ PApp (MkWithData nameOp $ PRef kn) (MkWithData _ $ PRef (MkKindedName (Just Bound) nm _))) x))
   = do log "resugar.sectionL" 30 $ "SectionL candidate: \{show tm}"
        let True = bd.fullName == nm
          | _ => pure tm
        syn <- get Syn
        let n = rawName kn
-       let asOp = PSectionL fc (MkFCVal opFC $ OpSymbols kn) (unbracketApp x)
+       let asOp = PSectionL (MkWithData nameOp (OpSymbols kn)) (mapData unbracketApp x)
        if not (null $ lookupName (UN $ Basic (nameRoot n)) (fixities syn))
          then pure asOp
          else case dropNS n of
@@ -85,21 +85,21 @@ mkSectionL tm@(PLam fc rig info (PRef _ bd) ty
 mkSectionL tm = pure tm
 
 export
-addBracket : FC -> PTerm' nm -> PTerm' nm
-addBracket fc tm = if needed tm then PBracketed fc tm else tm
+addBracket : PTerm' nm -> PTermBase nm
+addBracket tm = if needed tm.val then PBracketed tm else tm.val
   where
-    needed : PTerm' nm -> Bool
-    needed (PBracketed _ _) = False
-    needed (PRef _ _) = False
-    needed (PPair _ _ _) = False
-    needed (PDPair _ _ _ _ _) = False
-    needed (PUnit _) = False
-    needed (PComprehension _ _ _) = False
-    needed (PList _ _ _) = False
-    needed (PSnocList _ _ _) = False
+    needed : PTermBase nm -> Bool
+    needed (PBracketed {}) = False
+    needed (PRef {}) = False
+    needed (PPair {}) = False
+    needed (PDPair {}) = False
+    needed (PUnit {}) = False
+    needed (PComprehension {}) = False
+    needed (PList {}) = False
+    needed (PSnocList {}) = False
     needed (PRange{}) = False
     needed (PRangeStream{}) = False
-    needed (PPrimVal _ _) = False
+    needed (PPrimVal {}) = False
     needed (PIdiom{}) = False
     needed (PBang{}) = False
     needed tm = True
@@ -107,12 +107,12 @@ addBracket fc tm = if needed tm then PBracketed fc tm else tm
 bracket : {auto c : Ref Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
           (outer : Nat) -> (inner : Nat) ->
-          IPTerm -> Core IPTerm
+          IPTermBase -> Core IPTermBase
 bracket outer inner tm
     = do tm <- mkOp tm
          tm <- mkSectionL tm
          if outer > inner
-            then pure (addBracket emptyFC tm)
+            then pure (addBracket tm)
             else pure tm
 
 startPrec : Nat
@@ -139,85 +139,85 @@ showFullEnv
     = do pp <- getPPrint
          pure (showFullEnv pp)
 
-unbracket : PTerm' nm -> PTerm' nm
-unbracket (PBracketed _ tm) = tm
+unbracket : PTermBase nm -> PTermBase nm
+unbracket (PBracketed tm) = tm.val
 unbracket tm = tm
 
 ||| Attempt to extract a constant natural number
-extractNat : Nat -> IPTerm -> Maybe Nat
+extractNat : Nat -> IPTermBase -> Maybe Nat
 extractNat acc tm = case tm of
-  PRef _ (MkKindedName _ (NS ns (UN (Basic n))) rn) =>
+  PRef (MkKindedName _ (NS ns (UN (Basic n))) rn) =>
     do guard (n == "Z")
        guard (ns == typesNS || ns == preludeNS)
        pure acc
-  PApp _ (PRef _ (MkKindedName _ (NS ns (UN (Basic n))) rn)) k => case n of
+  PApp (MkWithData _ $ PRef (MkKindedName _ (NS ns (UN (Basic n))) rn)) k => case n of
     "S" => do guard (ns == typesNS || ns == preludeNS)
-              extractNat (1 + acc) k
-    "fromInteger" => extractNat acc k
+              extractNat (1 + acc) k.val
+    "fromInteger" => extractNat acc k.val
     _ => Nothing
-  PPrimVal _ (BI n) => do guard (0 <= n)
-                          pure (acc + integerToNat n)
-  PBracketed _ k    => extractNat acc k
-  _                 => Nothing
+  PPrimVal (BI n) => do guard (0 <= n)
+                        pure (acc + integerToNat n)
+  PBracketed k    => extractNat acc k.val
+  _               => Nothing
 
 ||| Attempt to extract a constant integer
-extractInteger : IPTerm -> Maybe Integer
+extractInteger : IPTermBase -> Maybe Integer
 extractInteger tm = case tm of
-  PApp _ (PRef _ (MkKindedName _ (NS ns (UN (Basic n))) rn)) k => case n of
-    "fromInteger" => extractInteger k
-    "negate"      => negate <$> extractInteger k
+  PApp (MkWithData _ $ PRef (MkKindedName _ (NS ns (UN (Basic n))) rn)) k => case n of
+    "fromInteger" => extractInteger k.val
+    "negate"      => negate <$> extractInteger k.val
     _ => Nothing
-  PPrimVal _ (BI i) => pure i
-  PBracketed _ t    => extractInteger t
+  PPrimVal (BI i) => pure i
+  PBracketed t    => extractInteger t.val
   _                 => Nothing
 
 ||| Attempt to extract a constant double
-extractDouble : IPTerm -> Maybe Double
+extractDouble : IPTermBase -> Maybe Double
 extractDouble tm = case tm of
-  PApp _ (PRef _ (MkKindedName _ (NS ns (UN (Basic n))) rn)) k => case n of
-    "fromDouble" => extractDouble k
-    "negate"     => negate <$> extractDouble k
+  PApp (MkWithData _ $ PRef (MkKindedName _ (NS ns (UN (Basic n))) rn)) k => case n of
+    "fromDouble" => extractDouble k.val
+    "negate"     => negate <$> extractDouble k.val
     _ => Nothing
-  PPrimVal _ (Db d) => pure d
-  PBracketed _ t    => extractDouble t
+  PPrimVal (Db d) => pure d
+  PBracketed t    => extractDouble t.val
   _                 => Nothing
 
 mutual
 
   ||| Put the special names (Nil, ::, Pair, Z, S, etc) back as syntax
   ||| Returns `Nothing` in case there was nothing to resugar.
-  sugarAppM : IPTerm -> Maybe IPTerm
-  sugarAppM (PApp fc (PApp _ (PApp _ (PRef opFC (MkKindedName nt (NS ns nm) rn)) l) m) r) =
+  sugarAppM : IPTermBase -> Maybe IPTermBase
+  sugarAppM (PApp (MkWithData _ $ PApp (MkWithData _ $ PApp (MkWithData _ $ PRef (MkKindedName nt (NS ns nm) rn)) l) m) r) =
     case nameRoot nm of
-      "rangeFromThenTo" => pure $ PRange fc (unbracket l) (Just $ unbracket m) (unbracket r)
+      "rangeFromThenTo" => pure $ PRange (mapData unbracket l) (Just $ mapData unbracket m) (mapData unbracket r)
       _ => Nothing
-  sugarAppM (PApp fc (PApp _ (PRef opFC (MkKindedName nt (NS ns nm) rn)) l) r) =
+  sugarAppM (PApp (MkWithData _ $ PApp op@(MkWithData opFC $ PRef (MkKindedName nt (NS ns nm) rn)) l) r) =
     if builtinNS == ns then
       case nameRoot nm of
-        "Pair"   => pure $ PPair fc (unbracket l) (unbracket r)
-        "MkPair" => pure $ PPair fc (unbracket l) (unbracket r)
-        "Equal"  => pure $ PEq fc (unbracket l) (unbracket r)
-        "==="    => pure $ PEq fc (unbracket l) (unbracket r)
-        "~=~"    => pure $ PEq fc (unbracket l) (unbracket r)
+        "Pair"   => pure $ PPair (mapData unbracket l) (mapData unbracket r)
+        "MkPair" => pure $ PPair (mapData unbracket l) (mapData unbracket r)
+        "Equal"  => pure $ PEq (mapData unbracket l) (mapData unbracket r)
+        "==="    => pure $ PEq (mapData unbracket l) (mapData unbracket r)
+        "~=~"    => pure $ PEq (mapData unbracket l) (mapData unbracket r)
         _        => Nothing
     else if dpairNS == ns then
       case nameRoot nm of
-        "DPair"  => case unbracket r of
-          PLam _ _ _ n _ r' => pure $ PDPair fc opFC n (unbracket l) (unbracket r')
-          _                 => Nothing
-        "MkDPair" => pure $ PDPair fc opFC (unbracket l) (PImplicit opFC) (unbracket r)
+        "DPair"  => case unbracket r.val of
+          PLam _ _ n _ r' => pure $ PDPair op.fc n (mapData unbracket l) (mapData unbracket r')
+          _               => Nothing
+        "MkDPair" => pure $ PDPair op.fc (mapData unbracket l) (MkFCVal op.fc PImplicit) (mapData unbracket r)
         _                 => Nothing
     else
       case nameRoot nm of
-        "::" => case sugarApp (unbracket r) of
-          PList fc nilFC xs => pure $ PList fc nilFC ((opFC, unbracketApp l) :: xs)
+        "::" => case sugarApp (unbracket r.val) of
+          PList nilFC xs => pure $ PList nilFC ((op.fc, mapData unbracketApp l) :: xs)
           _ => Nothing
-        ":<" => case sugarApp (unbracket l) of
-          PSnocList fc nilFC xs => pure $ PSnocList fc nilFC
-                                            (xs :< (opFC, unbracketApp r))
+        ":<" => case sugarApp (unbracket l.val) of
+          PSnocList nilFC xs => pure $ PSnocList nilFC
+                                          (xs :< (op.fc, mapData unbracketApp r))
           _ => Nothing
-        "rangeFromTo" => pure $ PRange fc (unbracket l) Nothing (unbracket r)
-        "rangeFromThen" => pure $ PRangeStream fc (unbracket l) (Just $ unbracket r)
+        "rangeFromTo" => pure $ PRange (mapData unbracket l) Nothing (mapData unbracket r)
+        "rangeFromThen" => pure $ PRangeStream (mapData unbracket l) (Just $ mapData unbracket r)
         _    => Nothing
   sugarAppM tm =
   -- refolding natural numbers if the expression is a constant
@@ -246,7 +246,7 @@ mutual
 
   ||| Put the special names (Nil, ::, Pair, Z, S, etc.) back as syntax
 
-  sugarApp : IPTerm -> IPTerm
+  sugarApp : IPTermBase -> IPTermBase
   sugarApp tm = fromMaybe tm (sugarAppM tm)
 
 export
@@ -256,13 +256,13 @@ sugarName (PV n _) = sugarName n
 sugarName (DN n _) = n
 sugarName x = show x
 
-toPRef : FC -> KindedName -> Core IPTerm
+toPRef : FC -> KindedName -> Core IPTermBase
 toPRef fc (MkKindedName nt fn nm) = case dropNS nm of
-  MN n i     => pure (sugarApp (PRef fc (MkKindedName nt fn $ MN n i)))
-  PV n _     => pure (sugarApp (PRef fc (MkKindedName nt fn $ n)))
-  DN n _     => pure (sugarApp (PRef fc (MkKindedName nt fn $ UN $ Basic n)))
+  MN n i     => pure (sugarApp (PRef (MkKindedName nt fn $ MN n i)))
+  PV n _     => pure (sugarApp (PRef (MkKindedName nt fn $ n)))
+  DN n _     => pure (sugarApp (PRef (MkKindedName nt fn $ UN $ Basic n)))
   Nested _ n => toPRef fc (MkKindedName nt fn n)
-  n          => pure (sugarApp (PRef fc (MkKindedName nt fn n)))
+  n          => pure (sugarApp (PRef (MkKindedName nt fn n)))
 
 mutual
   toPTerm : {auto c : Ref Ctxt Defs} ->
@@ -270,7 +270,7 @@ mutual
             (prec : Nat) -> IRawImp -> Core IPTerm
   toPTerm p (IVar fc nm) = do
     t <- if fullNamespace !(getPPrint)
-      then pure $ PRef fc nm
+      then pure $ PRef nm
       else toPRef fc nm
     log "resugar.var" 70 $
       unwords [ "Resugaring", show @{Raw} nm.rawName, "to", show t]
@@ -407,22 +407,22 @@ mutual
 
   mkApp : {auto c : Ref Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
-          IPTerm ->
+          IPTermBase ->
           List (FC, Maybe (Maybe Name), IPTerm) ->
-          Core IPTerm
-  mkApp fn [] = pure fn
-  mkApp fn ((fc, Nothing, arg) :: rest)
-      = do let ap = sugarApp (PApp fc fn arg)
-           mkApp ap rest
-  mkApp fn ((fc, Just Nothing, arg) :: rest)
-      = do let ap = sugarApp (PAutoApp fc fn arg)
-           mkApp ap rest
-  mkApp fn ((fc, Just (Just n), arg) :: rest)
-      = do imp <- showImplicits
-           if imp
-              then do let ap = PNamedApp fc fn n arg
-                      mkApp ap rest
-              else mkApp fn rest
+          Core IPTermBase
+--   mkApp fn [] = pure fn
+--   mkApp fn ((fc, Nothing, arg) :: rest)
+--       = do let ap = sugarApp (PApp fn arg)
+--            mkApp ap rest
+--   mkApp fn ((fc, Just Nothing, arg) :: rest)
+--       = do let ap = sugarApp (PAutoApp fc fn arg)
+--            mkApp ap rest
+--   mkApp fn ((fc, Just (Just n), arg) :: rest)
+--       = do imp <- showImplicits
+--            if imp
+--               then do let ap = PNamedApp fc fn n arg
+--                       mkApp ap rest
+--               else mkApp fn rest
 
   toPTermApp : {auto c : Ref Ctxt Defs} ->
                {auto s : Ref Syn SyntaxInfo} ->
@@ -462,19 +462,19 @@ mutual
 
   toPClause : {auto c : Ref Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
-              ImpClause' KindedName -> Core (PClause' KindedName)
+              ImpClause' KindedName -> Core (PClauseBase KindedName)
   toPClause (PatClause fc lhs rhs)
-      = pure (MkPatClause fc !(toPTerm startPrec lhs)
-                             !(toPTerm startPrec rhs)
-                             [])
+      = pure (MkPatClause !(toPTerm startPrec lhs)
+                          !(toPTerm startPrec rhs)
+                          [])
   toPClause (WithClause fc lhs rig wval prf flags cs)
-      = pure $ MkWithClause fc
+      = pure $ MkWithClause
                  !(toPTerm startPrec lhs)
                  (MkPWithProblem rig !(toPTerm startPrec wval) prf ::: [])
                  flags
                  !(traverse toPClause cs)
   toPClause (ImpossibleClause fc lhs)
-      = pure (MkImpossible fc !(toPTerm startPrec lhs))
+      = pure (MkImpossible !(toPTerm startPrec lhs))
 
   toPTypeDecl : {auto c : Ref Ctxt Defs} ->
                 {auto s : Ref Syn SyntaxInfo} ->
@@ -600,19 +600,19 @@ cleanPTerm ptm
     cleanBinderName AutoImplicit (UN (Basic "__con")) = pure Nothing
     cleanBinderName _ nm = Just <$> cleanName nm
 
-    cleanNode : IPTerm -> Core IPTerm
-    cleanNode (PRef fc nm)    =
-      PRef fc <$> cleanKindedName nm
-    cleanNode (POp fc abi op y) =
-      (\ op => POp fc abi op y) <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
-    cleanNode (PPrefixOp fc op x) =
-      (\ op => PPrefixOp fc op x) <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
-    cleanNode (PSectionL fc op x) =
-      (\ op => PSectionL fc op x) <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
-    cleanNode (PSectionR fc x op) =
-      PSectionR fc x <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
-    cleanNode (PPi fc rig vis (Just n) arg ret) =
-      (\ n => PPi fc rig vis n arg ret) <$> (cleanBinderName vis n)
+    cleanNode : IPTermBase -> Core IPTermBase
+    cleanNode (PRef nm)    =
+      PRef <$> cleanKindedName nm
+    cleanNode (POp abi op y) =
+      (\ op => POp abi op y) <$> traverseData (traverseOp @{Functor.CORE} cleanKindedName) op
+    cleanNode (PPrefixOp op x) =
+      (\ op => PPrefixOp op x) <$> traverseData (traverseOp @{Functor.CORE} cleanKindedName) op
+    cleanNode (PSectionL op x) =
+      (\ op => PSectionL op x) <$> traverseData (traverseOp @{Functor.CORE} cleanKindedName) op
+    cleanNode (PSectionR x op) =
+      PSectionR x <$> traverseFC (traverseOp @{Functor.CORE} cleanKindedName) op
+    cleanNode (PPi rig vis (Just n) arg ret) =
+      (\ n => PPi rig vis n arg ret) <$> cleanBinderName vis n
     cleanNode tm = pure tm
 
 toCleanPTerm : {auto c : Ref Ctxt Defs} ->

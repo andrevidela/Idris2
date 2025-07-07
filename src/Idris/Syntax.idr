@@ -90,6 +90,10 @@ mutual
   IPTerm : Type
   IPTerm = PTerm' KindedName
 
+  public export
+  IPTermBase : Type
+  IPTermBase = PTermBase KindedName
+
   ||| The full high level source language
   ||| This gets desugared to RawImp (TTImp.TTImp),
   ||| then elaborated to Term (Core.TT)
@@ -986,8 +990,8 @@ Show (PTermBase Name) where
 
 export
 covering
-Show IPTerm where
-  showPrec prec x = showPTermPrec rawName prec x
+Show IPTermBase where
+  showPrec prec x = showPTermPrec' rawName prec x
 
 public export
 Method : Type
