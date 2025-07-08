@@ -49,11 +49,11 @@ displayClause : {auto c : Ref Ctxt Defs} ->
 displayClause defs (vs ** (env, lhs, rhs))
   = do lhstm <- resugar env !(normaliseHoles defs env lhs)
        rhstm <- resugar env !(normaliseHoles defs env rhs)
-       pure (prettyLHS lhstm <++> equals <++> pretty rhstm)
+       pure (prettyLHS lhstm.val <++> equals <++> pretty rhstm)
 
   where
-    prettyLHS : IPTerm -> Doc IdrisSyntax
-    prettyLHS (PRef _ op) = cast $ prettyOp True op.rawName
+    prettyLHS : IPTermBase -> Doc IdrisSyntax
+    prettyLHS (PRef op) = cast $ prettyOp True op.rawName
     prettyLHS t = pretty t
 
 export
@@ -78,11 +78,11 @@ displayImpl defs (n, idx, gdef)
   = case definition gdef of
       PMDef _ _ ct _ [(vars ** (env,  _, rhs))] =>
         do rhstm <- resugar env !(normaliseHoles defs env rhs)
-           let (_, args) = getFnArgs defaultKindedName rhstm
+           let (_, args) = getFnArgs defaultKindedName rhstm.val
            defs <- get Ctxt
            pds <- map catMaybes $ for args $ \ arg => do
              let (_, expr) = underLams (unArg arg)
-             let (PRef _ kn, _) = getFnArgs defaultKindedName expr
+             let (PRef kn, _) = getFnArgs defaultKindedName expr.val
                | _ => pure Nothing
              log "doc.implementation" 20 $ "Got name \{show @{Raw} kn}"
              let (ns, DN dn nm) = splitNS (kn.fullName)

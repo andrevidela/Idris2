@@ -112,7 +112,7 @@ getImplDocs keep
               True <- keep ty
                 | False => pure []
               ty <- resugar Env.empty ty
-              pure [annotate (Decl impl) $ prettyBy Syntax ty]
+              pure [annotate ?huhh $ prettyBy Syntax ty]
          pure $ case concat docss of
            [] => []
            [doc] => [header "Hint" <++> annotate Declarations doc]
@@ -454,8 +454,8 @@ getDocsForName fc n config
              ty <- resugar Env.empty =<< normaliseHoles defs Env.empty (type def)
              -- when printing e.g. interface methods there is no point in
              -- repeating the interface's name
-             let ty = ifThenElse (not dropFirst) ty $ case ty of
-                        PPi _ _ AutoImplicit _ _ sc => sc
+             let ty = ifThenElse (not dropFirst) ty $ case ty.val of
+                        PPi _ AutoImplicit _ _ sc => sc
                         _ => ty
              nm <- aliasName n
              let prig = reAnnotate Syntax $ prettyRig def.multiplicity
@@ -488,7 +488,7 @@ getDocsForImplementation :
   PTerm -> Core (Maybe (Doc IdrisSyntax))
 getDocsForImplementation t = do
   -- the term better be of the shape (I e1 e2 e3) where I is a name
-  let (PRef fc intf, args) = getFnArgs id t
+  let (PRef intf, args) = Views.getFnArgs id t.val
     | _ => pure Nothing
   -- That name (I) better be the name of an interface
   syn <- get Syn
@@ -497,7 +497,7 @@ getDocsForImplementation t = do
     | _ => pure Nothing
   -- Now lookup the declared implementations for that interface
   -- For now we only look at the top list
-  ((_, tophs) :: _) <- hintGroups <$> getSearchData fc False intf
+  ((_, tophs) :: _) <- hintGroups <$> getSearchData t.fc False intf
     | _ => pure Nothing
   defs <- get Ctxt
   impls <- map catMaybes $ for tophs $ \ hint => do
@@ -508,7 +508,7 @@ getDocsForImplementation t = do
     let (_, retTy) = underPis ty
     -- try to see whether it approximates what we are looking for
     -- we throw the head away because it'll be the interface name (I)
-    let (_, cargs) = getFnArgs defaultKindedName retTy
+    let (_, cargs) = Views.getFnArgs ?ad ?bqw -- retTy
     bs <- for (zip args cargs) $ \ (arg, carg) => do
       -- For now we only compare the heads of the arguments because we expect
       -- we are interested in implementations of the form
@@ -517,9 +517,9 @@ getDocsForImplementation t = do
       -- retain implementations whose type is fully compatible.
 
       -- TODO: check the Args have the same shape before unArgging?
-      let ((PRef fc hd, _), (PRef _ chd, _)) = ( getFnArgs id (unArg arg), getFnArgs defaultKindedName (unArg carg))
-        | ((PPrimVal _ c, _), (PPrimVal _ c', _)) => pure (c == c')
-        | ((PType _, _), (PType _, _)) => pure True
+      let ((PRef hd, _), (PRef chd, _)) = ( Views.getFnArgs id (unArg arg).val, Views.getFnArgs defaultKindedName (unArg carg).val)
+        | ((PPrimVal c, _), (PPrimVal c', _)) => pure (c == c')
+        | ((PType, _), (PType, _)) => pure True
         | _ => pure False
       -- if the names match on the nose we can readily say True
       let False = dropNS hd == dropNS (fullName chd)
@@ -552,38 +552,38 @@ export
 getDocsForPTerm : {auto o : Ref ROpts REPLOpts} ->
                   {auto c : Ref Ctxt Defs} ->
                   {auto s : Ref Syn SyntaxInfo} ->
-                  PTerm -> Core (Doc IdrisDocAnn)
-getDocsForPTerm (PRef fc name) = getDocsForName fc name MkConfig
-getDocsForPTerm (PPrimVal _ c) = getDocsForPrimitive c
-getDocsForPTerm (PType _) = pure $ vcat
+                  PTermBase Name -> Core (Doc IdrisDocAnn)
+getDocsForPTerm (PRef name) = getDocsForName ?fcNo name MkConfig
+getDocsForPTerm (PPrimVal c) = getDocsForPrimitive c
+getDocsForPTerm PType = pure $ vcat
   [ "Type : Type"
   , indent 2 "The type of all types is Type. The type of Type is Type."
   ]
-getDocsForPTerm (PString _ _ _) = pure $ vcat
+getDocsForPTerm (PString {}) = pure $ vcat
   [ "String Literal"
   , indent 2 "Desugars to a fromString call"
   ]
-getDocsForPTerm (PList _ _ _) = pure $ vcat
+getDocsForPTerm (PList {}) = pure $ vcat
   [ "List Literal"
   , indent 2 "Desugars to (::) and Nil"
   ]
-getDocsForPTerm (PSnocList _ _ _) = pure $ vcat
+getDocsForPTerm (PSnocList {}) = pure $ vcat
   [ "SnocList Literal"
   , indent 2 "Desugars to (:<) and Lin"
   ]
-getDocsForPTerm (PPair _ _ _) = pure $ vcat
+getDocsForPTerm (PPair {}) = pure $ vcat
   [ "Pair Literal"
   , indent 2 "Desugars to MkPair or Pair"
   ]
-getDocsForPTerm (PDPair _ _ _ _ _) = pure $ vcat
+getDocsForPTerm (PDPair {}) = pure $ vcat
   [ "Dependant Pair Literal"
   , indent 2 "Desugars to MkDPair or DPair"
   ]
-getDocsForPTerm (PUnit _) = pure $ vcat
+getDocsForPTerm (PUnit {}) = pure $ vcat
   [ "Unit Literal"
   , indent 2 "Desugars to MkUnit or Unit"
   ]
-getDocsForPTerm (PUnquote _ _) = pure $ vcat $
+getDocsForPTerm (PUnquote {}) = pure $ vcat $
   header "Unquotes" :: ""
   :: map (indent 2) [
   """
@@ -600,7 +600,7 @@ getDocsForPTerm (PUnquote _ _) = pure $ vcat $
   foo expr = `(either ~(expr) x y)
   ```
   """]
-getDocsForPTerm (PDelayed _ LLazy _) = pure $ vcat $
+getDocsForPTerm (PDelayed LLazy _) = pure $ vcat $
   header "Laziness annotation" :: ""
   :: map (indent 2) [
   """
@@ -612,7 +612,7 @@ getDocsForPTerm (PDelayed _ LLazy _) = pure $ vcat $
   necessary. This can be disabled using the `%auto_lazy off` pragma.
   """
   ]
-getDocsForPTerm (PDelayed _ LInf  _) = pure $ vcat $
+getDocsForPTerm (PDelayed LInf  _) = pure $ vcat $
   header "Codata (infinite data type) annotation" :: ""
   :: map (indent 2) [
   """
@@ -626,7 +626,7 @@ getDocsForPTerm (PDelayed _ LInf  _) = pure $ vcat $
   structure. This can be disabled using the `%auto_lazy off` pragma.
   """
   ]
-getDocsForPTerm (PDelay _ _) = pure $ vcat $
+getDocsForPTerm (PDelay {}) = pure $ vcat $
   header "Laziness compiler primitive" :: ""
   :: map (indent 2) [
   """
@@ -638,7 +638,7 @@ getDocsForPTerm (PDelay _ _) = pure $ vcat $
   Automatically inserted by the compiler unless `%auto_lazy off` is set.
   """
   ]
-getDocsForPTerm (PForce _ _) = pure $ vcat $
+getDocsForPTerm (PForce {}) = pure $ vcat $
   header "Laziness compiler primitive" :: ""
   :: map (indent 2) [
   """
@@ -657,7 +657,7 @@ getDocs : {auto o : Ref ROpts REPLOpts} ->
           {auto c : Ref Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
           DocDirective -> Core (Doc IdrisDocAnn)
-getDocs (APTerm ptm) = getDocsForPTerm ptm
+getDocs (APTerm ptm) = getDocsForPTerm ptm.val
 getDocs (Symbol k) = pure $ getDocsForSymbol k
 getDocs (Bracket bracket) = pure $ getDocsForBracket bracket
 getDocs (Keyword k) = pure $ getDocsForKeyword k

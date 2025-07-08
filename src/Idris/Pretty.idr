@@ -109,6 +109,7 @@ export
 code : Doc IdrisAnn -> Doc IdrisAnn
 code = annotate Code
 
+export
 Pretty i a => Pretty i (WithData fields a) where
   pretty x = pretty x.val
 

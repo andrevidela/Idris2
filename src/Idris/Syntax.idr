@@ -91,6 +91,10 @@ mutual
   IPTerm = PTerm' KindedName
 
   public export
+  PTerm' : Type -> Type
+  PTerm' = WithFC . PTermBase
+
+  public export
   IPTermBase : Type
   IPTermBase = PTermBase KindedName
 
@@ -180,10 +184,6 @@ mutual
 
        -- with-disambiguation
        PWithUnambigNames : List (FC, Name) -> PTerm' nm -> PTermBase nm
-
-  public export
-  PTerm' : Type -> Type
-  PTerm' = WithFC . PTermBase
 
   export
   getPTermLoc : PTerm' nm -> FC
@@ -992,6 +992,11 @@ export
 covering
 Show IPTermBase where
   showPrec prec x = showPTermPrec' rawName prec x
+
+export
+covering
+Show IPTerm where
+  showPrec prec x = showPTermPrec' rawName prec x.val
 
 public export
 Method : Type

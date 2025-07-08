@@ -362,49 +362,50 @@ mutual
            fn' <- toPTerm startPrec fn
            MkFCVal fc <$> bracket p appPrec (PWithApp fn' arg')
   toPTerm p (IBindingApp fn bind arg)
-      = pure $ PBindingApp fn
+      = pure $ MkDef $ PBindingApp fn
           !(traverseData (traverseBindingInfo (toPTerm p)) bind)
           !(traverseData (toPTerm p) arg)
   toPTerm p (INamedApp fc fn n arg)
       = do arg' <- toPTerm startPrec arg
            app <- toPTermApp fn [(fc, Just (Just n), arg')]
            imp <- showImplicits
-           if imp
-              then bracket p startPrec app
-              else mkOp app
-  toPTerm p (ISearch fc d) = pure (PSearch fc d)
-  toPTerm p (IAlternative fc _ _) = pure (PImplicit fc)
+           MkFCVal fc <$> if imp
+              then bracket p startPrec app.val
+              else mkOp app.val
+  toPTerm p (ISearch fc d) = pure $ MkFCVal fc (PSearch d)
+  toPTerm p (IAlternative fc _ _) = pure $ MkFCVal fc PImplicit
   toPTerm p (IRewrite fc rule tm)
-      = pure (PRewrite fc !(toPTerm startPrec rule)
-                               !(toPTerm startPrec tm))
+      = pure $ MkFCVal fc $
+                   (PRewrite !(toPTerm startPrec rule)
+                        !(toPTerm startPrec tm))
   toPTerm p (ICoerced fc tm) = toPTerm p tm
-  toPTerm p (IPrimVal fc c) = pure (PPrimVal fc c)
-  toPTerm p (IHole fc str) = pure (PHole fc False str)
-  toPTerm p (IType fc) = pure (PType fc)
+  toPTerm p (IPrimVal fc c) = pure $ MkFCVal fc (PPrimVal c)
+  toPTerm p (IHole fc str) = pure $ MkFCVal fc (PHole False str)
+  toPTerm p (IType fc) = pure $ MkFCVal fc PType
   toPTerm p (IBindVar fc v)
     = let nm = UN (Basic v) in
-      pure (PRef fc (MkKindedName (Just Bound) nm nm))
+      pure $ MkFCVal fc (PRef (MkKindedName (Just Bound) nm nm))
   toPTerm p (IBindHere fc _ tm) = toPTerm p tm
-  toPTerm p (IAs fc nameFC _ n pat) = pure (PAs fc nameFC n !(toPTerm argPrec pat))
-  toPTerm p (IMustUnify fc r pat) = pure (PDotted fc !(toPTerm argPrec pat))
+  toPTerm p (IAs fc nameFC _ n pat) = pure $ MkFCVal fc (PAs (MkFCVal nameFC n) !(toPTerm argPrec pat))
+  toPTerm p (IMustUnify fc r pat) = pure $ MkFCVal fc (PDotted !(toPTerm argPrec pat))
 
-  toPTerm p (IDelayed fc r ty) = pure (PDelayed fc r !(toPTerm argPrec ty))
-  toPTerm p (IDelay fc tm) = pure (PDelay fc !(toPTerm argPrec tm))
-  toPTerm p (IForce fc tm) = pure (PForce fc !(toPTerm argPrec tm))
-  toPTerm p (IQuote fc tm) = pure (PQuote fc !(toPTerm argPrec tm))
-  toPTerm p (IQuoteName fc n) = pure (PQuoteName fc n)
+  toPTerm p (IDelayed fc r ty) = pure $ MkFCVal fc (PDelayed r !(toPTerm argPrec ty))
+  toPTerm p (IDelay fc tm) = pure $ MkFCVal fc (PDelay !(toPTerm argPrec tm))
+  toPTerm p (IForce fc tm) = pure $ MkFCVal fc (PForce !(toPTerm argPrec tm))
+  toPTerm p (IQuote fc tm) = pure $ MkFCVal fc (PQuote !(toPTerm argPrec tm))
+  toPTerm p (IQuoteName fc n) = pure $ MkFCVal fc (PQuoteName n)
   toPTerm p (IQuoteDecl fc ds)
       = do ds' <- traverse toPDecl ds
-           pure $ PQuoteDecl fc (catMaybes ds')
-  toPTerm p (IUnquote fc tm) = pure (PUnquote fc !(toPTerm argPrec tm))
-  toPTerm p (IRunElab fc _ tm) = pure (PRunElab fc !(toPTerm argPrec tm))
+           pure $ MkFCVal fc $ PQuoteDecl (catMaybes ds')
+  toPTerm p (IUnquote fc tm) = pure (MkFCVal fc $ PUnquote !(toPTerm argPrec tm))
+  toPTerm p (IRunElab fc _ tm) = pure (MkFCVal fc $ PRunElab !(toPTerm argPrec tm))
 
   toPTerm p (IUnifyLog fc _ tm) = toPTerm p tm
-  toPTerm p (Implicit fc True) = pure (PImplicit fc)
-  toPTerm p (Implicit fc False) = pure (PInfer fc)
+  toPTerm p (Implicit fc True) = pure (MkFCVal fc PImplicit)
+  toPTerm p (Implicit fc False) = pure (MkFCVal fc PInfer)
 
   toPTerm p (IWithUnambigNames fc ns rhs) =
-    PWithUnambigNames fc ns <$> toPTerm startPrec rhs
+    (MkFCVal fc . PWithUnambigNames ns) <$> toPTerm startPrec rhs
 
   mkApp : {auto c : Ref Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
@@ -439,17 +440,17 @@ mutual
       = do defs <- get Ctxt
            case !(lookupCtxtExact (rawName n) (gamma defs)) of
                 Nothing => do fn' <- toPTerm appPrec fn
-                              MkFCVal fc <$> mkApp fn' args
+                              MkFCVal fc <$> mkApp fn'.val args
                 Just def => do fn' <- toPTerm appPrec fn
                                fenv <- showFullEnv
                                let args'
                                      = if fenv
                                           then args
                                           else drop (length (localVars def)) args
-                               MkFCVal fc <$> mkApp fn' args'
+                               MkFCVal fc <$> mkApp fn'.val args'
   toPTermApp fn args
       = do fn' <- toPTerm appPrec fn
-           mkApp fn' args
+           NoFC <$> mkApp fn'.val args
 
   toPFieldUpdate : {auto c : Ref Ctxt Defs} ->
                    {auto s : Ref Syn SyntaxInfo} ->
@@ -579,7 +580,7 @@ cleanPTerm : {auto c : Ref Ctxt Defs} ->
 cleanPTerm ptm
    = do pp <- getPPrint
         if showMachineNames pp then pure ptm
-                               else traverseData mapPTermM cleanNode ptm
+                               else mapPTermM cleanNode ptm
 
   where
 
