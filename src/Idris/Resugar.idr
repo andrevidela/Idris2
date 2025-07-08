@@ -299,68 +299,68 @@ mutual
       = do arg' <- toPTerm appPrec arg
            ret' <- toPTerm tyPrec ret
            pt' <- traverse (toPTerm argPrec) pt
-           bracket p tyPrec (PPi fc rig pt' n arg' ret')
+           MkFCVal fc <$> bracket p tyPrec (PPi rig pt' n arg' ret')
   toPTerm p (ILam fc rig pt mn arg sc)
       = do let n = case mn of
                         Nothing => UN Underscore
                         Just n' => n'
            imp <- showImplicits
            arg' <- if imp then toPTerm tyPrec arg
-                          else pure (PImplicit fc)
+                          else pure $ MkFCVal fc PImplicit
            sc' <- toPTerm startPrec sc
            pt' <- traverse (toPTerm argPrec) pt
-           let var = PRef fc (MkKindedName (Just Bound) n n)
-           bracket p startPrec (PLam fc rig pt' var arg' sc')
+           let var = PRef (MkKindedName (Just Bound) n n)
+           MkFCVal fc <$> bracket p startPrec (PLam rig pt' (MkDef var) arg' sc')
   toPTerm p (ILet fc lhsFC rig n ty val sc)
       = do imp <- showImplicits
            ty' <- if imp then toPTerm startPrec ty
-                         else pure (PImplicit fc)
+                         else pure (MkFCVal fc $ PImplicit)
            val' <- toPTerm startPrec val
            sc' <- toPTerm startPrec sc
-           let var = PRef lhsFC (MkKindedName (Just Bound) n n)
-           bracket p startPrec (PLet fc rig var ty' val' sc' [])
+           let var = MkFCVal fc $ PRef (MkKindedName (Just Bound) n n)
+           MkFCVal fc <$> bracket p startPrec (PLet rig var ty' val' sc' [])
   toPTerm p (ICase fc _ sc scty [PatClause _ lhs rhs])
       = do sc' <- toPTerm startPrec sc
            lhs' <- toPTerm startPrec lhs
            rhs' <- toPTerm startPrec rhs
-           bracket p startPrec
-                   (PLet fc top lhs' (PImplicit fc) sc' rhs' [])
+           MkFCVal fc <$> bracket p startPrec
+                   (PLet top lhs' (MkFCVal fc PImplicit) sc' rhs' [])
   toPTerm p (ICase fc opts sc scty alts)
       = do opts' <- traverse toPFnOpt opts
            sc' <- toPTerm startPrec sc
            alts' <- traverse toPClause alts
-           bracket p startPrec (mkIf (PCase fc opts' sc' alts'))
+           MkFCVal fc <$> bracket p startPrec (mkIf (PCase opts' sc' alts'))
     where
-      mkIf : IPTerm -> IPTerm
-      mkIf tm@(PCase loc opts sc
-                 [ MkPatClause _ (PRef _ tval) t []
-                 , MkPatClause _ (PRef _ fval) f []])
+      mkIf : IPTermBase -> IPTermBase
+      mkIf tm@(PCase opts sc
+                 [ MkWithData _ (MkPatClause (MkWithData _ $ PRef tval) t [])
+                 , MkWithData _ (MkPatClause (MkWithData _ $ PRef fval) f [])])
          = if dropNS (rawName tval) == UN (Basic "True")
            && dropNS (rawName fval) == UN (Basic "False")
-              then PIfThenElse loc sc t f
+              then PIfThenElse sc t f
               else tm
       mkIf tm = tm
   toPTerm p (ILocal fc ds sc)
       = do ds' <- traverse toPDecl ds
            sc' <- toPTerm startPrec sc
-           bracket p startPrec (PLocal fc (catMaybes ds') sc')
+           MkFCVal fc <$> bracket p startPrec (PLocal (catMaybes ds') sc')
   toPTerm p (ICaseLocal fc _ _ _ sc) = toPTerm p sc
   toPTerm p (IUpdate fc ds f)
       = do ds' <- traverse toPFieldUpdate ds
            f' <- toPTerm argPrec f
-           bracket p startPrec (PApp fc (PUpdate fc ds') f')
+           MkFCVal fc <$> bracket p startPrec (PApp (MkFCVal fc $ PUpdate ds') f')
   toPTerm p (IApp fc fn arg)
       = do arg' <- toPTerm argPrec arg
            app <- toPTermApp fn [(fc, Nothing, arg')]
-           bracket p appPrec app
+           traverseData (bracket p appPrec) app
   toPTerm p (IAutoApp fc fn arg)
       = do arg' <- toPTerm argPrec arg
            app <- toPTermApp fn [(fc, Just Nothing, arg')]
-           bracket p appPrec app
+           traverseData (bracket p appPrec) app
   toPTerm p (IWithApp fc fn arg)
       = do arg' <- toPTerm startPrec arg
            fn' <- toPTerm startPrec fn
-           bracket p appPrec (PWithApp fc fn' arg')
+           MkFCVal fc <$> bracket p appPrec (PWithApp fn' arg')
   toPTerm p (IBindingApp fn bind arg)
       = pure $ PBindingApp fn
           !(traverseData (traverseBindingInfo (toPTerm p)) bind)
@@ -439,14 +439,14 @@ mutual
       = do defs <- get Ctxt
            case !(lookupCtxtExact (rawName n) (gamma defs)) of
                 Nothing => do fn' <- toPTerm appPrec fn
-                              mkApp fn' args
+                              MkFCVal fc <$> mkApp fn' args
                 Just def => do fn' <- toPTerm appPrec fn
                                fenv <- showFullEnv
                                let args'
                                      = if fenv
                                           then args
                                           else drop (length (localVars def)) args
-                               mkApp fn' args'
+                               MkFCVal fc <$> mkApp fn' args'
   toPTermApp fn args
       = do fn' <- toPTerm appPrec fn
            mkApp fn' args
@@ -463,19 +463,19 @@ mutual
 
   toPClause : {auto c : Ref Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
-              ImpClause' KindedName -> Core (PClauseBase KindedName)
+              ImpClause' KindedName -> Core (WithFC $ PClauseBase KindedName)
   toPClause (PatClause fc lhs rhs)
-      = pure (MkPatClause !(toPTerm startPrec lhs)
+      = pure (MkFCVal fc $ MkPatClause !(toPTerm startPrec lhs)
                           !(toPTerm startPrec rhs)
                           [])
   toPClause (WithClause fc lhs rig wval prf flags cs)
-      = pure $ MkWithClause
+      = pure $ MkFCVal fc $ MkWithClause
                  !(toPTerm startPrec lhs)
                  (MkPWithProblem rig !(toPTerm startPrec wval) prf ::: [])
                  flags
                  !(traverse toPClause cs)
   toPClause (ImpossibleClause fc lhs)
-      = pure (MkImpossible !(toPTerm startPrec lhs))
+      = pure (MkFCVal fc $ MkImpossible !(toPTerm startPrec lhs))
 
   toPTypeDecl : {auto c : Ref Ctxt Defs} ->
                 {auto s : Ref Syn SyntaxInfo} ->
@@ -540,7 +540,7 @@ mutual
   toPDecl (IData fc vis mbtot d)
       = pure (Just (MkFCVal fc $ PData "" vis mbtot !(toPData d)))
   toPDecl (IDef fc n cs)
-      = pure (Just (MkFCVal fc $ PDef !(traverse toPClause cs)))
+      = pure (Just (MkFCVal fc $ PDef !(traverse (?asd toPClause) cs)))
   toPDecl (IParameters fc ps ds)
       = do ds' <- traverse toPDecl ds
            args <-
@@ -578,7 +578,8 @@ cleanPTerm : {auto c : Ref Ctxt Defs} ->
              IPTerm -> Core IPTerm
 cleanPTerm ptm
    = do pp <- getPPrint
-        if showMachineNames pp then pure ptm else traverseData mapPTermM cleanNode ptm
+        if showMachineNames pp then pure ptm
+                               else traverseData mapPTermM cleanNode ptm
 
   where
 
