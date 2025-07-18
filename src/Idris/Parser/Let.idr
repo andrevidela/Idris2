@@ -54,7 +54,7 @@ mkLets : OriginDesc ->
          List1 (WithBounds (Either LetBinder LetDecl)) ->
          PTerm -> PTerm
 mkLets origin = letFactory buildLets
-  (\ decls, scope => PLocal (virtualiseFC $ boundToFC origin decls) decls.val scope)
+  (\ decls, scope => MkFCVal (virtualiseFC $ boundToFC origin decls) (PLocal decls.val scope))
 
   where
 
@@ -63,7 +63,7 @@ mkLets origin = letFactory buildLets
     buildLets (b :: rest) sc
       = let (MkLetBinder rig pat ty val alts) = b.val
             fc = virtualiseFC $ boundToFC origin b
-        in PLet fc rig pat ty val (buildLets rest sc) alts
+         in MkFCVal fc $ PLet rig pat ty val (buildLets rest sc) alts --(buildLets rest sc) alts.val
 
 export
 mkDoLets : OriginDesc ->
@@ -80,12 +80,12 @@ mkDoLets origin lets = letFactory
     buildDoLets : List (WithBounds LetBinder) -> List PDo
     buildDoLets [] = []
     buildDoLets (b :: rest) = let fc = boundToFC origin b in case b.val of
-      (MkLetBinder rig (PRef fc' (UN un)) ty val []) =>
+      (MkLetBinder rig b@(MkWithData _ $ PRef (UN un)) ty val []) =>
          (if isPatternVariable un
-            then DoLet fc fc' (UN un) rig ty val
-            else DoLetPat fc (PRef fc' (UN un)) ty val []
+            then DoLet fc b.fc (UN un) rig ty val
+            else DoLetPat fc b ty val []
          ) :: buildDoLets rest
-      (MkLetBinder rig (PImplicit fc') ty val []) =>
-        DoLet fc fc' (UN Underscore) rig ty val :: buildDoLets rest
+      (MkLetBinder rig imp@(MkWithData _ PImplicit) ty val []) =>
+        DoLet fc imp.fc (UN Underscore) rig ty val :: buildDoLets rest
       (MkLetBinder rig pat ty val alts) =>
         DoLetPat fc pat ty val alts :: buildDoLets rest

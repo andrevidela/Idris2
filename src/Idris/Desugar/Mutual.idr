@@ -30,11 +30,11 @@ getDecl AsType (MkWithData fc $ PRecord doc vis mbtot (MkPRecord n ps _ _ _))
     = Just (MkWithData fc $ PData doc vis mbtot (MkPLater (get "fc" fc) n (mkRecType ps)))
   where
     mkRecType : List PBinder -> PTerm
-    mkRecType [] = PType (get "fc" fc)
+    mkRecType [] = MkWithData fc PType
     mkRecType (MkPBinder p (MkBasicMultiBinder c (n ::: []) t) :: ts)
-      = PPi (get "fc" fc) c p (Just n.val) t (mkRecType ts)
+      = MkWithData fc $ PPi c p (Just n.val) t (mkRecType ts)
     mkRecType (MkPBinder p (MkBasicMultiBinder c (n ::: x :: xs) t) :: ts)
-      = PPi (get "fc" fc) c p (Just n.val) t
+      = MkWithData fc $ PPi  c p (Just n.val) t
           (assert_total $ mkRecType (MkPBinder p (MkBasicMultiBinder c (x ::: xs) t) :: ts))
 getDecl AsType d@(MkWithData _ $ PFixity _ ) = Just d
 getDecl AsType d@(MkWithData _ $ PDirective _) = Just d

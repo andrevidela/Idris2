@@ -475,7 +475,7 @@ compileMain mainn mfilename exec
          m <- newRef MD (initMetadata (PhysicalIdrSrc modIdent))
          u <- newRef UST initUState
          ignore $ loadMainFile mfilename
-         ignore $ compileExp (PRef replFC mainn) exec
+         ignore $ compileExp (MkFCVal replFC $ PRef mainn) exec
 
 ||| Emit captured warnings from inner scope and clear them
 ||| afterwards (to avoid emitting them in some unrelated

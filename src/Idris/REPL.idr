@@ -511,8 +511,8 @@ processEdit (Intro upd line hole)
          pintrods <- traverseList1 pterm (iintrod ::: iintrods)
          syn <- get Syn
          let brack = elemBy (\x, y => dropNS x == dropNS y) hole (bracketholes syn)
-         let introds = map (show . pretty . ifThenElse brack (addBracket replFC) id) pintrods
-
+         -- Replacing the next line by `map` makes the compiler unable to disambiguate `.val`
+         let introds = [ show (pretty (ifThenElse brack addBracket id x.val)) | x <- pintrods ]
          if upd
             then case introds of
                    introd ::: [] => updateFile (proofSearch hole introd (integerToNat (cast (line - 1))))
@@ -527,12 +527,12 @@ processEdit (Refine upd line hole e)
          let Hole args _ = definition hgdef
            | _ => pure $ EditError (pretty0 hole <++> "is not a refinable hole")
          let (lhsCtxt ** (env, htyInLhsCtxt)) = underPis (cast args) Env.empty (type hgdef)
-
+         let expr : PTermBase Name = e.val
          -- Then we elaborate the expression we were given and infer its type.
          -- We have some magic built-in if the expression happens to be a single identifier
          -- corresponding to a top-level definition
-         Right msize_tele_fun <- case e of
-             PRef fc v => do
+         Right msize_tele_fun <- case expr of
+             PRef v => do
                (n :: ns) <- lookupCtxtName v (gamma defs)
                  -- could not find the variable: it may be a local one!
                  | [] => pure (Right Nothing)
@@ -581,7 +581,7 @@ processEdit (Refine upd line hole e)
          let True = size_tele_fun >= size_tele_hole
            | _ => pure $ EditError $ hsep
                        [ "Cannot seem to refine", pretty0 hole
-                       , "by", pretty0 (show e) ]
+                       , "by", pretty0 (show e.val) ]
 
          -- We now have all the necessary information to manufacture the function call
          -- that starts with the expression the user passed
@@ -590,8 +590,8 @@ processEdit (Refine upd line hole e)
                     -- because of defaulting instances.
                     let n = minus size_tele_fun size_tele_hole
                     ns <- uniqueHoleNames defs n (nameRoot hole)
-                    let new_holes = PHole replFC True <$> ns
-                    let pcall = papply replFC e new_holes
+                    let new_holes = PHole True <$> ns
+                    let pcall = papply replFC e ?newHoles
 
                     -- We're desugaring it to the corresponding TTImp
                     icall <- desugar AnyExpr (lhsCtxt <>> []) pcall
@@ -610,7 +610,7 @@ processEdit (Refine upd line hole e)
                     pcall <- resugar env ncall
                     syn <- get Syn
                     let brack = elemBy (\x, y => dropNS x == dropNS y) hole (bracketholes syn)
-                    pure $ show $ ifThenElse brack (addBracket replFC) id pcall
+                    pure $ show $ ifThenElse brack (mapData addBracket) id pcall
 
          if upd
             then updateFile (proofSearch hole call (integerToNat (cast (line - 1))))
@@ -628,7 +628,7 @@ processEdit (ExprSearch upd line name hints)
                           | Nothing => pure $ EditError "No search results"
                      let tm' = dropLams locs restm
                      itm <- pterm $ map defaultKindedName tm' -- hack
-                     let itm'  = ifThenElse brack (addBracket replFC itm) itm
+                     let itm' = ifThenElse brack (mapData addBracket itm) itm
                      if upd
                         then updateFile (proofSearch name (show itm') (integerToNat (cast (line - 1))))
                         else pure $ DisplayEdit (prettyBy Syntax itm')
@@ -638,7 +638,7 @@ processEdit (ExprSearch upd line name hints)
                        SolvedHole locs =>
                           do let (_ ** (env, tm')) = dropLamsTm locs Env.empty !(normaliseHoles defs Env.empty tm)
                              itm <- resugar env tm'
-                             let itm'= ifThenElse brack (addBracket replFC itm) itm
+                             let itm'= ifThenElse brack (mapData addBracket itm) itm
                              if upd
                                 then updateFile (proofSearch name (show itm') (integerToNat (cast (line - 1))))
                                 else pure $ DisplayEdit (prettyBy Syntax itm')
@@ -654,7 +654,7 @@ processEdit ExprSearchNext
          let brack = elemBy (\x, y => dropNS x == dropNS y) name (bracketholes syn)
          let tm' = dropLams locs restm
          itm <- pterm $ map defaultKindedName tm'
-         let itm' = ifThenElse brack (addBracket replFC itm) itm
+         let itm' = ifThenElse brack (mapData addBracket itm) itm
          pure $ DisplayEdit (prettyBy Syntax itm')
 
 processEdit (GenerateDef upd line name rej)
@@ -700,7 +700,7 @@ processEdit (MakeLemma upd line name)
                      pty <- pterm $ map defaultKindedName lty -- hack
                      papp <- pterm $ map defaultKindedName lapp -- hack
                      let pappstr = show (ifThenElse brack
-                                            (addBracket replFC papp)
+                                            (mapData addBracket papp)
                                             papp)
                      Just srcLine <- getSourceLine line
                        | Nothing => pure (EditError "Source line not found")
@@ -743,7 +743,7 @@ prepareExp :
     {auto o : Ref ROpts REPLOpts} ->
     PTerm -> Core ClosedTerm
 prepareExp ctm
-    = do ttimp <- desugar AnyExpr [] (PApp replFC (PRef replFC (UN $ Basic "unsafePerformIO")) ctm)
+    = do ttimp <- desugar AnyExpr [] (MkFCVal replFC $ PApp (MkFCVal replFC $ PRef (UN $ Basic "unsafePerformIO")) ctm)
          let ttimpWithIt = ILocal replFC !getItDecls ttimp
          inidx <- resolveName (UN $ Basic "[input]")
          (tm, ty) <- elabTerm inidx InExpr [] (MkNested [])
@@ -914,15 +914,15 @@ process (Eval itm)
                     then do ity <- resugar Env.empty !(norm defs Env.empty ty)
                             pure (Evaluated itm (Just ity))
                     else pure (Evaluated itm Nothing)
-process (Check (PRef fc (UN (Basic "it"))))
+process (Check ref@(MkWithData _ $ PRef (UN (Basic "it"))))
     = do opts <- get ROpts
          case evalResultName opts of
-              Nothing => throw (UndefinedName fc (UN $ Basic "it"))
-              Just n => process (Check (PRef fc n))
-process (Check (PRef fc fn))
+              Nothing => throw (UndefinedName ref.fc (UN $ Basic "it"))
+              Just n => process (Check (MkFCVal ref.fc (PRef n)))
+process (Check ref@(MkWithData _ $ PRef fn))
     = do defs <- get Ctxt
          case !(lookupCtxtName fn (gamma defs)) of
-              [] => undefinedName fc fn
+              [] => undefinedName ref.fc fn
               ts => do tys <- traverse (displayType False defs) ts
                        pure (Printed $ vsep $ map (reAnnotate Syntax) tys)
 process (Check itm)
@@ -938,16 +938,16 @@ process (CheckWithImplicits itm)
          result <- process (Check itm)
          setOpt (ShowImplicits showImplicits)
          pure result
-process (PrintDef (PRef fc fn))
+process (PrintDef ref@(MkWithData _ $ PRef fn))
     = do defs <- get Ctxt
          case !(lookupCtxtName fn (gamma defs)) of
-              [] => undefinedName fc fn
+              [] => undefinedName ref.fc fn
               ts => do defs <- traverse (displayPats False defs) ts
                        pure (Printed $ vsep $ map (reAnnotate Syntax) defs)
 process (PrintDef t)
     = case !(getDocsForImplementation t) of
         Just d => pure (Printed $ reAnnotate Syntax d)
-        Nothing => pure (Printed $ pretty0 "Error: could not find definition of \{show t}")
+        Nothing => pure (Printed $ pretty0 "Error: could not find definition of \{show t.val}")
 process Reload
     = do opts <- get ROpts
          case mainfile opts of

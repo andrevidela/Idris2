@@ -195,6 +195,9 @@ mergeFC (MkFC fname1 start1 end1) (MkFC fname2 start2 end2) =
   else Nothing
 mergeFC _ _ = Nothing
 
+export
+mergeFC' : FC -> FC -> FC
+mergeFC' f1 f2 = fromMaybe emptyFC (mergeFC f1 f2)
 
 %name FC fc
 

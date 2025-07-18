@@ -57,8 +57,8 @@ parameters
         | _ => pure Nothing
       let nargs = lengthExplicitPi $ fst $ snd $ underPis (-1) Env.empty (type gdef)
       new_hole_names <- uniqueHoleNames defs nargs (nameRoot hole)
-      let new_holes = PHole replFC True <$> new_hole_names
-      let pcons = papply replFC (PRef replFC cons) new_holes
+      let new_holes = MkFCVal replFC . PHole True <$> new_hole_names
+      let pcons = papply replFC (MkFCVal replFC $ PRef cons) new_holes
       res <- catch
         (do -- We're desugaring it to the corresponding TTImp
             icons <- desugar AnyExpr (toList lhsCtxt) pcons

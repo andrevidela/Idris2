@@ -557,7 +557,7 @@ postOptions res@(ErrorLoadingFile _ _) (OutputFile _ :: rest)
     = do ignore $ postOptions res rest
          pure False
 postOptions res (OutputFile outfile :: rest)
-    = do ignore $ compileExp (PRef EmptyFC (UN $ Basic "main")) outfile
+    = do ignore $ compileExp (NoFC $ PRef (UN $ Basic "main")) outfile
          ignore $ postOptions res rest
          pure False
 postOptions res (ExecFn expr :: rest)

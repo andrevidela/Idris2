@@ -28,7 +28,7 @@ fuzzySearch : {auto c : Ref Ctxt Defs}
            -> PTerm
            -> Core REPLResult
 fuzzySearch expr = do
-  let Just (neg, pos) = parseExpr expr
+  let Just (neg, pos) = parseExpr expr.val
     | _ => pure (REPLError ("Bad expression, expected"
                        <++> code "B"
                        <++> "or"
@@ -67,24 +67,24 @@ fuzzySearch expr = do
   eqConst AType         AType         = True
   eqConst _             _             = False -- names equality is irrelevant
 
-  parseNameOrConst : PTerm -> Maybe NameOrConst
-  parseNameOrConst (PRef _ n)               = Just (AName n)
-  parseNameOrConst (PPrimVal _ $ PrT t)     = Just (APrimType t)
-  parseNameOrConst (PType _)                = Just AType
-  parseNameOrConst _                        = Nothing
+  parseNameOrConst : PTermBase Name -> Maybe NameOrConst
+  parseNameOrConst (PRef n)               = Just (AName n)
+  parseNameOrConst (PPrimVal $ PrT t)     = Just (APrimType t)
+  parseNameOrConst (PType)                = Just AType
+  parseNameOrConst _                      = Nothing
 
-  parseExpr' : PTerm -> Maybe (List NameOrConst)
-  parseExpr' (PApp _ f x) =
-    [| parseNameOrConst x :: parseExpr' f |]
+  parseExpr' : PTermBase Name -> Maybe (List NameOrConst)
+  parseExpr' (PApp f x) =
+    [| parseNameOrConst x.val :: parseExpr' f.val |]
   parseExpr' x = (:: []) <$> parseNameOrConst x
 
-  parseExpr : PTerm -> Maybe (List NameOrConst, List NameOrConst)
-  parseExpr (PPi _ _ _ _ a (PImplicit _)) = do
-    a' <- parseExpr' a
+  parseExpr : PTermBase Name -> Maybe (List NameOrConst, List NameOrConst)
+  parseExpr (PPi _ _ _ a (MkWithData _ PImplicit)) = do
+    a' <- parseExpr' a.val
     pure (a', [])
-  parseExpr (PPi _ _ _ _ a b) = do
-    a' <- parseExpr' a
-    b' <- parseExpr' b
+  parseExpr (PPi _ _ _ a b) = do
+    a' <- parseExpr' a.val
+    b' <- parseExpr' b.val
     pure (a', b')
   parseExpr b = do
     b' <- parseExpr' b
@@ -130,7 +130,7 @@ fuzzySearch expr = do
       = doFind (doFind ns t) y
   doFind ns (TForce fc r x) = doFind ns x
   doFind ns (PrimVal fc c) =
-    fromMaybe [] ((:: []) <$> parseNameOrConst (PPrimVal fc c)) ++ ns
+    fromMaybe [] ((:: []) <$> parseNameOrConst (PPrimVal c)) ++ ns
   doFind ns (Erased fc i) = ns
   doFind ns (TType fc _) = AType :: ns
 

@@ -43,17 +43,17 @@ toStrUpdate : {auto c : Ref Ctxt Defs} ->
               (Name, RawImp) -> Core Updates
 toStrUpdate (UN (Basic n), term)
     = do clause <- pterm (map defaultKindedName term) -- hack
-         pure [(n, show (bracket clause))]
+         pure [(n, show (bracket clause.val))]
   where
-    bracket : PTerm' nm -> PTerm' nm
-    bracket tm@(PRef _ _) = tm
-    bracket tm@(PList _ _ _) = tm
-    bracket tm@(PSnocList _ _ _) = tm
-    bracket tm@(PPair _ _ _) = tm
-    bracket tm@(PUnit _) = tm
-    bracket tm@(PComprehension _ _ _) = tm
-    bracket tm@(PPrimVal _ _) = tm
-    bracket tm = PBracketed emptyFC tm
+    bracket : PTermBase nm -> PTermBase nm
+    bracket tm@(PRef {}) = tm
+    bracket tm@(PList {}) = tm
+    bracket tm@(PSnocList {}) = tm
+    bracket tm@(PPair {}) = tm
+    bracket tm@(PUnit {}) = tm
+    bracket tm@(PComprehension {}) = tm
+    bracket tm@(PPrimVal {}) = tm
+    bracket tm = PBracketed (NoFC tm)
 toStrUpdate _ = pure [] -- can't replace non user names
 
 data UPD : Type where

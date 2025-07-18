@@ -107,8 +107,8 @@ mutual
 
        PRef : nm -> PTermBase nm
        -- Pi-types with an arbitrary complex binder
-       NewPi : WithFC (PBinderScope' nm) -> PTermBase nm
-       Forall : WithFC (List1 (WithFC Name), PTerm' nm) -> PTermBase nm
+       NewPi : PBinderScope' nm -> PTermBase nm
+       Forall : (boundNames : List1 (WithFC Name)) -> (scope : PTerm' nm) -> PTermBase nm
 
        -- Simple pi-types, translates directly into IPi, this should be replace din favor of `NewPi`
        PPi : RigCount -> PiInfo (PTerm' nm) -> Maybe Name ->
@@ -124,7 +124,8 @@ mutual
        PApp : PTerm' nm -> PTerm' nm -> PTermBase nm
        PWithApp : PTerm' nm -> PTerm' nm -> PTermBase nm
        PNamedApp : PTerm' nm -> Name -> PTerm' nm -> PTermBase nm
-       PBindingApp : (function : WithFC Name) -> (binder : WithFC (BindingInfo (PTerm' nm))) -> (scope : WithFC (PTerm' nm)) -> PTermBase nm
+       PBindingApp : (function : WithFC Name) -> (binder : WithFC (BindingInfo (PTerm' nm))) ->
+                     (scope : WithFC (PTerm' nm)) -> PTermBase nm
        PAutoApp : PTerm' nm -> PTerm' nm -> PTermBase nm
 
        PDelayed : LazyReason -> PTerm' nm -> PTermBase nm
@@ -175,9 +176,9 @@ mutual
        -- A stream range [x,y..]
        PRangeStream : PTerm' nm -> Maybe (PTerm' nm) -> PTermBase nm
        -- r.x.y
-       PPostfixApp : PTerm' nm -> List (FC, Name) -> PTermBase nm
+       PPostfixApp : PTerm' nm -> List (WithFC Name) -> PTermBase nm
        -- .x.y
-       PPostfixAppPartial : List (FC, Name) -> PTermBase nm
+       PPostfixAppPartial : List (WithFC Name) -> PTermBase nm
 
        -- Debugging
        PUnifyLog : LogLevel -> PTerm' nm -> PTermBase nm
@@ -218,8 +219,8 @@ mutual
 
   public export
   data PStr' : Type -> Type where
-       StrLiteral : FC -> String -> PStr' nm
-       StrInterp : FC -> PTerm' nm -> PStr' nm
+       StrLiteral : WithFC String -> PStr' nm
+       StrInterp : PTerm' nm -> PStr' nm
 
   public export
   PlainMultiBinder : Type
@@ -555,7 +556,7 @@ mutual
        PRecord : (doc : String) ->
                  WithDefault Visibility Private ->
                  Maybe TotalReq ->
-                 PRecordDecl' nm ->
+                 PRecordDecl' nm -> -- add WithFC
                  PDeclNoFC' nm
 
        -- TODO: PPostulate
@@ -586,13 +587,13 @@ mutual
 
 export
 isStrInterp : PStr -> Maybe FC
-isStrInterp (StrInterp fc _) = Just fc
-isStrInterp (StrLiteral _ _) = Nothing
+isStrInterp (StrInterp str) = Just str.fc
+isStrInterp (StrLiteral {}) = Nothing
 
 export
 isStrLiteral : PStr -> Maybe (FC, String)
-isStrLiteral (StrInterp _ _) = Nothing
-isStrLiteral (StrLiteral fc str) = Just (fc, str)
+isStrLiteral (StrInterp {}) = Nothing
+isStrLiteral (StrLiteral str) = Just (str.fc, str.val)
 
 export
 isPDef : PDecl -> Maybe (WithFC (List PClause))
@@ -814,8 +815,8 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showDo (DoRewrite _ rule)
       = "rewrite " ++ showPTerm rule
 
-  showPStr (StrLiteral _ str) = show str
-  showPStr (StrInterp _ tm) = showPTerm tm
+  showPStr (StrLiteral str) = show str.val
+  showPStr (StrInterp tm) = showPTerm tm
 
   showUpdate (PSetField p v) = showSep "." p ++ " = " ++ showPTerm v
   showUpdate (PSetFieldApp p v) = showSep "." p ++ " $= " ++ showPTerm v
@@ -832,9 +833,9 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPBinder d (MkPBinder (DefImplicit x) bind) = "{default \{showPTerm x} \{ showBasicMultiBinder bind}}"
 
   showPTermPrec' d (PRef n) = showPrec d (toName n)
-  showPTermPrec' d (Forall (MkWithData _ (names, scope)))
+  showPTermPrec' d (Forall names scope)
         = "forall " ++ concat (intersperse ", " (map (show . val) (forget names))) ++ " . " ++ showPTermPrec d scope
-  showPTermPrec' d (NewPi (MkWithData _ (MkPBinderScope binder scope)))
+  showPTermPrec' d (NewPi (MkPBinderScope binder scope))
         = showPBinder d binder ++ " -> "  ++ showPTermPrec d scope
   showPTermPrec' d (PPi rig Explicit Nothing arg ret)
         = showPTermPrec d arg ++ " -> " ++ showPTermPrec d ret
@@ -974,9 +975,9 @@ parameters {0 nm : Type} (toName : nm -> Name)
         = "[" ++ showPTermPrec d start ++ ", " ++ showPTermPrec d next ++ " .. ]"
   showPTermPrec' d (PUnifyLog _ tm) = showPTermPrec d tm
   showPTermPrec' d (PPostfixApp rec fields)
-        = showPTermPrec d rec ++ concatMap (\n => "." ++ show n) fields
+        = showPTermPrec d rec ++ concatMap (\n => "." ++ show n.val) fields
   showPTermPrec' d (PPostfixAppPartial fields)
-        = concatMap (\n => "." ++ show n) fields
+        = concatMap (\n => "." ++ show n.val) fields
   showPTermPrec' d (PWithUnambigNames ns rhs)
         = "with " ++ show ns ++ " " ++ showPTermPrec d rhs
 

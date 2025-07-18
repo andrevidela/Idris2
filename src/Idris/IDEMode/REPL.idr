@@ -157,7 +157,7 @@ process (NameAt n (Just _))
     = do todoCmd "name-at <name> <line> <column>"
          pure $ REPL $ Edited $ DisplayEdit emptyDoc
 process (TypeOf n Nothing)
-    = replWrap $ Idris.REPL.process (Check (PRef replFC (UN $ mkUserName n)))
+    = replWrap $ Idris.REPL.process (Check (MkFCVal replFC $ PRef (UN $ mkUserName n)))
 process (TypeOf n (Just (l, c)))
     = replWrap $ Idris.REPL.process
                $ Editing (TypeAt (fromInteger l) (fromInteger c) (UN $ mkUserName n))
@@ -198,7 +198,7 @@ process (MakeCase l n)
 process (MakeWith l n)
     = replWrap $ Idris.REPL.process (Editing (MakeWith False (fromInteger l) (UN $ mkUserName n)))
 process (DocsFor n modeOpt)
-    = replWrap $ Idris.REPL.process (Doc $ APTerm (PRef EmptyFC (UN $ mkUserName n)))
+    = replWrap $ Idris.REPL.process (Doc $ APTerm (NoFC $ PRef (UN $ mkUserName n)))
 process (Apropos n)
     = do todoCmd "apropros"
          pure $ REPL $ Printed emptyDoc

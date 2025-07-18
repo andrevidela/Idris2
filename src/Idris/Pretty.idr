@@ -132,8 +132,8 @@ mutual
       pretty lhs <++> impossible_
 
   prettyPStr : PStr' KindedName -> Doc IdrisSyntax
-  prettyPStr (StrLiteral _ str) = pretty0 str
-  prettyPStr (StrInterp _ tm) = pretty tm.val
+  prettyPStr (StrLiteral str) = pretty0 str
+  prettyPStr (StrInterp tm) = pretty tm.val
 
   prettyPDo : PDo' KindedName -> Doc IdrisSyntax
   prettyPDo (DoExp _ tm) = pretty tm.val
@@ -186,16 +186,16 @@ mutual
   export
   Pretty IdrisSyntax (PTermBase KindedName) where
     prettyPrec d (PRef nm) = annotateM (kindAnn nm) $ cast $ prettyOp False nm.rawName
-    prettyPrec d (NewPi (MkWithData fc (MkPBinderScope (MkPBinder Implicit bind) scope))) =
+    prettyPrec d (NewPi (MkPBinderScope (MkPBinder Implicit bind) scope)) =
       lcurly <+> pretty bind <+> rcurly <++> arrow <++> prettyPrec d scope.val
-    prettyPrec d (NewPi (MkWithData fc (MkPBinderScope (MkPBinder Explicit bind) scope))) =
+    prettyPrec d (NewPi (MkPBinderScope (MkPBinder Explicit bind) scope)) =
       lparen <+> pretty bind <+> rparen <++> arrow <++> prettyPrec d scope.val
-    prettyPrec d (NewPi (MkWithData fc (MkPBinderScope (MkPBinder AutoImplicit bind) scope))) =
+    prettyPrec d (NewPi (MkPBinderScope (MkPBinder AutoImplicit bind) scope)) =
       lcurly <+> auto_ <++> pretty bind <+> rcurly <++> arrow <++> prettyPrec d scope.val
-    prettyPrec d (NewPi (MkWithData fc (MkPBinderScope (MkPBinder (DefImplicit x) bind) scope))) =
+    prettyPrec d (NewPi (MkPBinderScope (MkPBinder (DefImplicit x) bind) scope)) =
       lcurly <+> default_ <++> prettyPrec appPrec x
       <++> pretty bind <+> rcurly <++> arrow <++> prettyPrec d scope.val
-    prettyPrec d (Forall (MkWithData fc (names, scope))) =
+    prettyPrec d (Forall names scope) =
       parenthesise (d > startPrec) $ group $
         forall_ <++> commaSep (map (prettyBinder . val) (forget names)) <++> dot <++> pretty scope
     prettyPrec d (PPi rig Explicit Nothing arg ret) =
@@ -433,9 +433,9 @@ mutual
     prettyPrec d (PUnifyLog lvl tm) = prettyPrec d tm
     prettyPrec d (PPostfixApp rec fields) =
       parenthesise (d > startPrec) $
-        pretty rec <++> dot <+> concatWith (surround dot) (map (pretty0 . snd) fields)
+        pretty rec <++> dot <+> concatWith (surround dot) (map (pretty0 . val) fields)
     prettyPrec d (PPostfixAppPartial fields) =
-      parens (dot <+> concatWith (surround dot) (map (pretty0 . snd) fields))
+      parens (dot <+> concatWith (surround dot) (map (pretty0 . val) fields))
     prettyPrec d (PWithUnambigNames ns rhs) =
       parenthesise (d > startPrec) $ group $
         with_ <++> cast (prettyList $ map snd ns) <+> line <+> pretty rhs

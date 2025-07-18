@@ -181,7 +181,7 @@ checkConflictingBinding opName foundFixity use_site rhs
     = if isCompatible foundFixity use_site
          then pure ()
          else throw $ OperatorBindingMismatch
-             {print = byShow} opName.fc foundFixity use_site (opNameToEither opName.val) rhs !candidates
+             {print = byShow} opName.fc foundFixity (map val use_site) (opNameToEither opName.val) rhs.val !candidates
     where
 
       isCompatible : FixityDeclarationInfo -> OperatorLHSInfo PTerm -> Bool
@@ -231,7 +231,7 @@ parameters (side : Side)
   toTokList : {auto s : Ref Syn SyntaxInfo} ->
               {auto c : Ref Ctxt Defs} ->
               PTerm -> Core (List (Tok ((OpStr, FixityDeclarationInfo), Maybe (OperatorLHSInfo PTerm)) PTerm))
-  toTokList (POp fc (MkWithData _ l) opn r)
+  toTokList op@(MkWithData _ $ POp (MkWithData _ l) opn r)
       = do (precInfo, fixInfo) <- checkConflictingFixities False opn
            unless (side == LHS) -- do not check for conflicting fixity on the LHS
                                 -- This is because we do not parse binders on the lhs
@@ -239,11 +239,11 @@ parameters (side : Side)
                                 -- operator when binding is expected.
                   (checkConflictingBinding opn fixInfo l r)
            rtoks <- toTokList r
-           pure (Expr l.getLhs :: Op fc opn.fc ((opn.val, fixInfo), Just l) precInfo :: rtoks)
-  toTokList (PPrefixOp fc opn arg)
+           pure (Expr l.getLhs :: Op op.fc opn.fc ((opn.val, fixInfo), Just l) precInfo :: rtoks)
+  toTokList op@(MkWithData _ $ PPrefixOp opn arg)
       = do (precInfo, fixInfo) <- checkConflictingFixities True opn
            rtoks <- toTokList arg
-           pure (Op fc opn.fc ((opn.val, fixInfo), Nothing) precInfo :: rtoks)
+           pure (Op op.fc opn.fc ((opn.val, fixInfo), Nothing) precInfo :: rtoks)
   toTokList t = pure [Expr t]
 
 record BangData where
@@ -301,16 +301,16 @@ mutual
              {auto u : Ref UST UState} ->
              {auto o : Ref ROpts REPLOpts} ->
              Side -> List Name -> PTerm -> Core RawImp
-  desugarB side ps (PRef fc x) = do
+  desugarB side ps ref@(MkWithData _ $ PRef x) = do
     let ns = mbNamespace !(get Bang)
     let pur = UN $ Basic "pure"
     case x == pur of -- implicitly add namespace to unqualified occurrences of `pure` in a qualified do-block
-      False => pure $ IVar fc x
-      True => pure $ IVar fc (maybe pur (`NS` pur) ns)
+      False => pure $ IVar ref.fc x
+      True => pure $ IVar ref.fc (maybe pur (`NS` pur) ns)
 
   -- Desugaring forall n1, n2, n3 . s into
   -- {0 n1 : ?} -> {0 n2 : ?} -> {0 n3 : ?} -> s
-  desugarB side ps (Forall (MkWithData _ (names, scope)))
+  desugarB side ps (MkWithData _ $ Forall names scope)
         = desugarForallNames ps (forget names)
       where
         desugarForallNames : (ctx : List Name) ->
@@ -318,13 +318,13 @@ mutual
         desugarForallNames ctx [] = desugarB side ctx scope
         desugarForallNames ctx (x :: xs)
           = IPi x.fc erased Implicit (Just x.val)
-          <$> desugarB side ps (PImplicit x.fc)
+          <$> desugarB side ps (MkFCVal x.fc PImplicit)
           <*> desugarForallNames (x.val :: ctx) xs
 
   -- Desugaring (n1, n2, n3 : t) -> s into
   -- (n1 : t) -> (n2 : t) -> (n3 : t) -> s
   desugarB side ps
-      (NewPi (MkWithData fc
+      (MkWithData fc (NewPi
           (MkPBinderScope (MkPBinder info (MkBasicMultiBinder rig names type)) scope)))
         = desugarMultiBinder ps (forget names)
       where
@@ -339,277 +339,277 @@ mutual
               <*> desugarB side ps type
               <*> desugarMultiBinder extendedCtx xs
 
-  desugarB side ps (PPi fc rig p mn argTy retTy)
+  desugarB side ps pi@(MkWithData _ $ PPi rig p mn argTy retTy)
       = let ps' = maybe ps (:: ps) mn in
-            pure $ IPi fc rig !(traverse (desugar side ps') p)
+            pure $ IPi pi.fc rig !(traverse (desugar side ps') p)
                               mn !(desugarB side ps argTy)
                                  !(desugarB side ps' retTy)
-  desugarB side ps (PLam fc rig p pat@(PRef prefFC n@(UN nm)) argTy scope)
+  desugarB side ps lam@(MkWithData _ $ PLam rig p pat@(MkWithData _ $ PRef n@(UN nm)) argTy scope)
       =  if isPatternVariable nm
-           then do whenJust (isConcreteFC prefFC) $ \nfc
+           then do whenJust (isConcreteFC pat.fc) $ \nfc
                      => addSemanticDecorations [(nfc, Bound, Just n)]
-                   pure $ ILam fc rig !(traverse (desugar AnyExpr ps) p)
+                   pure $ ILam lam.fc rig !(traverse (desugar AnyExpr ps) p)
                            (Just n) !(desugarB AnyExpr ps argTy)
                                     !(desugar AnyExpr (n :: ps) scope)
            else pure $ ILam EmptyFC rig !(traverse (desugar AnyExpr ps) p)
                    (Just (MN "lamc" 0)) !(desugarB AnyExpr ps argTy) $
-                 ICase fc [] (IVar EmptyFC (MN "lamc" 0)) (Implicit fc False)
-                     [snd !(desugarClause ps True (MkPatClause fc pat scope []))]
-  desugarB side ps (PLam fc rig p (PRef _ n@(MN _ _)) argTy scope)
-      = pure $ ILam fc rig !(traverse (desugar AnyExpr ps) p)
+                 ICase lam.fc [] (IVar EmptyFC (MN "lamc" 0)) (Implicit lam.fc False)
+                     [snd !(desugarClause ps True (MkFCVal lam.fc $ MkPatClause pat scope []))]
+  desugarB side ps lam@(MkWithData _ $ PLam rig p (MkWithData _ $ PRef n@(MN _ _)) argTy scope)
+      = pure $ ILam lam.fc rig !(traverse (desugar AnyExpr ps) p)
                            (Just n) !(desugarB AnyExpr ps argTy)
                                     !(desugar AnyExpr (n :: ps) scope)
-  desugarB side ps (PLam fc rig p (PImplicit _) argTy scope)
-      = pure $ ILam fc rig !(traverse (desugar AnyExpr ps) p)
+  desugarB side ps lam@(MkWithData _ $ PLam rig p (MkWithData _ PImplicit) argTy scope)
+      = pure $ ILam lam.fc rig !(traverse (desugar AnyExpr ps) p)
                            Nothing !(desugarB AnyExpr ps argTy)
                                    !(desugar AnyExpr ps scope)
-  desugarB side ps (PLam fc rig p pat argTy scope)
+  desugarB side ps lam@(MkWithData _ $ PLam rig p pat argTy scope)
       = pure $ ILam EmptyFC rig !(traverse (desugar AnyExpr ps) p)
                    (Just (MN "lamc" 0)) !(desugarB AnyExpr ps argTy) $
-                 ICase fc [] (IVar EmptyFC (MN "lamc" 0)) (Implicit fc False)
-                     [snd !(desugarClause ps True (MkPatClause fc pat scope []))]
-  desugarB side ps (PLet fc rig (PRef prefFC n) nTy nVal scope [])
-      = do whenJust (isConcreteFC prefFC) $ \nfc =>
+                 ICase lam.fc [] (IVar EmptyFC (MN "lamc" 0)) (Implicit lam.fc False)
+                     [snd !(desugarClause ps True (MkFCVal lam.fc $ MkPatClause pat scope []))]
+  desugarB side ps plet@(MkWithData _ $ PLet rig ref@(MkWithData _ $ PRef n) nTy nVal scope [])
+      = do whenJust (isConcreteFC ref.fc) $ \nfc =>
              addSemanticDecorations [(nfc, Bound, Just n)]
-           pure $ ILet fc prefFC rig n !(desugarB side ps nTy) !(desugarB side ps nVal)
+           pure $ ILet plet.fc ref.fc rig n !(desugarB side ps nTy) !(desugarB side ps nVal)
                                        !(desugar side (n :: ps) scope)
-  desugarB side ps (PLet fc rig pat nTy nVal scope alts)
-      = pure $ ICase fc [] !(desugarB side ps nVal) !(desugarB side ps nTy)
+  desugarB side ps plet@(MkWithData _ $ PLet rig pat nTy nVal scope alts)
+      = pure $ ICase plet.fc [] !(desugarB side ps nVal) !(desugarB side ps nTy)
                         !(traverse (map snd . desugarClause ps True)
-                            (MkPatClause fc pat scope [] :: alts))
-  desugarB side ps (PCase fc opts scr cls)
+                            (MkFCVal plet.fc (MkPatClause pat scope []) :: alts))
+  desugarB side ps pcase@(MkWithData _ $ PCase opts scr cls)
       = do opts <- traverse (desugarFnOpt ps) opts
            scr <- desugarB side ps scr
-           let scrty = Implicit (virtualiseFC fc) False
+           let scrty = Implicit (virtualiseFC pcase.fc) False
            cls <- traverse (map snd . desugarClause ps True) cls
-           pure $ ICase fc opts scr scrty cls
-  desugarB side ps (PLocal fc xs scope)
+           pure $ ICase pcase.fc opts scr scrty cls
+  desugarB side ps local@(MkWithData _ $ PLocal xs scope)
       = let ps' = definedIn (map val xs) ++ ps in
-            pure $ ILocal fc (concat !(traverse (desugarDecl ps') xs))
+            pure $ ILocal local.fc (concat !(traverse (desugarDecl ps') xs))
                              !(desugar side ps' scope)
-  desugarB side ps (PApp pfc (PUpdate fc fs) rec)
-      = pure $ IUpdate pfc !(traverse (desugarUpdate side ps) fs)
+  desugarB side ps app@(MkWithData _ $ PApp (MkWithData _ $ PUpdate fs) rec)
+      = pure $ IUpdate app.fc !(traverse (desugarUpdate side ps) fs)
                            !(desugarB side ps rec)
-  desugarB side ps (PUpdate fc fs)
+  desugarB side ps upd@(MkWithData _ $ PUpdate fs)
       = desugarB side ps
-      $ let vfc = virtualiseFC fc in
-      PLam vfc top Explicit (PRef vfc (MN "rec" 0)) (PImplicit vfc)
-      $ PApp vfc (PUpdate fc fs) (PRef vfc (MN "rec" 0))
-  desugarB side ps (PApp fc x y)
-      = pure $ IApp fc !(desugarB side ps x) !(desugarB side ps y)
-  desugarB side ps (PAutoApp fc x y)
-      = pure $ IAutoApp fc !(desugarB side ps x) !(desugarB side ps y)
-  desugarB side ps (PWithApp fc x y)
-      = pure $ IWithApp fc !(desugarB side ps x) !(desugarB side ps y)
-  desugarB side ps (PBindingApp nm bind scope)
+      $ let vfc = virtualiseFC upd.fc in
+      MkFCVal vfc $ PLam top Explicit (MkFCVal vfc $ PRef (MN "rec" 0)) (MkFCVal vfc PImplicit)
+      $ MkFCVal vfc $ PApp (MkFCVal upd.fc $ PUpdate fs) (MkFCVal vfc $ PRef (MN "rec" 0))
+  desugarB side ps app@(MkWithData _ $ PApp x y)
+      = pure $ IApp app.fc !(desugarB side ps x) !(desugarB side ps y)
+  desugarB side ps app@(MkWithData _ $ PAutoApp x y)
+      = pure $ IAutoApp app.fc !(desugarB side ps x) !(desugarB side ps y)
+  desugarB side ps app@(MkWithData _ $ PWithApp x y)
+      = pure $ IWithApp app.fc !(desugarB side ps x) !(desugarB side ps y)
+  desugarB side ps (MkWithData _ $ PBindingApp nm bind scope)
       = pure $ IBindingApp nm !(traverseFC (traverseBindingInfo (desugarB side ps)) bind)
                               !(traverseFC (desugarB side ps) scope)
-  desugarB side ps (PNamedApp fc x argn y)
-      = pure $ INamedApp fc !(desugarB side ps x) argn !(desugarB side ps y)
-  desugarB side ps (PDelayed fc r ty)
-      = pure $ IDelayed fc r !(desugarB side ps ty)
-  desugarB side ps (PDelay fc tm)
-      = pure $ IDelay fc !(desugarB side ps tm)
-  desugarB side ps (PForce fc tm)
-      = pure $ IForce fc !(desugarB side ps tm)
-  desugarB side ps (PEq fc l r)
+  desugarB side ps napp@(MkWithData _ $ PNamedApp x argn y)
+      = pure $ INamedApp napp.fc !(desugarB side ps x) argn !(desugarB side ps y)
+  desugarB side ps del@(MkWithData _ $ PDelayed r ty)
+      = pure $ IDelayed del.fc r !(desugarB side ps ty)
+  desugarB side ps del@(MkWithData _ $ PDelay tm)
+      = pure $ IDelay del.fc !(desugarB side ps tm)
+  desugarB side ps pf@(MkWithData _ $ PForce tm)
+      = pure $ IForce pf.fc !(desugarB side ps tm)
+  desugarB side ps eq@(MkWithData _ $ PEq l r)
       = do l' <- desugarB side ps l
            r' <- desugarB side ps r
-           pure $ IAlternative fc FirstSuccess
-                     [apply (IVar fc (UN $ Basic "===")) [l', r'],
-                      apply (IVar fc (UN $ Basic "~=~")) [l', r']]
-  desugarB side ps (PBracketed fc e) = desugarB side ps e
-  desugarB side ps (POp fc l op r)
-      = do ts <- toTokList side (POp fc l op r)
+           pure $ IAlternative eq.fc FirstSuccess
+                     [apply (IVar eq.fc (UN $ Basic "===")) [l', r'],
+                      apply (IVar eq.fc (UN $ Basic "~=~")) [l', r']]
+  desugarB side ps (MkWithData _ $ PBracketed e) = desugarB side ps e
+  desugarB side ps pop@(MkWithData _ $ POp l op r)
+      = do ts <- toTokList side pop
            tree <- parseOps @{interpName} @{showWithLoc} ts
            unop <- desugarTree side ps (mapFst (\((x, _), y) => (x, y)) tree)
            desugarB side ps unop
-  desugarB side ps (PPrefixOp fc op arg)
-      = do ts <- toTokList side (PPrefixOp fc op arg)
+  desugarB side ps ppop@(MkWithData _ $ PPrefixOp op arg)
+      = do ts <- toTokList side ppop
            tree <- parseOps @{interpName} @{showWithLoc} ts
            unop <- desugarTree side ps (mapFst (\((x, _), y) => (x, y)) tree)
            desugarB side ps unop
-  desugarB side ps (PSectionL fc op arg)
+  desugarB side ps sec@(MkWithData _ $ PSectionL op arg)
       = do syn <- get Syn
            -- It might actually be a prefix argument rather than a section
            -- so check that first, otherwise desugar as a lambda
            case lookupName op.val.toName (prefixes syn) of
                 [] =>
                     desugarB side ps
-                        (PLam fc top Explicit (PRef fc (MN "arg" 0)) (PImplicit fc)
-                            (POp fc (MkFCVal op.fc (NoBinder (PRef fc (MN "arg" 0)))) op arg))
-                (prec :: _) => desugarB side ps (PPrefixOp fc op arg)
-  desugarB side ps (PSectionR fc arg op)
+                        (MkFCVal sec.fc $ PLam top Explicit (MkFCVal sec.fc $ PRef (MN "arg" 0)) (MkFCVal sec.fc PImplicit) ?huh)
+                            -- (POp sec.fc (MkFCVal op.fc (NoBinder (MkFCVal sec.fc $ PRef (MN "arg" 0)))) op arg))
+                (prec :: _) => desugarB side ps (MkFCVal sec.fc $ PPrefixOp op arg)
+  desugarB side ps sec@(MkWithData _ $ PSectionR arg op)
       = desugarB side ps
-          (PLam fc top Explicit (PRef fc (MN "arg" 0)) (PImplicit fc)
-              (POp fc (MkFCVal op.fc $ NoBinder arg) op (PRef fc (MN "arg" 0))))
-  desugarB side ps (PSearch fc depth) = pure $ ISearch fc depth
-  desugarB side ps (PPrimVal fc (BI x))
+          (MkFCVal sec.fc $ PLam top Explicit (MkFCVal sec.fc $ PRef (MN "arg" 0)) (MkFCVal sec.fc PImplicit)
+              (MkFCVal sec.fc $ POp (MkFCVal op.fc $ NoBinder arg) op (MkFCVal sec.fc $ PRef (MN "arg" 0))))
+  desugarB side ps sch@(MkWithData _ $ PSearch depth) = pure $ ISearch sch.fc depth
+  desugarB side ps pval@(MkWithData _ $ PPrimVal (BI x))
       = case !fromIntegerName of
              Nothing =>
-                pure $ IAlternative fc (UniqueDefault (IPrimVal fc (BI x)))
-                                [IPrimVal fc (BI x),
-                                 IPrimVal fc (I (fromInteger x))]
+                pure $ IAlternative pval.fc (UniqueDefault (IPrimVal pval.fc (BI x)))
+                                [IPrimVal pval.fc (BI x),
+                                 IPrimVal pval.fc (I (fromInteger x))]
              Just fi =>
-               let vfc = virtualiseFC fc in
-               pure $ IApp vfc (IVar vfc fi) (IPrimVal fc (BI x))
-  desugarB side ps (PPrimVal fc (Ch x))
+               let vfc = virtualiseFC pval.fc in
+               pure $ IApp vfc (IVar vfc fi) (IPrimVal pval.fc (BI x))
+  desugarB side ps pval@(MkWithData _ $ PPrimVal (Ch x))
       = case !fromCharName of
              Nothing =>
-                pure $ IPrimVal fc (Ch x)
+                pure $ IPrimVal pval.fc (Ch x)
              Just f =>
-               let vfc = virtualiseFC fc in
-               pure $ IApp vfc (IVar vfc f) (IPrimVal fc (Ch x))
-  desugarB side ps (PPrimVal fc (Db x))
+               let vfc = virtualiseFC pval.fc in
+               pure $ IApp vfc (IVar vfc f) (IPrimVal pval.fc (Ch x))
+  desugarB side ps pval@(MkWithData _ $ PPrimVal (Db x))
       = case !fromDoubleName of
              Nothing =>
-                pure $ IPrimVal fc (Db x)
+                pure $ IPrimVal pval.fc (Db x)
              Just f =>
-               let vfc = virtualiseFC fc in
-               pure $ IApp vfc (IVar vfc f) (IPrimVal fc (Db x))
-  desugarB side ps (PPrimVal fc x) = pure $ IPrimVal fc x
-  desugarB side ps (PQuote fc tm)
-      = do let q = IQuote fc !(desugarB side ps tm)
+               let vfc = virtualiseFC pval.fc in
+               pure $ IApp vfc (IVar vfc f) (IPrimVal pval.fc (Db x))
+  desugarB side ps val@(MkWithData _ $ PPrimVal x) = pure $ IPrimVal val.fc x
+  desugarB side ps qt@(MkWithData _ $ PQuote tm)
+      = do let q = IQuote qt.fc !(desugarB side ps tm)
            case side of
-                AnyExpr => pure $ maybeIApp fc !fromTTImpName q
+                AnyExpr => pure $ maybeIApp qt.fc !fromTTImpName q
                 _ => pure q
-  desugarB side ps (PQuoteName fc n)
-      = do let q = IQuoteName fc n
+  desugarB side ps qn@(MkWithData _ $ PQuoteName n)
+      = do let q = IQuoteName qn.fc n
            case side of
-                AnyExpr => pure $ maybeIApp fc !fromNameName q
+                AnyExpr => pure $ maybeIApp qn.fc !fromNameName q
                 _ => pure q
-  desugarB side ps (PQuoteDecl fc x)
+  desugarB side ps qd@(MkWithData _ $ PQuoteDecl x)
       = do xs <- traverse (desugarDecl ps) x
-           let dls = IQuoteDecl fc (concat xs)
+           let dls = IQuoteDecl qd.fc (concat xs)
            case side of
-                AnyExpr => pure $ maybeIApp fc !fromDeclsName dls
+                AnyExpr => pure $ maybeIApp qd.fc !fromDeclsName dls
                 _ => pure dls
-  desugarB side ps (PUnquote fc tm)
-      = pure $ IUnquote fc !(desugarB side ps tm)
-  desugarB side ps (PRunElab fc tm)
-      = pure $ IRunElab fc True !(desugarB side ps tm)
-  desugarB side ps (PHole fc br holename)
+  desugarB side ps uq@(MkWithData _ $ PUnquote tm)
+      = pure $ IUnquote uq.fc !(desugarB side ps tm)
+  desugarB side ps el@(MkWithData _ $ PRunElab tm)
+      = pure $ IRunElab el.fc True !(desugarB side ps tm)
+  desugarB side ps hl@(MkWithData _ $ PHole br holename)
       = do when br $ update Syn { bracketholes $= ((UN (Basic holename)) ::) }
-           pure $ IHole fc holename
-  desugarB side ps (PType fc) = pure $ IType fc
-  desugarB side ps (PAs fc nameFC vname pattern)
-      = pure $ IAs fc nameFC UseRight vname !(desugarB side ps pattern)
-  desugarB side ps (PDotted fc x)
-      = pure $ IMustUnify fc UserDotted !(desugarB side ps x)
-  desugarB side ps (PImplicit fc) = pure $ Implicit fc True
-  desugarB side ps (PInfer fc)
+           pure $ IHole hl.fc holename
+  desugarB side ps ty@(MkWithData _ PType) = pure $ IType ty.fc
+  desugarB side ps as@(MkWithData _ $ PAs vname pattern)
+      = pure $ IAs as.fc vname.fc UseRight vname.val !(desugarB side ps pattern)
+  desugarB side ps dt@(MkWithData _ $ PDotted x)
+      = pure $ IMustUnify dt.fc UserDotted !(desugarB side ps x)
+  desugarB side ps imp@(MkWithData _ PImplicit) = pure $ Implicit imp.fc True
+  desugarB side ps inf@(MkWithData _ PInfer)
     = do when (side == LHS) $
-           throw (GenericMsg fc "? is not a valid pattern")
-         pure $ Implicit fc False
-  desugarB side ps (PMultiline fc hashtag indent lines)
-      = pure $ maybeIApp fc !fromStringName !(expandString side ps fc hashtag !(trimMultiline fc indent lines))
+           throw (GenericMsg inf.fc "? is not a valid pattern")
+         pure $ Implicit inf.fc False
+  desugarB side ps ml@(MkWithData _ $ PMultiline hashtag indent lines)
+      = pure $ maybeIApp ml.fc !fromStringName !(expandString side ps ml.fc hashtag !(trimMultiline ml.fc indent lines))
 
   -- We only add `fromString` if we are looking at a plain string literal.
   -- Interpolated string literals don't have a `fromString` call since they
   -- are always concatenated with other strings and therefore can never use
   -- another `fromString` implementation that differs from `id`.
-  desugarB side ps (PString fc hashtag [])
-      = pure $ maybeIApp fc !fromStringName (IPrimVal fc (Str ""))
-  desugarB side ps (PString fc hashtag [StrLiteral fc' str])
-      = case unescape hashtag str of
-             Just str => pure $ maybeIApp fc !fromStringName (IPrimVal fc' (Str str))
-             Nothing => throw (GenericMsg fc "Invalid escape sequence: \{show str}")
-  desugarB side ps (PString fc hashtag strs)
-      = expandString side ps fc hashtag strs
+  desugarB side ps st@(MkWithData _ $ PString hashtag [])
+      = pure $ maybeIApp st.fc !fromStringName (IPrimVal st.fc (Str ""))
+  desugarB side ps st@(MkWithData _ $ PString hashtag [StrLiteral str])
+      = case unescape hashtag str.val of
+             Just str' => pure $ maybeIApp st.fc !fromStringName (IPrimVal str.fc (Str str'))
+             Nothing => throw (GenericMsg st.fc "Invalid escape sequence: \{show str.val}")
+  desugarB side ps st@(MkWithData _ $ PString hashtag strs)
+      = expandString side ps st.fc hashtag strs
 
-  desugarB side ps (PDoBlock fc ns block)
-      = expandDo side ps fc ns block
-  desugarB side ps (PBang fc term)
+  desugarB side ps dob@(MkWithData _ $ PDoBlock ns block)
+      = expandDo side ps dob.fc ns block
+  desugarB side ps bg@(MkWithData _ $ PBang term)
       = do itm <- desugarB side ps term
            bs <- get Bang
            let bn = MN "bind" (nextName bs)
            put Bang ({ nextName $= (+1),
-                       bangNames $= ((bn, fc, itm) ::)
+                       bangNames $= ((bn, bg.fc, itm) ::)
                      } bs)
-           pure (IVar (virtualiseFC fc) bn)
-  desugarB side ps (PIdiom fc ns term)
+           pure (IVar (virtualiseFC bg.fc) bn)
+  desugarB side ps idm@(MkWithData _ $ PIdiom ns term)
       = do itm <- desugarB side ps term
            logRaw "desugar.idiom" 10 "Desugaring idiom for" itm
-           let val = idiomise fc (mbNamespace !(get Bang)) ns itm
+           let val = idiomise idm.fc (mbNamespace !(get Bang)) ns itm
            logRaw "desugar.idiom" 10 "Desugared to" val
            pure val
-  desugarB side ps (PList fc nilFC args)
+  desugarB side ps pl@(MkWithData _ $ PList nilFC args)
       = expandList side ps nilFC args
-  desugarB side ps (PSnocList fc nilFC args)
+  desugarB side ps pl@(MkWithData _ $ PSnocList nilFC args)
       = expandSnocList side ps nilFC args
-  desugarB side ps (PPair fc l r)
+  desugarB side ps pr@(MkWithData _ $ PPair l r)
       = do l' <- desugarB side ps l
            r' <- desugarB side ps r
-           let pval = apply (IVar fc mkpairname) [l', r']
-           pure $ IAlternative fc (UniqueDefault pval)
-                  [apply (IVar fc pairname) [l', r'], pval]
-  desugarB side ps (PDPair fc opFC (PRef nameFC n@(UN _)) (PImplicit _) r)
+           let pval = apply (IVar pr.fc mkpairname) [l', r']
+           pure $ IAlternative pr.fc (UniqueDefault pval)
+                  [apply (IVar pr.fc pairname) [l', r'], pval]
+  desugarB side ps dp@(MkWithData _ $ PDPair opFC name@(MkWithData _ $ PRef n@(UN _)) (MkWithData _ PImplicit) r)
       = do r' <- desugarB side ps r
-           let pval = apply (IVar opFC mkdpairname) [IVar nameFC n, r']
-           let vfc = virtualiseFC nameFC
-           whenJust (isConcreteFC nameFC) $ \nfc =>
+           let pval = apply (IVar opFC mkdpairname) [IVar name.fc n, r']
+           let vfc = virtualiseFC name.fc
+           whenJust (isConcreteFC name.fc) $ \nfc =>
              addSemanticDefault (nfc, Bound, Just n)
-           pure $ IAlternative fc (UniqueDefault pval)
+           pure $ IAlternative dp.fc (UniqueDefault pval)
                   [apply (IVar opFC dpairname)
                       [Implicit vfc False,
-                       ILam nameFC top Explicit (Just n) (Implicit vfc False) r'],
+                       ILam name.fc top Explicit (Just n) (Implicit vfc False) r'],
                    pval]
-  desugarB side ps (PDPair fc opFC (PRef namefc n@(UN _)) ty r)
+  desugarB side ps (MkWithData _ $ PDPair opFC name@(MkWithData _ $ PRef n@(UN _)) ty r)
       = do ty' <- desugarB side ps ty
            r' <- desugarB side ps r
            pure $ apply (IVar opFC dpairname)
-                        [ty', ILam namefc top Explicit (Just n) ty' r']
-  desugarB side ps (PDPair fc opFC l (PImplicit _) r)
+                        [ty', ILam name.fc top Explicit (Just n) ty' r']
+  desugarB side ps (MkWithData _ $ PDPair opFC l (MkWithData _ PImplicit) r)
       = do l' <- desugarB side ps l
            r' <- desugarB side ps r
            pure $ apply (IVar opFC mkdpairname) [l', r']
-  desugarB side ps (PDPair fc opFC l ty r)
-      = throw (GenericMsg fc "Invalid dependent pair type")
-  desugarB side ps (PUnit fc)
-      = pure $ IAlternative fc (UniqueDefault (IVar fc (UN $ Basic "MkUnit")))
-               [IVar fc (UN $ Basic "Unit"),
-                IVar fc (UN $ Basic "MkUnit")]
-  desugarB side ps (PIfThenElse fc x t e)
-      = let fc = virtualiseFC fc in
+  desugarB side ps dp@(MkWithData _ $ PDPair opFC l ty r)
+      = throw (GenericMsg dp.fc "Invalid dependent pair type")
+  desugarB side ps uu@(MkWithData _ $ PUnit)
+      = pure $ IAlternative uu.fc (UniqueDefault (IVar uu.fc (UN $ Basic "MkUnit")))
+               [IVar uu.fc (UN $ Basic "Unit"),
+                IVar uu.fc (UN $ Basic "MkUnit")]
+  desugarB side ps ite@(MkWithData _ $ PIfThenElse x t e)
+      = let fc = virtualiseFC ite.fc in
         pure $ ICase fc [] !(desugarB side ps x) (IVar fc (UN $ Basic "Bool"))
                    [PatClause fc (IVar fc (UN $ Basic "True")) !(desugar side ps t),
                     PatClause fc (IVar fc (UN $ Basic "False")) !(desugar side ps e)]
-  desugarB side ps (PComprehension fc ret conds) = do
+  desugarB side ps cp@(MkWithData _ $ PComprehension ret conds) = do
         let ns = mbNamespace !(get Bang)
-        desugarB side ps (PDoBlock fc ns (map (guard ns) conds ++ [toPure ns ret]))
+        desugarB side ps (MkFCVal cp.fc $ PDoBlock ns (map (guard ns) conds ++ [toPure ns ret]))
     where
       guard : Maybe Namespace -> PDo -> PDo
       guard ns (DoExp fc tm)
-       = DoExp fc (PApp fc (PRef fc (mbApplyNS ns $ UN $ Basic "guard")) tm)
+       = DoExp fc (MkFCVal fc $ PApp (MkFCVal fc $ PRef (mbApplyNS ns $ UN $ Basic "guard")) tm)
       guard ns d = d
 
       toPure : Maybe Namespace -> PTerm -> PDo
-      toPure ns tm = DoExp fc (PApp fc (PRef fc (mbApplyNS ns $ UN $ Basic "pure")) tm)
-  desugarB side ps (PRewrite fc rule tm)
-      = pure $ IRewrite fc !(desugarB side ps rule) !(desugarB side ps tm)
-  desugarB side ps (PRange fc start next end)
-      = let fc = virtualiseFC fc in
+      toPure ns tm = DoExp cp.fc (MkFCVal cp.fc $ PApp (MkFCVal cp.fc $ PRef (mbApplyNS ns $ UN $ Basic "pure")) tm)
+  desugarB side ps rw@(MkWithData _ $ PRewrite rule tm)
+      = pure $ IRewrite rw.fc !(desugarB side ps rule) !(desugarB side ps tm)
+  desugarB side ps rg@(MkWithData _ $ PRange start next end)
+      = let fc = virtualiseFC rg.fc in
         desugarB side ps $ case next of
-           Nothing => papply fc (PRef fc (UN $ Basic "rangeFromTo")) [start,end]
-           Just n  => papply fc (PRef fc (UN $ Basic "rangeFromThenTo")) [start, n, end]
-  desugarB side ps (PRangeStream fc start next)
-      = let fc = virtualiseFC fc in
+           Nothing => papply fc (MkFCVal fc $ PRef (UN $ Basic "rangeFromTo")) [start,end]
+           Just n  => papply fc (MkFCVal fc $ PRef (UN $ Basic "rangeFromThenTo")) [start, n, end]
+  desugarB side ps rs@(MkWithData _ $ PRangeStream start next)
+      = let fc = virtualiseFC rs.fc in
         desugarB side ps $ case next of
-           Nothing => papply fc (PRef fc (UN $ Basic "rangeFrom")) [start]
-           Just n  => papply fc (PRef fc (UN $ Basic "rangeFromThen")) [start, n]
-  desugarB side ps (PUnifyLog fc lvl tm)
-      = pure $ IUnifyLog fc lvl !(desugarB side ps tm)
-  desugarB side ps (PPostfixApp fc rec projs)
-      = desugarB side ps
-      $ foldl (\x, (fc, proj) => PApp fc (PRef fc proj) x) rec projs
-  desugarB side ps (PPostfixAppPartial fc projs)
-      = do let vfc = virtualiseFC fc
-           let var = PRef vfc (MN "paRoot" 0)
+           Nothing => papply fc (MkFCVal fc $ PRef (UN $ Basic "rangeFrom")) [start]
+           Just n  => papply fc (MkFCVal fc $ PRef (UN $ Basic "rangeFromThen")) [start, n]
+  desugarB side ps un@(MkWithData _ $ PUnifyLog lvl tm)
+      = pure $ IUnifyLog un.fc lvl !(desugarB side ps tm)
+  desugarB side ps pfa@(MkWithData _ $ PPostfixApp rec projs)
+      = desugarB side ps ?adad
+      -- $ foldl (\x, proj => MkFCVal proj.fc $ PApp (mapData PRef proj) x) rec projs
+  desugarB side ps pap@(MkWithData _ $ PPostfixAppPartial projs)
+      = do let vfc = virtualiseFC pap.fc
+           let var = MkFCVal vfc (PRef (MN "paRoot" 0))
            desugarB side ps $
-             PLam fc top Explicit var (PImplicit vfc) $
-               foldl (\r, (fc, proj) => PApp fc (PRef fc proj) r) var projs
-  desugarB side ps (PWithUnambigNames fc ns rhs)
-      = IWithUnambigNames fc ns <$> desugarB side ps rhs
+             MkFCVal pap.fc $ PLam top Explicit var (MkFCVal vfc PImplicit) $
+               foldl (\r, proj => MkFCVal pap.fc $ PApp (mapData PRef proj) r) var projs
+  desugarB side ps wun@(MkWithData _ $ PWithUnambigNames ns rhs)
+      = IWithUnambigNames wun.fc ns <$> desugarB side ps rhs
 
   desugarUpdate : {auto s : Ref Syn SyntaxInfo} ->
                   {auto b : Ref Bang BangData} ->
@@ -679,11 +679,11 @@ mutual
                (strInterpolate xs)
     where
       toRawImp : PStr -> Core RawImp
-      toRawImp (StrLiteral fc str) =
-        case unescape hashtag str of
-             Just str => pure $ IPrimVal fc (Str str)
-             Nothing => throw (GenericMsg fc "Invalid escape sequence: \{show str}")
-      toRawImp (StrInterp fc tm) = desugarB side ps tm
+      toRawImp (StrLiteral str) =
+        case unescape hashtag str.val of
+             Just str' => pure $ IPrimVal str.fc (Str str')
+             Nothing => throw (GenericMsg str.fc "Invalid escape sequence: \{show str.val}")
+      toRawImp (StrInterp tm) = desugarB side ps tm
 
       -- merge neighbouring StrLiteral
       mergeStrLit : List PStr -> List PStr
@@ -692,13 +692,13 @@ mutual
         ([], x::xs) => x :: mergeStrLit xs
         (lits@(_::_), xs) =>
           -- TODO: merge all the FCs of the merged literals!
-          let fc  = fst $ head lits in
+          let fc  = foldl1 mergeFC' (map fst lits) in
           let lit = fastConcat $ snd <$> lits in
-          StrLiteral fc lit :: mergeStrLit xs
+          StrLiteral (MkFCVal fc lit) :: mergeStrLit xs
 
       notEmpty : PStr -> Bool
-      notEmpty (StrLiteral _ str) = str /= ""
-      notEmpty (StrInterp _ _) = True
+      notEmpty (StrLiteral str) = str.val /= ""
+      notEmpty (StrInterp _) = True
 
       strInterpolate : List RawImp -> RawImp
       strInterpolate []
@@ -722,8 +722,8 @@ mutual
       trimLast fc lines with (snocList lines)
         trimLast fc [] | Empty = throw $ BadMultiline fc "Expected new line"
         trimLast _ (initLines `snoc` []) | Snoc [] initLines _ = pure lines
-        trimLast _ (initLines `snoc` [StrLiteral fc str]) | Snoc [(StrLiteral _ _)] initLines _
-            = if any (not . isSpace) (fastUnpack str)
+        trimLast _ (initLines `snoc` [StrLiteral str]) | Snoc [(StrLiteral _)] initLines _
+            = if any (not . isSpace) (fastUnpack str.val)
                      then throw $ BadMultiline fc "Closing delimiter of multiline strings cannot be preceded by non-whitespace characters"
                      else pure initLines
         trimLast _ (initLines `snoc` xs) | Snoc xs initLines _
@@ -732,17 +732,17 @@ mutual
 
       trimLeft : Nat -> List PStr -> Core (List PStr)
       trimLeft indent [] = pure []
-      trimLeft indent [StrLiteral fc str]
-          = let (trimed, rest) = splitAt indent (fastUnpack str) in
+      trimLeft indent [StrLiteral str]
+          = let (trimed, rest) = splitAt indent (fastUnpack str.val) in
             if any (not . isSpace) trimed
               then throw $ BadMultiline fc "Line is less indented than the closing delimiter"
-              else let str = if null rest then "\n" else fastPack rest in
-                   pure [StrLiteral fc str]
-      trimLeft indent (StrLiteral fc str :: xs)
-          = let (trimed, rest) = splitAt indent (fastUnpack str) in
+              else let restOrLineBreak = if null rest then "\n" else fastPack rest in
+                   pure [StrLiteral (MkFCVal str.fc restOrLineBreak)]
+      trimLeft indent (StrLiteral str :: xs)
+          = let (trimed, rest) = splitAt indent (fastUnpack str.val) in
             if any (not . isSpace) trimed || length trimed < indent
-              then throw $ BadMultiline fc "Line is less indented than the closing delimiter"
-             else pure $ (StrLiteral fc (fastPack rest))::xs
+              then throw $ BadMultiline str.fc "Line is less indented than the closing delimiter"
+             else pure $ (StrLiteral (MkFCVal fc (fastPack rest)))::xs
       trimLeft indent xs = throw $ BadMultiline fc "Line is less indented than the closing delimiter"
 
       mapLast : (a -> a) -> List a -> List a
@@ -753,7 +753,7 @@ mutual
       dropLastNL : List (List PStr) -> List (List PStr)
       dropLastNL
           = mapLast $ mapLast $
-              \case StrLiteral fc str => StrLiteral fc (fst $ break isNL str)
+              \case StrLiteral str => StrLiteral (mapData (fst . break isNL) str)
                     other => other
 
   expandDo : {auto s : Ref Syn SyntaxInfo} ->
@@ -836,36 +836,36 @@ mutual
   desugarTree : Side -> List Name -> Tree (OpStr, Maybe $ OperatorLHSInfo PTerm) PTerm ->
                 Core PTerm
   desugarTree side ps (Infix loc eqFC (OpSymbols $ UN $ Basic "=", _) l r) -- special case since '=' is special syntax
-      = pure $ PEq eqFC !(desugarTree side ps l) !(desugarTree side ps r)
+      = pure $ MkFCVal eqFC $ PEq !(desugarTree side ps l) !(desugarTree side ps r)
 
   desugarTree side ps (Infix loc _ (OpSymbols $ UN $ Basic "$", _) l r) -- special case since '$' is special syntax
       = do l' <- desugarTree side ps l
            r' <- desugarTree side ps r
-           pure (PApp loc l' r')
+           pure (MkFCVal loc $ PApp l' r')
   -- normal operators
   desugarTree side ps (Infix loc opFC (op, Just (NoBinder lhs)) l r)
       = do l' <- desugarTree side ps l
            r' <- desugarTree side ps r
-           pure (PApp loc (PApp loc (PRef opFC op.toName) l') r')
+           pure (MkFCVal loc $ PApp (MkFCVal loc $ PApp (MkFCVal opFC $ PRef op.toName) l') r')
   -- (x : ty) =@ f x ==>> (=@) ty (\x : ty => f x)
   desugarTree side ps (Infix loc opFC (op, Just (LHSBinder $ BindType pat lhs)) l r)
       = do l' <- desugarTree side ps l
            body <- desugarTree side ps r
-           pure $ PApp loc (PApp loc (PRef opFC op.toName) l')
-                      (PLam loc top Explicit pat l' body)
+           pure $ MkFCVal loc $ PApp (MkFCVal loc $ PApp (MkFCVal opFC $ PRef op.toName) l')
+                      (MkFCVal loc $ PLam top Explicit pat l' body)
   -- (x := exp) =@ f x ==>> (=@) exp (\x : ? => f x)
   desugarTree side ps (Infix loc opFC (op, Just (LHSBinder $ BindExpr pat lhs)) l r)
       = do l' <- desugarTree side ps l
            body <- desugarTree side ps r
-           pure $ PApp loc (PApp loc (PRef opFC op.toName) l')
-                      (PLam loc top Explicit pat (PInfer opFC) body)
+           pure $ MkFCVal loc $ PApp (MkFCVal loc $ PApp (MkFCVal opFC $ PRef op.toName) l')
+                      (MkFCVal loc $ PLam top Explicit pat (MkFCVal opFC PInfer) body)
 
   -- (x : ty := exp) =@ f x ==>> (=@) exp (\x : ty => f x)
   desugarTree side ps (Infix loc opFC (op, Just (LHSBinder $ BindExplicitType pat ty expr)) l r)
       = do l' <- desugarTree side ps l
            body <- desugarTree side ps r
-           pure $ PApp loc (PApp loc (PRef opFC op.toName) l')
-                      (PLam loc top Explicit pat ty body)
+           pure $ MkFCVal loc $ PApp (MkFCVal loc $ PApp (MkFCVal opFC $ PRef op.toName) l')
+                      (MkFCVal loc $ PLam top Explicit pat ty body)
   desugarTree side ps (Infix loc opFC (op, Nothing) _ r)
       = throw $ InternalError "illegal fixity: Parsed as infix but no binding information"
 
@@ -875,9 +875,9 @@ mutual
   -- Note: In case of negated signed integer literals, we apply the
   -- negation directly. Otherwise, the literal might be
   -- truncated to 0 before being passed on to `negate`.
-  desugarTree side ps (Pre loc opFC (OpSymbols $ UN $ Basic "-", _) $ Leaf $ PPrimVal fc c)
-    = let newFC    = fromMaybe EmptyFC (mergeFC loc fc)
-          continue = desugarTree side ps . Leaf . PPrimVal newFC
+  desugarTree side ps (Pre loc opFC (OpSymbols $ UN $ Basic "-", _) $ Leaf val@(MkWithData _ $ PPrimVal c))
+    = let newFC    = fromMaybe EmptyFC (mergeFC loc val.fc)
+          continue = desugarTree side ps . Leaf . MkFCVal newFC . PPrimVal
        in case c of
             I   x => continue $ I (-x)
             I8  x => continue $ I8 (-x)
@@ -888,16 +888,16 @@ mutual
 
             -- not a signed integer literal. proceed by desugaring
             -- and applying to `negate`.
-            _     => do arg' <- desugarTree side ps (Leaf $ PPrimVal fc c)
-                        pure (PApp loc (PRef opFC (UN $ Basic "negate")) arg')
+            _     => do arg' <- desugarTree side ps (Leaf val)
+                        pure (MkFCVal loc $ PApp (MkFCVal opFC $ PRef (UN $ Basic "negate")) arg')
 
   desugarTree side ps (Pre loc opFC (OpSymbols $ UN $ Basic "-", _) arg)
     = do arg' <- desugarTree side ps arg
-         pure (PApp loc (PRef opFC (UN $ Basic "negate")) arg')
+         pure (MkFCVal loc $ PApp (MkFCVal opFC $ PRef (UN $ Basic "negate")) arg')
 
   desugarTree side ps (Pre loc opFC (op, _) arg)
       = do arg' <- desugarTree side ps arg
-           pure (PApp loc (PRef opFC op.toName) arg')
+           pure (MkFCVal loc $ PApp (MkFCVal opFC $ PRef op.toName) arg')
   desugarTree side ps (Leaf t) = pure t
 
   desugarType : {auto s : Ref Syn SyntaxInfo} ->
@@ -937,7 +937,7 @@ mutual
     do rawlhs <- desugar LHS ps lhs
        inm <- iunless arg $ getClauseFn rawlhs
        (bound, blhs) <- bindNames arg rawlhs
-       log "desugar.lhs" 10 "Desugared \{show lhs} to \{show blhs}"
+       log "desugar.lhs" 10 "Desugared \{show lhs.val} to \{show blhs}"
        iwhenJust inm $ \ nm =>
          when (nm `elem` bound) $ do
            let fc = getPTermLoc lhs
@@ -967,7 +967,7 @@ mutual
                   {auto o : Ref ROpts REPLOpts} ->
                   List Name -> (arg : Bool) -> PClause ->
                   Core (IMaybe (not arg) Name, ImpClause)
-  desugarClause ps arg (MkPatClause fc lhs rhs wheres)
+  desugarClause ps arg clause@(MkWithData _ $ MkPatClause lhs rhs wheres)
       = do ws <- traverse (desugarDecl ps) wheres
 
            (nm, bound, lhs') <- desugarLHS ps arg lhs
@@ -976,19 +976,19 @@ mutual
            rhs' <- desugar AnyExpr (bound ++ ps) rhs
            let rhs' = case ws of
                         [] => rhs'
-                        _ => ILocal fc (concat ws) rhs'
+                        _ => ILocal clause.fc (concat ws) rhs'
 
-           pure (nm, PatClause fc lhs' rhs')
+           pure (nm, PatClause clause.fc lhs' rhs')
 
-  desugarClause ps arg (MkWithClause fc lhs wps flags cs)
+  desugarClause ps arg clause@(MkWithData _ $ MkWithClause lhs wps flags cs)
       = do cs' <- traverse (map snd . desugarClause ps arg) cs
            (nm, bound, lhs') <- desugarLHS ps arg lhs
            wps' <- traverseList1 (desugarWithProblem (bound ++ ps)) wps
-           pure (nm, mkWithClause fc lhs' wps' flags cs')
+           pure (nm, mkWithClause clause.fc lhs' wps' flags cs')
 
-  desugarClause ps arg (MkImpossible fc lhs)
+  desugarClause ps arg imps@(MkWithData _ $ MkImpossible lhs)
       = do (nm, _, lhs') <- desugarLHS ps arg lhs
-           pure (nm, ImpossibleClause fc lhs')
+           pure (nm, ImpossibleClause imps.fc lhs')
 
   desugarData : {auto s : Ref Syn SyntaxInfo} ->
                 {auto c : Ref Ctxt Defs} ->
@@ -1176,8 +1176,7 @@ mutual
            let paramNames = concatMap (map val . forget . names) params
 
            let cons = concatMap expandConstraint cons_in
-           cons' <- traverse (\ ntm => do tm' <- desugar AnyExpr (ps ++ paramNames)
-                                                         (snd ntm)
+           cons' <- traverse (\ ntm => do tm' <- desugar AnyExpr (ps ++ paramNames) (snd ntm)
                                           pure (fst ntm, tm')) cons
            params' <- concat <$> traverse (\ (MkBasicMultiBinder rig nm tm) =>
                          do tm' <- desugar AnyExpr ps tm
@@ -1208,7 +1207,7 @@ mutual
       -- is a bit of a hack, but it's necessary to build parent constraint
       -- chasing functions correctly
       pairToCons : PTerm -> List PTerm
-      pairToCons (PPair _ l r) = pairToCons l ++ pairToCons r
+      pairToCons (MkWithData _ $ PPair l r) = pairToCons l ++ pairToCons r
       pairToCons t = [t]
 
       expandConstraint : (Maybe Name, PTerm) -> List (Maybe Name, PTerm)
@@ -1258,14 +1257,14 @@ mutual
       isNamed (Just _) = True
 
   desugarDecl ps (MkWithData fc $ PRecord doc vis mbtot (MkPRecordLater tn params))
-      = desugarDecl ps (MkWithData fc $ PData doc vis mbtot (MkPLater (get "fc" fc) tn (mkRecType params)))
+      = desugarDecl ps (MkWithData fc $ PData doc vis mbtot (MkPLater (get "fc" fc) tn (NoFC $ mkRecType params)))
     where
-      mkRecType : List PBinder -> PTerm
-      mkRecType [] = PType (get "fc" fc)
+      mkRecType : List PBinder -> PTermBase Name
+      mkRecType [] = PType
       mkRecType (MkPBinder p (MkBasicMultiBinder c (n ::: []) t) :: ts)
-        = PPi (get "fc" fc) c p (Just n.val) t (mkRecType ts)
+        = PPi c p (Just n.val) t (NoFC $ mkRecType ts)
       mkRecType (MkPBinder p (MkBasicMultiBinder c (n ::: x :: xs) t) :: ts)
-        = PPi (get "fc" fc) c p (Just n.val) t (mkRecType (MkPBinder p (MkBasicMultiBinder c (x ::: xs) t) :: ts))
+        = PPi c p (Just n.val) t (NoFC $ mkRecType (MkPBinder p (MkBasicMultiBinder c (x ::: xs) t) :: ts))
   desugarDecl ps (MkWithData fc $ PRecord doc vis mbtot (MkPRecord tn params opts conname_in fields))
       = do addDocString tn.val doc
            params'  <- concat <$> traverse (\ (MkPBinder info (MkBasicMultiBinder rig names tm)) =>

@@ -100,7 +100,7 @@ getImplDocs : {auto c : Ref Ctxt Defs} ->
               Core (List (Doc IdrisDocAnn))
 getImplDocs keep
     = do defs <- get Ctxt
-         docss <- for (concat $ values $ typeHints defs) $ \ (impl, _) =>
+         docss <- the (Core (List (List $ Doc IdrisDocAnn))) $ for (concat $ values $ typeHints defs) $ \ (impl, _) =>
            do Just def <- lookupCtxtExact impl (gamma defs)
                 | _ => pure []
               -- Only keep things that look like implementations.
@@ -112,11 +112,11 @@ getImplDocs keep
               True <- keep ty
                 | False => pure []
               ty <- resugar Env.empty ty
-              pure [annotate ?huhh $ prettyBy Syntax ty]
+              pure [annotate (Decl impl) $ prettyBy Syntax ty]
          pure $ case concat docss of
            [] => []
            [doc] => [header "Hint" <++> annotate Declarations doc]
-           docs  => [vcat [header "Hints"
+           docs  => [ vcat [header "Hints"
                     , annotate Declarations $
                         vcat $ map (indent 2) docs]]
 
@@ -508,7 +508,7 @@ getDocsForImplementation t = do
     let (_, retTy) = underPis ty
     -- try to see whether it approximates what we are looking for
     -- we throw the head away because it'll be the interface name (I)
-    let (_, cargs) = Views.getFnArgs ?ad ?bqw -- retTy
+    let (_, cargs) = Views.getFnArgs defaultKindedName retTy.val
     bs <- for (zip args cargs) $ \ (arg, carg) => do
       -- For now we only compare the heads of the arguments because we expect
       -- we are interested in implementations of the form
@@ -537,14 +537,14 @@ getDocsForImplementation t = do
         | _ => pure False
       -- If the name starts with an uppercase letter it's probably a misspelt constructor name
       whenJust ((isUN >=> (isBasic . snd) >=> strUncons >=> (guard . isUpper . fst)) hd) $ \ _ =>
-        undefinedName fc hd
+        ?arg12 -- undefinedName fc hd
       pure True
     -- all arguments better be valid approximations
     let True = all id bs
       | False => pure Nothing
     pure (Just (hint, ix, def))
   case impls of
-    [] => pure $ Just $ "Could not find an implementation for" <++> pretty0 (show t) --hack
+    [] => pure $ Just $ "Could not find an implementation for" <++> pretty0 (show t.val) --hack
     _ => do ds <- traverse (displayImpl defs) impls
             pure $ Just $ vcat ds
 
