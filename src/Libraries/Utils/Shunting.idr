@@ -3,6 +3,7 @@ module Libraries.Utils.Shunting
 import Core.Context
 import Core.Core
 import Core.FC
+import Data.List1
 
 %default total
 
@@ -25,6 +26,8 @@ public export
 data Tok : (op, a : Type) ->  Type where
     Op : (expressionLoc : FC) -> (operatorLoc : FC) -> (operatorInfo : op) -> OpPrec -> Tok op a
     Expr : a -> Tok op a
+
+
 
 -- The result of shunting is a parse tree with the precedences made explicit
 -- in the tree.
@@ -66,19 +69,30 @@ export
 -- Label for the output queue state
 data Out : Type where
 
-output : List (Tree op a) -> Tok op a ->
-         Core (List (Tree op a))
-output [] (Op _ _ _ _) = throw (InternalError "Invalid input to shunting")
+public export
+data ShuntingError op a
+  = NotEnoughOperators (Tok op a)
+  | UnexpectedOperator (List (Tree op a)) (Tok op a)
+  | UnexpectedTrees (List1 (Tree op a))
+  | NoOutput
+
+output : (Show op, Show a) =>
+         List (Tree op a) -> Tok op a ->
+         Either (ShuntingError op a) (List (Tree op a))
+output [] op@(Op _ _ _ _) = Left (NotEnoughOperators op)
 output (x :: stk) (Op loc opFC str (Prefix _)) = pure $ Pre loc opFC str x :: stk
 output (x :: y :: stk) (Op loc opFC str _) = pure $ Infix loc opFC str y x :: stk
 output stk (Expr a) = pure $ Leaf a :: stk
-output _ _ = throw (InternalError "Invalid input to shunting")
+output ls tree = Left (UnexpectedOperator ls tree)
 
-emit : {auto o : Ref Out (List (Tree op a))} ->
-       Tok op a -> Core ()
+emit : Show op => Show a => {auto o : Ref Out (List (Tree op a))} ->
+       Tok op a -> Core (Maybe (ShuntingError op a))
 emit t
     = do out <- get Out
-         put Out !(output out t)
+         let Right out = output out t
+           | Left err => pure (Just err)
+         put Out out
+         pure Nothing
 
 getPrec : OpPrec -> Nat
 getPrec (AssocL k) = k
@@ -110,36 +124,40 @@ higher loc opl l opr r
     = pure $ (getPrec l > getPrec r) ||
              ((getPrec l == getPrec r) && isLAssoc l)
 
-processStack : Interpolation op => (showLoc : Show op) => {auto o : Ref Out (List (Tree op a))} ->
+processStack : Interpolation op => (showLoc : Show op) => Show a => {auto o : Ref Out (List (Tree op a))} ->
                List (FC, FC, op, OpPrec) -> op -> OpPrec ->
-               Core (List (FC, FC, op, OpPrec))
-processStack [] op prec = pure []
+               Core (Either (ShuntingError op a) (List (FC, FC, op, OpPrec)))
+processStack [] op prec = pure (Right [])
 processStack (x@(loc, opFC, opx, sprec) :: xs) opy prec
     = if !(higher loc opx sprec opy prec)
-         then do emit (Op loc opFC opx sprec)
+         then do Nothing <- emit (Op loc opFC opx sprec)
+                   | Just err => pure (Left err)
                  processStack xs opy prec
-         else pure (x :: xs)
+         else pure (Right (x :: xs))
 
-shunt : Interpolation op => (showLoc : Show op) => {auto o : Ref Out (List (Tree op a))} ->
+shunt : Interpolation op => (showLoc : Show op) => Show a => {auto o : Ref Out (List (Tree op a))} ->
         (opstk : List (FC, FC, op, OpPrec)) ->
-        List (Tok op a) -> Core (Tree op a)
+        List (Tok op a) -> Core (Either (ShuntingError op a) (Tree op a))
 shunt stk (Expr x :: rest)
-    = do emit (Expr x)
+    = do Nothing <- emit (Expr x)
+           | Just err => pure (Left err)
          shunt stk rest
 shunt stk (Op loc opFC op prec :: rest)
-    = do stk' <- processStack stk op prec
+    = do Right stk' <- processStack stk op prec
+           | Left err => pure (Left err)
          shunt ((loc, opFC, op, prec) :: stk') rest
 shunt stk []
     = do traverse_ (emit . mkOp) stk
          [out] <- get Out
-             | out => throw (InternalError "Invalid input to shunting")
-         pure out
+           | [] => pure (Left NoOutput)
+           | (o :: os) => pure (Left (UnexpectedTrees (o ::: os)))
+         pure (Right out)
   where
     mkOp : (FC, FC, op, OpPrec) -> Tok op a
     mkOp (loc, opFC, op, prec) = Op loc opFC op prec
 
 export
-parseOps : Interpolation op => (showLoc : Show op) => List (Tok op a) -> Core (Tree op a)
+parseOps : Interpolation op => (showLoc : Show op) => Show a => List (Tok op a) -> Core (Either (ShuntingError op a) (Tree op a))
 parseOps toks
     = do o <- newRef {t = List (Tree op a)} Out []
          shunt [] toks

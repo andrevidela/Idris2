@@ -417,12 +417,18 @@ mutual
   desugarB side ps (PBracketed fc e) = desugarB side ps e
   desugarB side ps (POp fc l op r)
       = do ts <- toTokList side (POp fc l op r)
-           tree <- parseOps @{interpName} @{showWithLoc} ts
+           Right tree <- parseOps @{interpName} @{showWithLoc} ts
+             | Left _ => do
+               coreLift $ putStrLn "hello"
+               throw (GenericMsg fc "Could not parse infix operator")
            unop <- desugarTree side ps (mapFst (\((x, _), y) => (x, y)) tree)
            desugarB side ps unop
   desugarB side ps (PPrefixOp fc op arg)
       = do ts <- toTokList side (PPrefixOp fc op arg)
-           tree <- parseOps @{interpName} @{showWithLoc} ts
+           Right tree <- parseOps @{interpName} @{showWithLoc} ts
+             | Left err => do
+               coreLift $ putStrLn "hello2"
+               throw (GenericMsg fc "Could not parse prefix operator")
            unop <- desugarTree side ps (mapFst (\((x, _), y) => (x, y)) tree)
            desugarB side ps unop
   desugarB side ps (PSectionL fc op arg)
