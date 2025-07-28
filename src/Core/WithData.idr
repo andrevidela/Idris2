@@ -94,6 +94,10 @@ public export
 Doc' : KeyVal
 Doc' = "doc" :-: String
 
+public export 0
+AddDoc : Type -> Type
+AddDoc = AddMetadata Doc'
+
 ||| Obtain documentation information from the metadata
 export
 (.doc) : {n : Nat} ->
@@ -109,6 +113,10 @@ export
 public export
 Rig' : KeyVal
 Rig' = "rig" :-: RigCount
+
+public export 0
+AddRig : Type -> Type
+AddRig = AddMetadata Rig'
 
 ||| Obtain quantity information from the metadata
 export

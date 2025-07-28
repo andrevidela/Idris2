@@ -228,7 +228,7 @@ printClause l i (WithClause _ lhsraw rig wvraw prf flags csraw)
                 ++ show lhs
                 ++ " with " ++ showCount rig ++ "(" ++ show wval ++ ")"
                    -- TODO: remove `the` after fix idris-lang/Idris2#3418
-                ++ maybe "" (the (_ -> _) $ \(rg, nm) => " proof " ++ showCount rg ++ show nm) prf
+                ++ maybe "" (the (_ -> _) $ \nm => " proof " ++ showCount nm.rig ++ show nm.val) prf
                 ++ "\n")
                ++ showSep "\n" cs)
 printClause l i (ImpossibleClause _ lhsraw)

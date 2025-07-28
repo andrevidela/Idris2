@@ -439,7 +439,7 @@ mutual
        PatClause : FC -> (lhs : RawImp' nm) -> (rhs : RawImp' nm) -> ImpClause' nm
        WithClause : FC -> (lhs : RawImp' nm) ->
                     (rig : RigCount) -> (wval : RawImp' nm) -> -- with'd expression (& quantity)
-                    (prf : Maybe (RigCount, Name)) -> -- optional name for the proof
+                    (prf : Maybe (AddRig Name)) -> -- optional name for the proof
                     (flags : List WithFlag) ->
                     List (ImpClause' nm) -> ImpClause' nm
        ImpossibleClause : FC -> (lhs : RawImp' nm) -> ImpClause' nm
@@ -455,7 +455,7 @@ mutual
        = show lhs
        ++ " with " ++ showCount rig ++ "(" ++ show wval ++ ")"
           -- TODO: remove `the` after fix idris-lang/Idris2#3418
-       ++ maybe "" (the (_ -> _) $ \(rg, nm) => " proof " ++ showCount rg ++ show nm) prf
+       ++ maybe "" (the (_ -> _) $ \nm => " proof " ++ showCount nm.rig ++ show nm.val) prf
        ++ "\n\t" ++ show block
     show (ImpossibleClause fc lhs)
        = show lhs ++ " impossible"
@@ -531,7 +531,7 @@ mutual
 
 
 export
-mkWithClause : FC -> RawImp' nm -> List1 (RigCount, RawImp' nm, Maybe (RigCount, Name)) ->
+mkWithClause : FC -> RawImp' nm -> List1 (RigCount, RawImp' nm, Maybe (AddRig Name)) ->
                List WithFlag -> List (ImpClause' nm) -> ImpClause' nm
 mkWithClause fc lhs ((rig, wval, prf) ::: []) flags cls
   = WithClause fc lhs rig wval prf flags cls

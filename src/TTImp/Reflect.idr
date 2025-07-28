@@ -406,9 +406,10 @@ mutual
                           w' <- reify defs !(evalClosure defs w)
                           x' <- reify defs !(evalClosure defs x)
                           y' <- reify defs !(evalClosure defs y)
+                          let newY = map (\y : Pair RigCount Name => MkWithData ["rig" :- fst y] (snd y)) y'
                           z' <- reify defs !(evalClosure defs z)
                           a' <- reify defs !(evalClosure defs a)
-                          pure (WithClause u' v' w' x' y' z' a')
+                          pure (WithClause u' v' w' x' newY z' a')
                (UN (Basic "ImpossibleClause"), [x,y])
                     => do x' <- reify defs !(evalClosure defs x)
                           y' <- reify defs !(evalClosure defs y)
@@ -764,7 +765,7 @@ mutual
              v' <- reflect fc defs lhs env v
              w' <- reflect fc defs lhs env w
              x' <- reflect fc defs lhs env x
-             y' <- reflect fc defs lhs env y
+             y' <- reflect fc defs lhs env (map (\y => (y.rig, y.val)) y)
              z' <- reflect fc defs lhs env z
              a' <- reflect fc defs lhs env a
              appCon fc defs (reflectionttimp "WithClause") [u', v', w', x', y', z', a']

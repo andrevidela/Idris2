@@ -1232,7 +1232,7 @@ withProblem fname col indents
        wval <- bracketedExpr fname start indents
        prf <- optional $ do
                 decoratedKeyword fname "proof"
-                pure (!(multiplicity fname), !(decoratedSimpleBinderUName fname))
+                pure (Mk [!(multiplicity fname)] !(decoratedSimpleBinderUName fname))
        pure (MkPWithProblem rig wval prf)
 
 mutual

@@ -524,7 +524,7 @@ mutual
            symbol ")"
            prf <- optional $ do
                     keyword "proof"
-                    pure (!(getMult !multiplicity), !name)
+                    pure (Mk [!(getMult !multiplicity)] !name)
            ws <- nonEmptyBlock (clause (S withArgs) fname)
            end <- location
            let fc = MkFC fname start end
