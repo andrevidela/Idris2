@@ -110,6 +110,11 @@ public export
 Rig' : KeyVal
 Rig' = "rig" :-: RigCount
 
+||| Add quantity information to a record
+public export 0
+WithRig : Type -> Type
+WithRig = AddMetadata Rig'
+
 ||| Obtain quantity information from the metadata
 export
 (.rig) : {n : Nat} ->
