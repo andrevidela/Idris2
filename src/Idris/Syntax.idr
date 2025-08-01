@@ -299,18 +299,21 @@ mutual
   PlainBinder' : (nm : Type) -> Type
   PlainBinder' nm  = WithName (PTerm' nm)
 
-  public export
+  public export 0
   BasicMultiBinder : Type
   BasicMultiBinder = BasicMultiBinder' Name
 
   ||| A binder with quantity information attached
   ||| basicBinder := qty plainBinder
   public export
-  record BasicMultiBinder' (nm : Type) where
+  record BasicMultiBinderData (nm : Type) where
     constructor MkBasicMultiBinder
-    rig : RigCount
     names : List1 (WithFC Name)
     type : PTerm' nm
+
+  public export 0
+  BasicMultiBinder' : Type -> Type
+  BasicMultiBinder' x = WithRig (BasicMultiBinderData x)
 
   public export
   PBinder : Type
@@ -339,7 +342,7 @@ mutual
 
   public export
   MkFullBinder : PiInfo (PTerm' nm) -> RigCount -> WithFC Name -> PTerm' nm -> PBinder' nm
-  MkFullBinder info rig x y = MkPBinder info (MkBasicMultiBinder rig (singleton x) y)
+  MkFullBinder info rig x y = MkPBinder info (Mk [rig] $ MkBasicMultiBinder (singleton x) y)
 
 
   export
@@ -855,11 +858,11 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate (PSetField p v) = showSep "." p ++ " = " ++ showPTerm v
   showUpdate (PSetFieldApp p v) = showSep "." p ++ " $= " ++ showPTerm v
 
-  showBasicMultiBinder (MkBasicMultiBinder rig names type)
-        = "\{showCount rig} \{showNames}: \{showPTerm type}"
+  showBasicMultiBinder binder
+        = "\{showCount binder.rig} \{showNames}: \{showPTerm binder.val.type}"
         where
           showNames : String
-          showNames = concat $ intersperse ", " $ map (show . val) (forget names)
+          showNames = concat $ intersperse ", " $ map (show . val) (forget binder.val.names)
 
   showPBinder d (MkPBinder Implicit bind) = "{\{showBasicMultiBinder bind}}"
   showPBinder d (MkPBinder Explicit bind) = "(\{showBasicMultiBinder bind})"

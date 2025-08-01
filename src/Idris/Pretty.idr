@@ -178,9 +178,9 @@ mutual
       else Chara '`' <+> annotateM (kindAnn op) (pretty0 nm) <+> Chara '`'
 
   Pretty IdrisSyntax (BasicMultiBinder' KindedName) where
-    pretty (MkBasicMultiBinder rig names type)
-      = prettyRig rig <++> commaSep (forget $ map (prettyBinder . val) names)
-      <++> colon <++> pretty type
+    pretty binder
+      = prettyRig binder.rig <++> commaSep (forget $ map (prettyBinder . val) binder.val.names)
+      <++> colon <++> pretty binder.val.type
 
   Pretty IdrisSyntax (PBinder' KindedName) where
     prettyPrec d (MkPBinder Implicit bind) =

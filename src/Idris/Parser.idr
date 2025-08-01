@@ -676,7 +676,7 @@ mutual
             decoratedSymbol fname ":"
             ty <- typeExpr pdef fname indents
             atEnd indents
-            pure (MkBasicMultiBinder rig ns ty)
+            pure (Mk [rig] $ MkBasicMultiBinder ns ty)
     where
       -- _ gets treated specially here, it means "I don't care about the name"
       binderName : Rule Name
@@ -1204,7 +1204,7 @@ basicMultiBinder
                      $ fcBounds (decoratedSimpleBinderUName fname)
        decoratedSymbol fname ":"
        ty <- typeExpr pdef fname indents
-       pure $ MkBasicMultiBinder rig names ty
+       pure $ Mk [rig] $ MkBasicMultiBinder names ty
 
 tyDecls : Rule Name -> String -> OriginDesc -> IndentInfo -> Rule PTypeDecl
 tyDecls declName predoc fname indents
@@ -1713,7 +1713,7 @@ implBinds fname indents namedImpl = concatMap (map adjust) <$> go where
           when (not namedImpl && isDefaultImplicit piInfo.val) $
             fatalLoc piInfo.bounds "Default implicits are allowed only for named implementations"
           ns <- map
-                    (\case (MkBasicMultiBinder rig names type) => map (\nm => (rig, nm, piInfo.val, type)) (forget names))
+                    (\binder => map (\nm => (binder.rig, nm, piInfo.val, binder.val.type)) (forget binder.val.names))
                     (pibindListName fname indents)
           let ns = the (List (ZeroOneOmega, (WithFC Name, (PiInfo (PTerm' Name), PTerm' Name)))) ns
           commitSymbol fname "}"
@@ -1756,7 +1756,7 @@ parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
   ifaceParam
       = parens fname basicMultiBinder
     <|> do n <- fcBounds (decorate fname Bound name)
-           pure (MkBasicMultiBinder erased (singleton n) (PInfer n.fc))
+           pure (Mk [erased] $ MkBasicMultiBinder (singleton n) (PInfer n.fc))
 
   ifaceDecl : Rule PDeclNoFC
   ifaceDecl

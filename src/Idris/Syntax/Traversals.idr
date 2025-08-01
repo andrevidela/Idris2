@@ -254,13 +254,13 @@ mapPTermM f = goPTerm where
     goPlainBinder : PlainBinder' nm -> Core (PlainBinder' nm)
     goPlainBinder = traverseWName f
 
-    goBasicMultiBinder : BasicMultiBinder' nm -> Core (BasicMultiBinder' nm)
-    goBasicMultiBinder (MkBasicMultiBinder rig names type)
-      = MkBasicMultiBinder rig names <$> goPTerm type
+    goBasicMultiBinder : BasicMultiBinderData nm -> Core (BasicMultiBinderData nm)
+    goBasicMultiBinder (MkBasicMultiBinder names type)
+      = MkBasicMultiBinder names <$> goPTerm type
 
     goPBinder : PBinder' nm -> Core (PBinder' nm)
     goPBinder (MkPBinder info bind)
-      = MkPBinder <$> goPiInfo info <*> goBasicMultiBinder bind
+      = MkPBinder <$> goPiInfo info <*> traverse goBasicMultiBinder bind
 
     goPBinderScope : PBinderScope' nm -> Core (PBinderScope' nm)
     goPBinderScope (MkPBinderScope binder scope)
@@ -284,7 +284,7 @@ mapPTermM f = goPTerm where
       PInterface v <$> goPairedPTerms mnts
                    <*> pure n
                    <*> pure doc
-                   <*> traverse goBasicMultiBinder nrts
+                   <*> traverse (traverse goBasicMultiBinder) nrts
                    <*> pure ns
                    <*> pure mn
                    <*> goPDecls ps
@@ -576,7 +576,7 @@ mapPTerm f = goPTerm where
     goPDecl (PUsing mnts ps)
       = PUsing (goPairedPTerms mnts) (mapData goPDecl <$> ps)
     goPDecl (PInterface v mnts n doc nrts ns mn ps)
-      = PInterface v (goPairedPTerms mnts) n doc (goBasicMultiBinder <$> nrts) ns mn (mapData goPDecl <$> ps)
+      = PInterface v (goPairedPTerms mnts) n doc (mapData goBasicMultiBinder <$> nrts) ns mn (mapData goPDecl <$> ps)
     goPDecl (PImplementation v opts p is cs n ts mn ns mps)
       = PImplementation v opts p (goImplicits is) (goPairedPTerms cs)
            n (goPTerm <$> ts) mn ns (map (mapData goPDecl <$>) mps)
@@ -595,11 +595,11 @@ mapPTerm f = goPTerm where
     goPDecl p@(PBuiltin _ _) = p
 
     goPBinder : PBinder' nm -> PBinder' nm
-    goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (goBasicMultiBinder bind)
+    goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (mapData goBasicMultiBinder bind)
 
-    goBasicMultiBinder : BasicMultiBinder' nm -> BasicMultiBinder' nm
-    goBasicMultiBinder (MkBasicMultiBinder rig names type)
-      = MkBasicMultiBinder rig names (goPTerm type)
+    goBasicMultiBinder : BasicMultiBinderData nm -> BasicMultiBinderData nm
+    goBasicMultiBinder (MkBasicMultiBinder names type)
+      = MkBasicMultiBinder names (goPTerm type)
 
     goPTypeDecl : PTypeDeclData' nm -> PTypeDeclData' nm
     goPTypeDecl (MkPTy n d t) = MkPTy n d $ goPTerm t
