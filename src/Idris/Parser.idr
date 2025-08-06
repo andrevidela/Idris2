@@ -668,7 +668,7 @@ mutual
   ||| BNF:
   ||| pibindListName := qty name (, name)* ':' typeExpr
   pibindListName : OriginDesc -> IndentInfo ->
-                   Rule BasicMultiBinder
+                   Rule (WithRig BasicMultiBinderData)
   pibindListName fname indents
        = do rig <- multiplicity fname
             ns <- sepBy1 (decoratedSymbol fname ",")
@@ -1197,14 +1197,14 @@ plainBinder = do name <- fcBounds (decoratedSimpleBinderUName fname)
 ||| A binder with multiple names and one type
 ||| BNF:
 ||| basicMultiBinder := name (, name)* ':' typeExpr
-basicMultiBinder : (fname : OriginDesc) => (indents : IndentInfo) => Rule BasicMultiBinder
+basicMultiBinder : (fname : OriginDesc) => (indents : IndentInfo) => Rule BasicMultiBinderData
 basicMultiBinder
-  = do rig <- multiplicity fname
+  = do
        names <- sepBy1 (decoratedSymbol fname ",")
                      $ fcBounds (decoratedSimpleBinderUName fname)
        decoratedSymbol fname ":"
        ty <- typeExpr pdef fname indents
-       pure $ Mk [rig] $ MkBasicMultiBinder names ty
+       pure $ MkBasicMultiBinder names ty
 
 tyDecls : Rule Name -> String -> OriginDesc -> IndentInfo -> Rule PTypeDecl
 tyDecls declName predoc fname indents
@@ -1752,11 +1752,11 @@ fieldDecl indents
 
 parameters {auto fname : OriginDesc} {auto indents : IndentInfo}
 
-  ifaceParam : Rule BasicMultiBinder
+  ifaceParam : Rule (BasicMultiBinderData Name)
   ifaceParam
       = parens fname basicMultiBinder
     <|> do n <- fcBounds (decorate fname Bound name)
-           pure (Mk [erased] $ MkBasicMultiBinder (singleton n) (PInfer n.fc))
+           pure (MkBasicMultiBinder (singleton n) (PInfer n.fc))
 
   ifaceDecl : Rule PDeclNoFC
   ifaceDecl

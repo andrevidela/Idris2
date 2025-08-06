@@ -299,10 +299,6 @@ mutual
   PlainBinder' : (nm : Type) -> Type
   PlainBinder' nm  = WithName (PTerm' nm)
 
-  public export 0
-  BasicMultiBinder : Type
-  BasicMultiBinder = BasicMultiBinder' Name
-
   ||| A binder with quantity information attached
   ||| basicBinder := qty plainBinder
   public export
@@ -311,24 +307,37 @@ mutual
     names : List1 (WithFC Name)
     type : PTerm' nm
 
-  public export 0
-  BasicMultiBinder' : Type -> Type
-  BasicMultiBinder' x = WithRig (BasicMultiBinderData x)
-
+  ------------------------------------------------------------------------------------------
+  -- Type information
+  ------------------------------------------------------------------------------------------
+  ||| The "doc" label containing documentation information for metadata records
   public export
+  Type' : Type -> KeyVal
+  Type' nm = "type" :-: PTerm' nm
+
+  namespace Record
+    ||| Obtain documentation information from the metadata
+    export
+    (.type) : {n : Nat} ->
+             (inRange : NameInRange "type" fields === Just (n, PTerm' nm)) =>
+             Record fields -> PTerm' nm
+    (.type) rec = Record.get "type" rec
+
+  public export 0
+  PBinder' : Type -> Type
+  PBinder' = WithRig . PBinderData
+
+  public export 0
   PBinder : Type
   PBinder = PBinder' Name
 
-  ||| A binder with information about how it is binding
-  ||| pbinder := '{' basicBinder '}'
-  |||          | '{' auto basicBinder '}'
-  |||          | '{' default term basicBinder '}'
-  |||          | '(' basicBinder ')'
   public export
-  record PBinder' (nm : Type) where
-    constructor MkPBinder
-    info : PiInfo (PTerm' nm)
-    bind : BasicMultiBinder' nm
+  BinderDataSpec : Type -> KeyVal
+  BinderDataSpec = ["info" :-: PiInfo (Pterm' nm), "type" :-: PTerm' nm]
+
+  public export
+  PBinderData : Type -> Type
+  PBinderData = Record BinderDataSpec
 
   public export
   PBinderScope : Type
@@ -342,7 +351,7 @@ mutual
 
   public export
   MkFullBinder : PiInfo (PTerm' nm) -> RigCount -> WithFC Name -> PTerm' nm -> PBinder' nm
-  MkFullBinder info rig x y = MkPBinder info (Mk [rig] $ MkBasicMultiBinder (singleton x) y)
+  MkFullBinder info rig x y = Mk [rig] $ MkPBinder info ( MkBasicMultiBinder (singleton x) y)
 
 
   export
@@ -580,7 +589,7 @@ mutual
                     (constraints : List (Maybe Name, PTerm' nm)) ->
                     Name ->
                     (doc : String) ->
-                    (params : List (BasicMultiBinder' nm)) ->
+                    (params : List (WithRig $ BasicMultiBinderData nm)) ->
                     (det : Maybe (List1 Name)) ->
                     (conName : Maybe (String, Name)) ->
                     List (PDecl' nm) ->
@@ -826,7 +835,7 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPTermPrec : Prec -> PTerm' nm -> String
   showOpPrec : Prec -> OpStr' nm -> String
   showPBinder : Prec -> PBinder' nm -> String
-  showBasicMultiBinder : BasicMultiBinder' nm -> String
+  showBasicMultiBinder : BasicMultiBinderData nm -> String
 
   showPTerm : PTerm' nm -> String
   showPTerm = showPTermPrec Open
@@ -859,15 +868,15 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showUpdate (PSetFieldApp p v) = showSep "." p ++ " $= " ++ showPTerm v
 
   showBasicMultiBinder binder
-        = "\{showCount binder.rig} \{showNames}: \{showPTerm binder.val.type}"
+        = "\{showNames} : \{showPTerm binder.type}"
         where
           showNames : String
-          showNames = concat $ intersperse ", " $ map (show . val) (forget binder.val.names)
+          showNames = concat $ intersperse ", " $ map (show . val) (forget binder.names)
 
-  showPBinder d (MkPBinder Implicit bind) = "{\{showBasicMultiBinder bind}}"
-  showPBinder d (MkPBinder Explicit bind) = "(\{showBasicMultiBinder bind})"
-  showPBinder d (MkPBinder AutoImplicit bind) = "{auto \{showBasicMultiBinder bind}}"
-  showPBinder d (MkPBinder (DefImplicit x) bind) = "{default \{showPTerm x} \{ showBasicMultiBinder bind}}"
+  showPBinder d b@(MkWithData _ $ MkPBinder Implicit bind) = "{\{show b.rig} \{showBasicMultiBinder bind}}"
+  showPBinder d b@(MkWithData _ $ MkPBinder Explicit bind) = "(\{show b.rig} \{showBasicMultiBinder bind})"
+  showPBinder d b@(MkWithData _ $ MkPBinder AutoImplicit bind) = "{auto \{showBasicMultiBinder bind}}"
+  showPBinder d b@(MkWithData _ $ MkPBinder (DefImplicit x) bind) = "{default \{showPTerm x} \{ showBasicMultiBinder bind}}"
 
   showPTermPrec d (PRef _ n) = showPrec d (toName n)
   showPTermPrec d (Forall (MkWithData _ (names, scope)))

@@ -177,19 +177,19 @@ mutual
       then annotateM (kindAnn op) $ pretty0 nm
       else Chara '`' <+> annotateM (kindAnn op) (pretty0 nm) <+> Chara '`'
 
-  Pretty IdrisSyntax (BasicMultiBinder' KindedName) where
+  Pretty IdrisSyntax (BasicMultiBinderData KindedName) where
     pretty binder
-      = prettyRig binder.rig <++> commaSep (forget $ map (prettyBinder . val) binder.val.names)
-      <++> colon <++> pretty binder.val.type
+      = commaSep (forget $ map (prettyBinder . val) binder.names)
+      <++> colon <++> pretty binder.type
 
   Pretty IdrisSyntax (PBinder' KindedName) where
-    prettyPrec d (MkPBinder Implicit bind) =
-      lcurly <+> pretty bind <+> rcurly
-    prettyPrec d (MkPBinder Explicit bind) =
-      lparen <+> pretty bind <+> rparen
-    prettyPrec d (MkPBinder AutoImplicit bind)  =
+    prettyPrec d b@(MkWithData _ $ MkPBinder Implicit bind) =
+      lcurly <+> prettyRig b.rig <++> pretty bind <+> rcurly
+    prettyPrec d b@(MkWithData _ $ MkPBinder Explicit bind) =
+      lparen <+> prettyRig b.rig <++> pretty bind <+> rparen
+    prettyPrec d b@(MkWithData _ $ MkPBinder AutoImplicit bind)  =
       lcurly <+> auto_ <++> pretty bind <+> rcurly
-    prettyPrec d (MkPBinder (DefImplicit x) bind)  =
+    prettyPrec d b@(MkWithData _ $ MkPBinder (DefImplicit x) bind)  =
       lcurly <+> default_ <++> prettyPrec appPrec x <+> rcurly
 
   export

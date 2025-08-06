@@ -258,13 +258,13 @@ mapPTermM f = goPTerm where
     goBasicMultiBinder (MkBasicMultiBinder names type)
       = MkBasicMultiBinder names <$> goPTerm type
 
-    goPBinder : PBinder' nm -> Core (PBinder' nm)
+    goPBinder : PBinderData nm -> Core (PBinderData nm)
     goPBinder (MkPBinder info bind)
-      = MkPBinder <$> goPiInfo info <*> traverse goBasicMultiBinder bind
+      = MkPBinder <$> goPiInfo info <*> goBasicMultiBinder bind
 
     goPBinderScope : PBinderScope' nm -> Core (PBinderScope' nm)
     goPBinderScope (MkPBinderScope binder scope)
-      = MkPBinderScope <$> goPBinder binder <*> goPTerm scope
+      = MkPBinderScope <$> traverse goPBinder binder <*> goPTerm scope
 
     -- goParamArgs :
 
@@ -275,7 +275,7 @@ mapPTermM f = goPTerm where
     goPDecl (PData doc v mbt d) = PData doc v mbt <$> goPDataDecl d
     goPDecl (PParameters nts ps) =
       PParameters <$> either (\x => Left <$> traverseList1 goPlainBinder x)
-                             (\x => Right <$> traverseList1 goPBinder x) nts -- go4TupledPTerms nts
+                             (\x => Right <$> traverseList1 (traverse goPBinder) x) nts -- go4TupledPTerms nts
                   <*> goPDecls ps
     goPDecl (PUsing mnts ps) =
       PUsing <$> goPairedPTerms mnts
@@ -297,12 +297,12 @@ mapPTermM f = goPTerm where
                                <*> pure ns
                                <*> goMPDecls mps
     goPDecl (PRecord doc v tot (MkPRecord n nts opts mn fs)) =
-      pure $ PRecord doc v tot !(MkPRecord n <$> traverse goPBinder nts
+      pure $ PRecord doc v tot !(MkPRecord n <$> traverse (traverse goPBinder) nts
                                              <*> pure opts
                                              <*> pure mn
                                              <*> goPFields fs)
     goPDecl (PRecord doc v tot (MkPRecordLater n nts)) =
-      pure $ PRecord doc v tot (MkPRecordLater n !(traverse goPBinder nts))
+      pure $ PRecord doc v tot (MkPRecordLater n !(traverse (traverse goPBinder) nts))
     goPDecl (PFail msg ps) = PFail msg <$> goPDecls ps
     goPDecl (PMutual ps) = PMutual <$> goPDecls ps
     goPDecl (PFixity p) = pure (PFixity p)
@@ -564,7 +564,7 @@ mapPTerm f = goPTerm where
 
     goPBinderScope : PBinderScope' nm -> PBinderScope' nm
     goPBinderScope (MkPBinderScope binder scope)
-      = MkPBinderScope (goPBinder binder) (goPTerm scope)
+      = MkPBinderScope (mapData goPBinder binder) (goPTerm scope)
 
     goPDecl : PDeclNoFC' nm -> PDeclNoFC' nm
     goPDecl (PClaim claim)
@@ -572,7 +572,7 @@ mapPTerm f = goPTerm where
     goPDecl (PDef cls) = PDef $ (map goPClause) cls
     goPDecl (PData doc v mbt d) = PData doc v mbt $ goPDataDecl d
     goPDecl (PParameters nts ps)
-      = PParameters (bimap (map goPlainBinder) (map goPBinder) nts) (mapData goPDecl <$> ps)
+      = PParameters (bimap (map goPlainBinder) (map (mapData goPBinder)) nts) (mapData goPDecl <$> ps)
     goPDecl (PUsing mnts ps)
       = PUsing (goPairedPTerms mnts) (mapData goPDecl <$> ps)
     goPDecl (PInterface v mnts n doc nrts ns mn ps)
@@ -582,9 +582,9 @@ mapPTerm f = goPTerm where
            n (goPTerm <$> ts) mn ns (map (mapData goPDecl <$>) mps)
     goPDecl (PRecord doc v tot (MkPRecord n nts opts mn fs))
       = PRecord doc v tot
-          (MkPRecord n (map goPBinder nts) opts mn (map (mapData goRecordField) fs))
+          (MkPRecord n (map (mapData goPBinder) nts) opts mn (map (mapData goRecordField) fs))
     goPDecl (PRecord doc v tot (MkPRecordLater n nts))
-      = PRecord doc v tot (MkPRecordLater n (goPBinder <$> nts ))
+      = PRecord doc v tot (MkPRecordLater n (mapData goPBinder <$> nts ))
     goPDecl (PFail msg ps) = PFail msg $ mapData goPDecl <$> ps
     goPDecl (PMutual ps) = PMutual $ map (mapData goPDecl) ps
     goPDecl (PFixity p) = PFixity p
@@ -594,8 +594,8 @@ mapPTerm f = goPTerm where
     goPDecl (PDirective d) = PDirective d
     goPDecl p@(PBuiltin _ _) = p
 
-    goPBinder : PBinder' nm -> PBinder' nm
-    goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (mapData goBasicMultiBinder bind)
+    goPBinder : PBinderData nm -> PBinderData nm
+    goPBinder (MkPBinder info bind) = MkPBinder (goPiInfo info) (goBasicMultiBinder bind)
 
     goBasicMultiBinder : BasicMultiBinderData nm -> BasicMultiBinderData nm
     goBasicMultiBinder (MkBasicMultiBinder names type)
