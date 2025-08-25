@@ -194,7 +194,7 @@ Show Def where
 
 public export
 Constructor' : Type -> Type
-Constructor' = AddFC . WithName . WithArity
+Constructor' = AddFC . WithName . WithArity . AddMetadata Bind'
 
 public export
 Constructor : Type
@@ -348,6 +348,7 @@ record GlobalDef where
   namedcompexpr : Maybe NamedDef
   sizeChange : List SCCall
   schemeExpr : Maybe (SchemeMode, SchemeObj Write)
+  bindingMode : BindingModifier
 
 export
 getDefNameType : GlobalDef -> NameType
