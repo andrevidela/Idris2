@@ -919,7 +919,7 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPTermPrec d (PNamedApp _ f n a)
         = showPTermPrec d f ++ " {" ++ showPrec d n ++ " = " ++ showPTermPrec d a ++ "}"
   showPTermPrec d (PBindingApp fn bind scope)
-        = ?TODO1
+        = show fn.val ++ " (" ++ display (showPTermPrec d) bind.val ++ ") | " ++ showPTermPrec d scope.val
   showPTermPrec _ (PSearch {}) = "%search"
   showPTermPrec d (PQuote _ tm) = "`(" ++ showPTermPrec d tm ++ ")"
   showPTermPrec d (PQuoteName _ n) = "`{" ++ showPrec d n ++ "}"

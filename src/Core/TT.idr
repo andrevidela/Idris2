@@ -217,6 +217,12 @@ Show (BindingInfo tm) where
   show (BindExpr name expr)              = "automatically-binding (autobind)"
   show (BindExplicitType name type expr) = "automatically-binding (autobind)"
 
+export
+display : (tm -> String) -> BindingInfo tm -> String
+display print (BindType nm ty) = print nm ++ " : " ++ print ty
+display print (BindExpr nm ex) = print nm ++ " <- " ++ print ex
+display print (BindExplicitType nm ty ex) = print nm ++ " : " ++ print ty ++ " <- " ++ print ex
+
 %name BindingInfo opInfo
 
 export
