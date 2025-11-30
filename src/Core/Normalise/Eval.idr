@@ -351,12 +351,14 @@ parameters (defs : Defs) (topopts : EvalOpts)
              Core (CaseResult (TermWithEnv free))
     -- Dotted values should still reduce at compile time
     tryAlt {more} env loc opts fc stk (NErased _ (Dotted tm)) alt
-         = tryAlt {more} env loc opts fc stk tm alt
+         = do logC "eval.def.stuck" 50 $ (toFullNames tm >>= \x => pure "NErased \{show x}")
+              tryAlt {more} env loc opts fc stk tm alt
     -- Ordinary constructor matching
-    tryAlt {more} env loc opts fc stk (NDCon _ nm tag' arity args') (ConCase x tag args sc)
-         = if tag == tag'
-              then evalConAlt env loc opts fc stk args (map snd args') sc
-              else pure NoMatch
+    tryAlt {more} env loc opts fc stk (NDCon _ nm tag' arity args') tm@(ConCase x tag args sc)
+         = do logC "eval.def.stuck" 50 $ (toFullNames tm >>= \x => pure "NErased \{show x}")
+              if tag == tag'
+                then evalConAlt env loc opts fc stk args (map snd args') sc
+                else pure NoMatch
     -- Type constructor matching, in typecase
     tryAlt {more} env loc opts fc stk (NTCon _ nm arity args') (ConCase nm' tag args sc)
          = if nm == nm'
@@ -438,7 +440,7 @@ parameters (defs : Defs) (topopts : EvalOpts)
            -- i.e. only the top-level constructor.
            logC "eval.casetree" 5 $ do
              xval <- toFullNames xval
-             pure "Evaluated \{show name} to \{show xval}"
+             pure "Evaluated \{show name} at \{show fc} to \{show xval}"
            let loc' = updateLocal opts env idx (embedIsVar x) loc xval
            findAlt env loc' opts fc stk xval alts
     evalTree env loc opts fc stk (STerm _ tm)
