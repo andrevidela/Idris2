@@ -351,49 +351,60 @@ parameters (defs : Defs) (topopts : EvalOpts)
              Core (CaseResult (TermWithEnv free))
     -- Dotted values should still reduce at compile time
     tryAlt {more} env loc opts fc stk (NErased _ (Dotted tm)) alt
-         = tryAlt {more} env loc opts fc stk tm alt
+         = log "eval.stuck" 5 "reducing dotted values" >>
+           tryAlt {more} env loc opts fc stk tm alt
     -- Ordinary constructor matching
     tryAlt {more} env loc opts fc stk (NDCon _ nm tag' arity args') (ConCase x tag args sc)
-         = if tag == tag'
+         = log "eval.stuck" 5 "matching constructors" >>
+           if tag == tag'
               then evalConAlt env loc opts fc stk args (map snd args') sc
               else pure NoMatch
     -- Type constructor matching, in typecase
     tryAlt {more} env loc opts fc stk (NTCon _ nm arity args') (ConCase nm' tag args sc)
-         = if nm == nm'
+         = log "eval.stuck" 5 "matching constructors in typecase" >>
+           if nm == nm'
               then evalConAlt env loc opts fc stk args (map snd args') sc
               else pure NoMatch
     -- Primitive type matching, in typecase
     tryAlt env loc opts fc stk (NPrimVal _ c) (ConCase nm tag args sc)
-         = case args of -- can't just test for it in the `if` for typing reasons
+         = log "eval.stuck" 5 "matching primitive in typecase" >>
+           case args of -- can't just test for it in the `if` for typing reasons
              [] => if UN (Basic $ show c) == nm
                    then evalTree env loc opts fc stk sc
                    else pure NoMatch
              _ => pure NoMatch
     -- Type of type matching, in typecase
     tryAlt env loc opts fc stk (NType {}) (ConCase (UN (Basic "Type")) tag [] sc)
-         = evalTree env loc opts fc stk sc
+         = log "eval.stuck" 5 "matching Type in typecase" >>
+           evalTree env loc opts fc stk sc
     tryAlt env loc opts fc stk (NType {}) (ConCase {})
-         = pure NoMatch
+         = log "eval.stuck" 5 "matching Type in typecase" >>
+           pure NoMatch
     -- Arrow matching, in typecase
     tryAlt {more}
            env loc opts fc stk (NBind pfc x (Pi fc' r e aty) scty) (ConCase (UN (Basic "->")) tag [s,t] sc)
-       = evalConAlt {more} env loc opts fc stk [s,t]
+         = log "eval.stuck" 5 "matching `->` in typecase" >>
+           evalConAlt {more} env loc opts fc stk [s,t]
                   [aty,
                    MkNFClosure opts env (NBind pfc x (Lam fc' r e aty) scty)]
                   sc
     tryAlt {more}
            env loc opts fc stk (NBind pfc x (Pi fc' r e aty) scty) (ConCase nm tag args sc)
-       = pure NoMatch
+         = log "eval.stuck" 5 "matching `->` in typecase" >>
+           pure NoMatch
     -- Delay matching
     tryAlt env loc opts fc stk (NDelay _ _ ty arg) (DelayCase tyn argn sc)
-         = evalTree env (ty :: arg :: loc) opts fc stk sc
+         = log "eval.stuck" 5 "matching delay" >>
+           evalTree env (ty :: arg :: loc) opts fc stk sc
     -- Constant matching
     tryAlt env loc opts fc stk (NPrimVal _ c') (ConstCase c sc)
-         = if c == c' then evalTree env loc opts fc stk sc
+         = log "eval.stuck" 5 "matching constant" >>
+           if c == c' then evalTree env loc opts fc stk sc
                       else pure NoMatch
     -- Default case matches against any *concrete* value
     tryAlt env loc opts fc stk val (DefaultCase sc)
-         = if concrete val
+         = log "eval.stuck" 5 "matching concrete value" >>
+           if concrete val
               then evalTree env loc opts fc stk sc
               else pure GotStuck
       where
