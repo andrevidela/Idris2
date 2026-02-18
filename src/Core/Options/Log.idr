@@ -129,6 +129,7 @@ knownTopics = [
     ("eval.def.underapplied", Just "Evaluating definitions (unavailable by default, edit Core.Normalise.Eval & recompile)"),
     ("eval.def.stuck", Just "Evaluating definitions (unavailable by default, edit Core.Normalise.Eval & recompile)"),
     ("eval.eta", Nothing),
+    ("eval", Nothing),
     ("eval.ref", Just "Evaluating refs (unavailable by default, edit Core.Normalise.Eval & recompile)"),
     ("eval.stuck", Nothing),
     ("eval.stuck.outofscope", Nothing),

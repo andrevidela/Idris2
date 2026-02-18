@@ -339,7 +339,8 @@ parameters (defs : Defs) (topopts : EvalOpts)
                  CaseTree (Scope.addInner more args) ->
                  Core (CaseResult (TermWithEnv free))
     evalConAlt env loc opts fc stk args args' sc
-         = do let Just bound = getCaseBound args' args loc
+         = do log "eval" 50 "evalConAlt"
+              let Just bound = getCaseBound args' args loc
                    | Nothing => pure GotStuck
               evalTree env bound opts fc stk sc
 
@@ -351,11 +352,11 @@ parameters (defs : Defs) (topopts : EvalOpts)
              Core (CaseResult (TermWithEnv free))
     -- Dotted values should still reduce at compile time
     tryAlt {more} env loc opts fc stk (NErased _ (Dotted tm)) alt
-         = do logC "eval.def.stuck" 50 $ (toFullNames tm >>= \x => pure "NErased \{show x}")
+         = do logC "eval" 50 $ (toFullNames tm >>= \x => pure "NErased \{show x}")
               tryAlt {more} env loc opts fc stk tm alt
     -- Ordinary constructor matching
     tryAlt {more} env loc opts fc stk (NDCon _ nm tag' arity args') tm@(ConCase x tag args sc)
-         = do logC "eval.def.stuck" 50 $ (toFullNames tm >>= \x => pure "NErased \{show x}")
+         = do logC "eval" 50 $ (toFullNames tm >>= \x => pure "Constructor \{show x}")
               if tag == tag'
                 then evalConAlt env loc opts fc stk args (map snd args') sc
                 else pure NoMatch
@@ -395,7 +396,8 @@ parameters (defs : Defs) (topopts : EvalOpts)
                       else pure NoMatch
     -- Default case matches against any *concrete* value
     tryAlt env loc opts fc stk val (DefaultCase sc)
-         = if concrete val
+        = logC "eval" 50 (toFullNames val >>= \x => pure "tryAlt default case \{show x}")
+        >> if concrete val
               then evalTree env loc opts fc stk sc
               else pure GotStuck
       where
@@ -419,8 +421,14 @@ parameters (defs : Defs) (topopts : EvalOpts)
       log "eval.casetree.stuck" 2 "Ran out of alternatives"
       pure GotStuck
     findAlt env loc opts fc stk val (x :: xs)
-         = do res@(Result {}) <- tryAlt env loc opts fc stk val x
-                   | NoMatch => findAlt env loc opts fc stk val xs
+         = do log "eval" 50 "alternative size \{show (S (length xs))}"
+              res@(Result {}) <- tryAlt env loc opts fc stk val x
+                   | NoMatch => do
+                       logC "eval" 5 $ do
+                         val <- toFullNames val
+                         x <- toFullNames x
+                         pure $ "no match between \{show val} and \{show x}"
+                       findAlt env loc opts fc stk val xs
                    | GotStuck => do
                        logC "eval.casetree.stuck" 5 $ do
                          val <- toFullNames val
@@ -435,7 +443,8 @@ parameters (defs : Defs) (topopts : EvalOpts)
                Stack free -> CaseTree args ->
                Core (CaseResult (TermWithEnv free))
     evalTree env loc opts fc stk (Case {name} idx x _ alts)
-      = do xval <- evalLocal env fc Nothing idx (embedIsVar x) [] loc
+      = do log "eval" 50 "start evalTree Case \{show name}"
+           xval <- evalLocal env fc Nothing idx (embedIsVar x) [] loc
            -- we have not defined quote yet (it depends on eval itself) so we show the NF
            -- i.e. only the top-level constructor.
            logC "eval.casetree" 5 $ do
@@ -444,8 +453,12 @@ parameters (defs : Defs) (topopts : EvalOpts)
            let loc' = updateLocal opts env idx (embedIsVar x) loc xval
            findAlt env loc' opts fc stk xval alts
     evalTree env loc opts fc stk (STerm _ tm)
-          = pure (Result $ MkTermEnv loc $ embed tm)
-    evalTree env loc opts fc stk _ = pure GotStuck
+      = do tm' <- toFullNames tm
+           log "eval" 50 "start evalTree STerm \{show tm'}"
+           pure (Result $ MkTermEnv loc $ embed tm)
+    evalTree env loc opts fc stk _
+      = do log "eval" 50 "start evalTree Stuck"
+           pure GotStuck
 
     -- Take arguments from the stack, as long as there's enough.
     -- Returns the arguments, and the rest of the stack
