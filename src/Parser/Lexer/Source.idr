@@ -245,7 +245,7 @@ public export
 reservedInfixSymbols : List String
 reservedInfixSymbols
     = ["%", "\\", ":", "=", ":=", "$=", "|", "|||", "<-", "->", "=>", "?", "!",
-       "&", "**", "..", "~", "@"]
+       "??", "**", "..", "~", "@"]
 
 -- Valid symbols which have a special meaning so can't be operators
 public export

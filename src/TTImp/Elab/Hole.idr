@@ -5,6 +5,7 @@ import Core.Env
 import Core.Metadata
 import Core.Normalise
 import Core.Unify
+import Core.UnifyState
 import Core.Value
 
 import TTImp.Elab.Check
@@ -24,6 +25,12 @@ mkPrecise (NApp _ (NMeta n i _) _)
                     d => Nothing)
 mkPrecise _ = pure ()
 
+genHoleName : {auto c : Ref Ctxt Defs} ->
+              {auto u : Ref UST UState} ->
+              Maybe UserName -> Core Name
+genHoleName Nothing = genName "anon" -- anonymous hole, generate a fresh machine name
+genHoleName (Just userGivenName) = inCurrentNS (UN userGivenName) -- user specified a name
+
 export
 checkHole : {vars : _} ->
             {auto c : Ref Ctxt Defs} ->
@@ -32,10 +39,10 @@ checkHole : {vars : _} ->
             {auto e : Ref EST (EState vars)} ->
             RigCount -> ElabInfo ->
             NestedNames vars -> Env Term vars ->
-            FC -> UserName -> Maybe (Glued vars) ->
+            FC -> Maybe UserName -> Maybe (Glued vars) ->
             Core (Term vars, Glued vars)
 checkHole rig elabinfo nest env fc n_in (Just gexpty)
-    = do nm <- inCurrentNS (UN n_in)
+    = do nm <- genHoleName n_in
          defs <- get Ctxt
          Nothing <- lookupCtxtExact nm (gamma defs)
              | _ => do log "elab.hole" 1 $ show nm ++ " already defined"
@@ -59,7 +66,7 @@ checkHole rig elabinfo nest env fc n_in exp
          let env' = letToLam env
          u <- uniVar fc
          ty <- metaVar fc erased env' nmty (TType fc u)
-         nm <- inCurrentNS (UN n_in)
+         nm <- genHoleName n_in
          defs <- get Ctxt
          mkPrecise !(nf defs env' ty)
 

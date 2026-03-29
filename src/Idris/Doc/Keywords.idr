@@ -774,7 +774,7 @@ symbolsDoc
   :: "=>" ::= fatArrow
   :: "?" ::= "An implicit value solved by unification."
   :: "!" ::= bang
-  :: "&" ::= unusedSymbol
+  :: "??" ::= "Anonymous hole, used to query the type in interactive editors"
   :: "**" ::= tupleSyntax
   :: ".." ::= rangeSyntax
   :: "~" ::= ""

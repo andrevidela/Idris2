@@ -226,7 +226,7 @@ mutual
            def <- lookupDefExact (Resolved i) (gamma defs)
            let term = case def of
                               (Just (BySearch _ d _)) => ISearch fc d
-                              _ => IHole fc mkn
+                              _ => IHole fc (Just mkn)
            Just ty <- lookupTyExact (Resolved i) (gamma defs)
                | Nothing => case umode of
                                  ImplicitHoles => pure (Implicit fc True, gErased fc)
@@ -402,7 +402,7 @@ unelabNest : {vars : _} ->
              Term vars -> Core IRawImp
 unelabNest mode nest env (Meta fc n i args)
     = do let mkn = nameRoot n ++ showScope args
-         pure (IHole fc mkn)
+         pure (IHole fc (Just mkn))
   where
     toName : Term vars -> Maybe Name
     toName (Local _ _ idx p) = Just (nameAt p)

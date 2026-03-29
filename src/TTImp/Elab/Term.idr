@@ -212,7 +212,7 @@ checkTerm rig elabinfo nest env (IType fc) exp
     = do u <- uniVar fc
          checkExp rig elabinfo env fc (TType fc u) (gType fc u) exp
 checkTerm rig elabinfo nest env (IHole fc str) exp
-    = checkHole rig elabinfo nest env fc (Basic str) exp
+    = checkHole rig elabinfo nest env fc (map Basic str) exp
 checkTerm rig elabinfo nest env (IUnifyLog fc lvl tm) exp
     = withLogLevel lvl $ check rig elabinfo nest env tm exp
 checkTerm rig elabinfo nest env (Implicit fc b) (Just gexpty)

@@ -135,9 +135,11 @@ atom fname
          pure (PImplicit (boundToFC fname x))
   <|> do x <- bounds $ symbol "?"
          pure (PInfer (boundToFC fname x))
+  <|> do x <- bounds $ symbol "??"
+         pure (PHole (boundToFC fname x) False Nothing)
   <|> do x <- bounds $ holeName
          actH x.val -- record the hole name in the parser
-         pure (PHole (boundToFC fname x) False x.val)
+         pure (PHole (boundToFC fname x) False (Just x.val))
   <|> do x <- bounds $ decorate fname Data $ pragma "MkWorld"
          pure (PPrimVal (boundToFC fname x) WorldVal)
   <|> do x <- bounds $ decorate fname Typ  $ pragma "World"
@@ -2449,7 +2451,7 @@ docArgCmd parseCmd command doc = (names, DocArg, doc, parse)
     docLazyPrim : Rule PTerm
     docLazyPrim =
       let placeholeder : PTerm' Name
-          placeholeder = PHole EmptyFC False "lazyDocPlaceholeder"
+          placeholeder = PHole EmptyFC False (Just "lazyDocPlaceholeder") -- check if this can be "Nothing" later
       in  do exactIdent "Lazy"    -- v
              pure (PDelayed EmptyFC LLazy placeholeder)
       <|> do exactIdent "Inf"     -- v
