@@ -122,7 +122,7 @@ mutual
 
        IPrimVal : FC -> (c : Constant) -> RawImp' nm
        IType : FC -> RawImp' nm
-       IHole : FC -> String -> RawImp' nm
+       IHole : FC -> Maybe String -> RawImp' nm
 
        IUnifyLog : FC -> LogLevel -> RawImp' nm -> RawImp' nm
        -- An implicit value, solved by unification, but which will also be
@@ -216,7 +216,8 @@ mutual
       show (IUnquote fc tm) = "(%unquote " ++ show tm ++ ")"
       show (IRunElab fc _ tm) = "(%runelab " ++ show tm ++ ")"
       show (IPrimVal fc c) = show c
-      show (IHole _ x) = "?" ++ x
+      show (IHole _ $ Just x) = "?" ++ x
+      show (IHole _ Nothing) = "??"
       show (IUnifyLog _ lvl x) = "(%logging " ++ show lvl ++ " " ++ show x ++ ")"
       show (IType fc) = "%type"
       show (Implicit fc True) = "_"

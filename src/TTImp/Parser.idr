@@ -71,7 +71,7 @@ atom fname
   <|> do start <- location
          x <- holeName
          end <- location
-         pure (IHole (MkFC fname start end) x)
+         pure (IHole (MkFC fname start end) (Just x))
 
 visOption : Rule Visibility
 visOption

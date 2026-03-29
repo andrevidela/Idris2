@@ -478,9 +478,13 @@ mutual
       = pure $ IUnquote fc !(desugarB side ps tm)
   desugarB side ps (PRunElab fc tm)
       = pure $ IRunElab fc True !(desugarB side ps tm)
-  desugarB side ps (PHole fc br holename)
+  desugarB side ps (PHole fc br (Just holename))
       = do when br $ update Syn { bracketholes $= ((UN (Basic holename)) ::) }
-           pure $ IHole fc holename
+           pure $ IHole fc (Just holename)
+  desugarB side ps (PHole fc br Nothing)
+           -- BAD FIX, bracketd holes should be identified by their position, not names
+      = do -- when br $ update Syn { bracketholes $= ((UN (Basic holename)) ::) }
+           pure $ IHole fc Nothing
   desugarB side ps (PType fc) = pure $ IType fc
   desugarB side ps (PAs fc nameFC vname pattern)
       = pure $ IAs fc nameFC UseRight vname !(desugarB side ps pattern)
