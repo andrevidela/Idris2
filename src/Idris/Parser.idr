@@ -2732,7 +2732,7 @@ parserCommandsForHelp =
   , autoNumberArgCmd (ParseREPLCmd ["consolewidth"]) SetConsoleWidth (firstHelpLine "consolewidth")
   , onOffArgCmd (ParseREPLCmd ["colour", "color"]) SetColor (firstHelpLine "colour")
   , noArgCmd (ParseREPLCmd ["m", "metavars"]) Metavars (firstHelpLine "m")
-  , editLineColNameArgCmd (ParseREPLCmd ["typeat"]) (const TypeAt) (firstHelpLine "typeat")
+  , editLineColNameArgCmd (ParseREPLCmd ["typeat"]) (const $ \x, y => TypeAt x y . Just) (firstHelpLine "typeat")
   , editLineColNameArgCmd (ParseREPLCmd ["cs", "casesplit"]) CaseSplit (firstHelpLine "cs")
   , editLineNameArgCmd (ParseREPLCmd ["ac", "addclause"]) AddClause (firstHelpLine "ac")
   , editLineNameArgCmd (ParseREPLCmd ["ml", "makelemma"]) MakeLemma (firstHelpLine "ml")

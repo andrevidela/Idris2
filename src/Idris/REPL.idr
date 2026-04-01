@@ -343,11 +343,11 @@ dropLamsTm Z env tm = (_ ** (env, tm))
 dropLamsTm (S k) env (Bind _ _ b sc) = dropLamsTm k (b :: env) sc
 dropLamsTm _ env tm = (_ ** (env, tm))
 
-findInTree : FilePos -> Name -> PosMap (NonEmptyFC, Name) -> Maybe Name
+findInTree : FilePos -> Maybe Name -> PosMap (NonEmptyFC, Name) -> Maybe Name
 findInTree p hint m
   = map snd $ head'
   $ sortBy (cmp `on` measure)
-  $ filter match
+  $ filter (match hint)
   $ searchPos p m
 
   where
@@ -364,17 +364,19 @@ findInTree p hint m
        StrNil => False
        StrCons c _ => isUpper c || c > chr 160
 
-    matchingRoots : Name -> Name -> Bool
-    matchingRoots = (==) `on` nameRoot
+    matchingRoots : Maybe Name -> Name -> Bool
+    matchingRoots (Just n) = (nameRoot n ==) . nameRoot
+    matchingRoots _ = const False
 
     checkCandidate : Name -> Bool
     checkCandidate cand = matchingRoots hint cand || case hint of
       -- a basic user name: may actually be e.g. the `B` part of `A.B.C.val`
-      UN (Basic n) => startsWithUpper n && checkAsNamespace n cand
+      Just (UN (Basic n)) => startsWithUpper n && checkAsNamespace n cand
       _ => False
 
-    match : (NonEmptyFC, Name) -> Bool
-    match (_, n) = matches hint n && checkCandidate n
+    match : Maybe Name -> (NonEmptyFC, Name) -> Bool
+    match (Just hint) (_, n) = matches hint n && checkCandidate n
+    match _ _ = False
 
 record TermWithType (vars : Scope) where
   constructor WithType
@@ -434,11 +436,10 @@ processEdit (TypeAt line col name)
 
          -- Search the correct name by location for more precise search
          -- and fallback to given name if nothing found
-         let name = fromMaybe name
-                  $ findInTree (line-1, col) name (nameLocMap meta)
+         let name = findInTree (line-1, col) name (nameLocMap meta)
 
          -- Lookup the name globally
-         globals <- lookupCtxtName name (gamma defs)
+         globals <- traverseOpt (flip lookupCtxtName (gamma defs)) name
 
          -- Get the Doc for the result
          globalResult <- case globals of

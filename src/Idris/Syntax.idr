@@ -685,7 +685,7 @@ Pretty Void REPLOpt where
 
 public export
 data EditCmd : Type where
-     TypeAt : Int -> Int -> Name -> EditCmd
+     TypeAt : Int -> Int -> Maybe Name -> EditCmd
      CaseSplit : Bool -> Int -> Int -> Name -> EditCmd
      AddClause : Bool -> Int -> Name -> EditCmd
      Refine : Bool -> Int -> (hole : Name) -> (expr : PTerm) -> EditCmd
