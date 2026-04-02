@@ -18,6 +18,7 @@ import Data.String
 import System.Directory
 
 import Libraries.Data.StringMap
+import Libraries.System.Tasker
 
 %default covering
 
@@ -93,6 +94,14 @@ mkModTree loc done modFP mod
 data DoneMod : Type where
 data BuildOrder : Type where
 
+modTreeToDAG : ModTree -> DAG ModuleIdent BuildMod -> DAG ModuleIdent BuildMod
+modTreeToDAG (MkModTree nspace Nothing deps) acc = acc
+modTreeToDAG (MkModTree nspace (Just sourceFile)deps) acc
+  = let
+      currentBuildMod = (MkBuildMod sourceFile nspace [])
+      acc' = {items $= insert nspace currentBuildMod} acc
+    in foldr (\mod, acc => ?modTreeToDAG_rhs_0) acc' deps
+
 -- Given a module tree, returns the modules in the reverse order they need to
 -- be built, including their dependencies
 mkBuildMods : {auto d : Ref DoneMod (StringMap ())} ->
@@ -116,22 +125,45 @@ mkBuildMods mod
 -- built for that main file, in the order they need to be built
 -- Return an empty list if it turns out it's in the 'done' list
 export
+getModTree : {auto c : Ref Ctxt Defs} ->
+               {auto o : Ref ROpts REPLOpts} ->
+               FC -> (done : List BuildMod) ->
+               (mainFile : String) ->
+               Core (Maybe ModTree)
+getModTree loc done fname
+    = do a <- newRef AllMods []
+         fname_ns <- ctxtPathToNS fname
+         if fname_ns `elem` map buildNS done
+            then pure Nothing
+            else map Just (mkModTree {a} loc [] (Just fname) fname_ns)
+
+getModDAG : {auto c : Ref Ctxt Defs} ->
+            {auto o : Ref ROpts REPLOpts} ->
+            FC -> (done : List BuildMod) ->
+            (mainFile : String) ->
+            Core (DAG ModuleIdent BuildMod)
+getModDAG loc done fname
+  = do Just tree <- getModTree loc done fname
+         | Nothing  => pure empty
+       let dag = modTreeToDAG tree empty
+       pure dag
+
+-- Given a main file name, return the list of modules that need to be
+-- built for that main file, in the order they need to be built
+-- Return an empty list if it turns out it's in the 'done' list
+export
 getBuildMods : {auto c : Ref Ctxt Defs} ->
                {auto o : Ref ROpts REPLOpts} ->
                FC -> (done : List BuildMod) ->
                (mainFile : String) ->
                Core (List BuildMod)
 getBuildMods loc done fname
-    = do a <- newRef AllMods []
-         fname_ns <- ctxtPathToNS fname
-         if fname_ns `elem` map buildNS done
-            then pure []
-            else
-              do t <- mkModTree {a} loc [] (Just fname) fname_ns
-                 dm <- newRef DoneMod empty
-                 o <- newRef BuildOrder []
-                 mkBuildMods {d=dm} {o} t
-                 pure (reverse !(get BuildOrder))
+    = do Just t <- getModTree loc done fname
+           | Nothing => pure []
+         dm <- newRef DoneMod empty
+         o <- newRef BuildOrder []
+         mkBuildMods {d=dm} {o} t
+         pure (reverse !(get BuildOrder))
 
 checkTotalReq : {auto c : Ref Ctxt Defs} ->
                 String -> String -> TotalReq -> Core Bool
@@ -274,6 +306,16 @@ buildMods fc num len (m :: ms)
     = case !(buildMod fc num len m) of
            [] => buildMods fc (1 + num) len ms
            errs => pure errs
+
+buildModsConcurrent :
+    {auto c : Ref Ctxt Defs} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    (loc : FC) -> (taskCount : Nat) ->
+    DAG ModuleIdent BuildMod ->
+    Core (List Error)
+buildModsConcurrent loc taskCount dag
+  = execConcurrently (buildMod loc 0 taskCount) dag taskCount
 
 export
 buildDeps : {auto c : Ref Ctxt Defs} ->

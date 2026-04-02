@@ -9,6 +9,7 @@ import Control.Monad.State
 import System.Concurrency
 import System.Clock
 import System
+import Core.Core
 
 public export
 record DAG (key: Type) (value : Type) where
@@ -16,6 +17,10 @@ record DAG (key: Type) (value : Type) where
   items : SortedMap key value
   -- For each node, there is a list of children
   tree : SortedMap key (SortedSet key)
+
+export
+empty : Ord key => DAG key value
+empty = MkDAG empty empty
 
 (.nodeCount) : DAG key value -> Nat
 dag.nodeCount = length (keys dag.items)
@@ -55,30 +60,12 @@ allChildren key dag acc with (lookup key dag.tree)
 m2l : Maybe a -> List a
 m2l (Just a) = pure a
 m2l Nothing = []
--- to exec the list of tasks in order without multi-threading we supply a list of
--- elements available for computation as the initial state. Then we match on that state
--- and see if there is any available job. If there isn't, we are done. If there are, we
--- pick the next job in the queue, and run it, because it is finished, we all all its children
--- to the list of jobs available to perform, and repeat.
-execLinearly : Show error => Ord key => (perform : value -> IO (List error)) -> DAG key value -> StateT (SortedSet key, List error) IO (List error)
-execLinearly perform dag = do
-  (tasks, errors) <- get
-  case pop tasks of
-    Nothing => case errors of
-                    [] => putStrLn "done" >> pure []
-                    n => putStrLn "failed with errors:\n\{unlines $ map show n}" >> pure n
-    Just (key , keys) => do
-      let value = m2l $ lookup key dag.items
-      error <- lift $ traverse perform value
-      let newChildren = updateAvailableChildren key dag keys
-      put (newChildren, join error ++ errors)
-      execLinearly perform dag
 
-(.send) : Channel a -> a -> IO ()
-(.send) = channelPut
+(.send) : Channel a -> a -> Core ()
+(.send) channel = coreLift . channelPut channel
 
-(.wait) : Channel a -> IO a
-(.wait) = channelGet
+(.wait) : Channel a -> Core a
+(.wait) = coreLift . channelGet
 
 record TaskOutcome (0 key : Type) (0 error : Type) where
   constructor MkOut
@@ -111,17 +98,17 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type}
     (task : Channel (Maybe key)) (workNotif : Channel (TaskOutcome key error)) (dag : DAG key value)
 
   runWorker : Show key => (worker_id : Nat) ->
-              (perform : value -> IO (List error)) ->
-              IO ()
+              (perform : value -> Core (List error)) ->
+              Core ()
   runWorker wid perform = do
-    putStrLn "Worker \{show wid}: available"
+    coreLift $ putStrLn "Worker \{show wid}: available"
     Just taskKey <- task.wait
-      | Nothing => putStrLn "terminating worker \{show wid}" >>
+      | Nothing => coreLift $ putStrLn "terminating worker \{show wid}" >>
                    pure ()
-    putStrLn "Worker \{show wid}: Recieve & perform task \{show taskKey}"
+    coreLift $ putStrLn "Worker \{show wid}: Recieve & perform task \{show taskKey}"
     let value = m2l $ lookup taskKey dag.items
     errs <- traverse perform value
-    putStrLn "Worker \{show wid}: sending notification that task is done"
+    coreLift $ putStrLn "Worker \{show wid}: sending notification that task is done"
     workNotif.send (MkOut taskKey (join errs))
     runWorker wid perform
 
@@ -130,83 +117,78 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type}
                 CoordinatorState key error ->
                 (availableWorkers : Nat) ->
                 (remainingTasks : Nat) ->
-                IO ()
+                Core ()
   coordinator state Z Z
-    = putStrLn "Coord: all jobs done, notifying main thread" >> state.done.send state.collectedErrors
+    = coreLift (putStrLn "Coord: all jobs done, notifying main thread")
+    >> state.done.send state.collectedErrors
   coordinator state Z (S remain)
     = do -- no workers available, wait for the next result to keep going
-         putStrLn "Coord: no worker available, waiting for next result, \{show $ S remain} tasks remain}"
+         coreLift $ putStrLn "Coord: no worker available, waiting for next result, \{show $ S remain} tasks remain}"
          outcome <- workNotif.wait
-         putStrLn "Coord: task \{show outcome.wid} is finished"
+         coreLift $ putStrLn "Coord: task \{show outcome.wid} is finished"
          -- update the list of available jobs given the ones we already have
          -- coordinator runs again with 1 more worker available
          let (newState, count) = updateStateFromOutcome outcome dag state
          coordinator newState 1 (remain `minus` count)
   coordinator state (S w) Z
-    = do putStrLn "Coord: No more tasks, killing workers \{show w} left"
+    = do coreLift $ putStrLn "Coord: No more tasks, killing workers \{show w} left"
          task.send Nothing
          coordinator state w Z
   coordinator state (S availableWorkers) (S remain) with (pop state.availableTasks)
     _ | Nothing
-      = do putStrLn "Coord: We have \{show (S remain)} tasks in flight, waiting"
+      = do coreLift $ putStrLn "Coord: We have \{show (S remain)} tasks in flight, waiting"
            outcome  <- workNotif.wait
            let (newState, count) = updateStateFromOutcome outcome dag state
            coordinator newState (S availableWorkers) (remain `minus` count)
     _ | Just (next, jobs)
-      = putStrLn "Coord: \{show (S availableWorkers)} workers available, sending task \{show next}, \{show $ S remain} tasks remain"
-        >> if (state.hasFailedDependency `contains'` next)
-              then do
-                putStrLn "skipping task \{show next}, one of its dependencies failed"
-                coordinator ({availableTasks := jobs} state) availableWorkers remain
-              else do
-                task.send (Just next)
-                coordinator ({availableTasks := jobs} state) availableWorkers (S remain)
+      = do coreLift $ putStrLn "Coord: \{show (S availableWorkers)} workers available, sending task \{show next}, \{show $ S remain} tasks remain"
+           if (state.hasFailedDependency `contains'` next)
+             then do
+               coreLift (putStrLn "skipping task \{show next}, one of its dependencies failed")
+               coordinator ({availableTasks := jobs} state) availableWorkers remain
+             else do
+               task.send (Just next)
+               coordinator ({availableTasks := jobs} state) availableWorkers (S remain)
 
 parameters {0 key : Type} {0 value : Type} {0 error : Type}
-  {auto ord : Ord key} (perform : value -> IO (List error)) (dag : DAG key value)
+  {auto ord : Ord key} (perform : value -> Core (List error)) (dag : DAG key value)
 
   export
-  execConcurrently : Show key => Show error => (threads : Nat) -> IO (List error)
+  execConcurrently : Show key => Show error => (threads : Nat) -> Core (List error)
   execConcurrently threads = do
-    putStrLn "Starting concurrent execution on \{show threads} threads"
-    startTime <- clockTime Monotonic
-    tasks <- makeChannel
-    workNotif <- makeChannel
-    done <- makeChannel
+    coreLift $ putStrLn "Starting concurrent execution on \{show threads} threads"
+    startTime <- coreLift $ clockTime Monotonic
+    tasks <- coreLift $ makeChannel
+    workNotif <- coreLift $ makeChannel
+    done <- coreLift $ makeChannel
     -- spawn the coordinator
     let roots = fromList dag.getRoots
-    putStrLn "Starting coordinator with roots \{show roots}"
+    coreLift $ putStrLn "Starting coordinator with roots \{show roots}"
     let coordinatorInit = MkSt done roots [] empty
-    ignore $ fork (coordinator tasks workNotif dag coordinatorInit threads dag.nodeCount)
+    ignore $ coreLift $ fork (coreRun (coordinator tasks workNotif dag coordinatorInit threads dag.nodeCount) ?aqw ?bi)
     -- spawn the workers
     ignore $ for [1 .. threads] $ \n => do
-      putStrLn "Spawning worker \{show n}"
-      fork (runWorker tasks workNotif dag n perform)
+      coreLift $ putStrLn "Spawning worker \{show n}"
+      coreLift $ fork (coreRun (runWorker tasks workNotif dag n perform) ?aa pure)
 
     -- wait until the coordinator runs out of tasks
     errors <- done.wait
-    endTime <- clockTime Monotonic
+    endTime <- coreLift $ clockTime Monotonic
     let duration = endTime `timeDifference` startTime
 
     -- stop workers
     ignore $ for (replicate threads ()) $ \_ =>
       tasks.send Nothing
 
-    putStrLn "done with time \{show duration}"
+    coreLift $ putStrLn "done with time \{show duration}"
     pure errors
-
-  export
-  linear : Show error => IO ()
-  linear = case !(evalStateT (fromList dag.getRoots, []) (execLinearly perform dag)) of
-                [] => pure ()
-                xs => putStrLn "failed with errors \{show xs}"
 
 export
 execConcurrentlyNoError :
   Ord key =>
   Show key =>
-  (perform : value -> IO ()) -> DAG key value ->
-  (threads : Nat) -> IO ()
+  (perform : value -> Core ()) -> DAG key value ->
+  (threads : Nat) -> Core ()
 execConcurrentlyNoError perform dag threads = ignore $ execConcurrently {error = Void} (map (const []) . perform) dag threads
 
 
