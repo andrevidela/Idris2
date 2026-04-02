@@ -1,12 +1,14 @@
-module Library.System.Tasker
+module Libraries.System.Tasker
 
-import Data.SortedMap
-import Data.SortedSet
+import public Data.SortedMap
+import public Data.SortedSet
+import Data.String
 import Data.Maybe
 import Data.List
 import Control.Monad.State
 import System.Concurrency
 import System.Clock
+import System
 
 public export
 record DAG (key: Type) (value : Type) where
@@ -45,19 +47,31 @@ availableChildren key dag
 updateAvailableChildren : Ord key => key -> DAG key value -> SortedSet key -> SortedSet key
 updateAvailableChildren key dag = union (availableChildren key dag)
 
+allChildren : Ord key => key -> DAG key value -> SortedSet key -> SortedSet key
+allChildren key dag acc with (lookup key dag.tree)
+  _ | Nothing = acc
+  _ | Just children = foldr (\childKey => allChildren childKey dag) (union children acc) children
+
+m2l : Maybe a -> List a
+m2l (Just a) = pure a
+m2l Nothing = []
 -- to exec the list of tasks in order without multi-threading we supply a list of
 -- elements available for computation as the initial state. Then we match on that state
 -- and see if there is any available job. If there isn't, we are done. If there are, we
 -- pick the next job in the queue, and run it, because it is finished, we all all its children
 -- to the list of jobs available to perform, and repeat.
-execLinearly : Ord key => (perform : value -> IO ()) -> DAG key value -> StateT (SortedSet key) IO ()
-execLinearly perform dag =
-  case pop !get of
-    Nothing => putStrLn "done"
+execLinearly : Show error => Ord key => (perform : value -> IO (List error)) -> DAG key value -> StateT (SortedSet key, List error) IO (List error)
+execLinearly perform dag = do
+  (tasks, errors) <- get
+  case pop tasks of
+    Nothing => case errors of
+                    [] => putStrLn "done" >> pure []
+                    n => putStrLn "failed with errors:\n\{unlines $ map show n}" >> pure n
     Just (key , keys) => do
-      let value = lookup key dag.items
-      _ <- lift $ traverse perform value
-      put (updateAvailableChildren key dag keys)
+      let value = m2l $ lookup key dag.items
+      error <- lift $ traverse perform value
+      let newChildren = updateAvailableChildren key dag keys
+      put (newChildren, join error ++ errors)
       execLinearly perform dag
 
 (.send) : Channel a -> a -> IO ()
@@ -66,11 +80,38 @@ execLinearly perform dag =
 (.wait) : Channel a -> IO a
 (.wait) = channelGet
 
-parameters {0 key : Type} {0 value : Type}
-    (task : Channel (Maybe key)) (workNotif : Channel key) (dag : DAG key value)
+record TaskOutcome (0 key : Type) (0 error : Type) where
+  constructor MkOut
+  wid : key
+  errors : List error
+
+record CoordinatorState (0 key, error : Type) where
+  constructor MkSt
+  done : Channel (List error)
+  availableTasks : SortedSet key
+  collectedErrors : List error
+  hasFailedDependency : SortedSet key -- dictionary of keys with failed parent keys
+
+updateStateFromOutcome : Show key => Ord key => TaskOutcome key error -> DAG key value -> CoordinatorState key error -> (CoordinatorState key error, Nat)
+updateStateFromOutcome (MkOut doneTask []) dag state =
+  let doneRemoved = difference state.availableTasks (singleton doneTask)
+      newAvailable = updateAvailableChildren doneTask dag doneRemoved
+  in -- putStrLn "Coord: provisional list of tasks without the new unlocked tasks:\n\{show doneRemoved}"
+  ({ availableTasks := newAvailable} state, Z)
+updateStateFromOutcome (MkOut doneTask errors) dag state =
+  let doneRemoved = difference state.availableTasks (singleton doneTask)
+      toRemove = allChildren doneTask dag empty
+      totalAvailable = state.availableTasks `difference` toRemove
+  in
+  ( { availableTasks := totalAvailable, collectedErrors $= (errors ++)
+    , hasFailedDependency $= union toRemove} state
+  , length (Prelude.toList toRemove))
+
+parameters {0 key : Type} {0 value : Type} {0 error : Type}
+    (task : Channel (Maybe key)) (workNotif : Channel (TaskOutcome key error)) (dag : DAG key value)
 
   runWorker : Show key => (worker_id : Nat) ->
-              (perform : value -> IO ()) ->
+              (perform : value -> IO (List error)) ->
               IO ()
   runWorker wid perform = do
     putStrLn "Worker \{show wid}: available"
@@ -78,63 +119,72 @@ parameters {0 key : Type} {0 value : Type}
       | Nothing => putStrLn "terminating worker \{show wid}" >>
                    pure ()
     putStrLn "Worker \{show wid}: Recieve & perform task \{show taskKey}"
-    let value = lookup taskKey dag.items
-    ignore $ traverse perform value
+    let value = m2l $ lookup taskKey dag.items
+    errs <- traverse perform value
     putStrLn "Worker \{show wid}: sending notification that task is done"
-    workNotif.send taskKey
+    workNotif.send (MkOut taskKey (join errs))
     runWorker wid perform
 
   coordinator : Show key => Ord key =>
-                (done : Channel ()) ->
-                (nextTasks : SortedSet key) ->
+                Show error =>
+                CoordinatorState key error ->
                 (availableWorkers : Nat) ->
                 (remainingTasks : Nat) ->
                 IO ()
-  coordinator doneChannel _ Z Z
-    = putStrLn "Coord: all jobs done, notifying main thread" >> doneChannel.send ()
-  coordinator doneChannel availableTasks Z (S remain)
+  coordinator state Z Z
+    = putStrLn "Coord: all jobs done, notifying main thread" >> state.done.send state.collectedErrors
+  coordinator state Z (S remain)
     = do -- no workers available, wait for the next result to keep going
          putStrLn "Coord: no worker available, waiting for next result, \{show $ S remain} tasks remain}"
-         doneTask <- workNotif.wait
-         putStrLn "Coord: task \{show doneTask} is finished"
+         outcome <- workNotif.wait
+         putStrLn "Coord: task \{show outcome.wid} is finished"
          -- update the list of available jobs given the ones we already have
-         let doneRemoved = difference availableTasks (singleton doneTask)
-         putStrLn "Coord: provisional list of tasks without the new unlocked tasks:\n\{show doneRemoved}"
-         let newJobs = updateAvailableChildren doneTask dag doneRemoved
          -- coordinator runs again with 1 more worker available
-         coordinator doneChannel newJobs 1 remain
-  coordinator doneChannel n (S w) Z
+         let (newState, count) = updateStateFromOutcome outcome dag state
+         coordinator newState 1 (remain `minus` count)
+  coordinator state (S w) Z
     = do putStrLn "Coord: No more tasks, killing workers \{show w} left"
          task.send Nothing
-         coordinator doneChannel n w Z
-  coordinator doneChannel availableTasks (S availableWorkers) (S remain) with (pop availableTasks)
+         coordinator state w Z
+  coordinator state (S availableWorkers) (S remain) with (pop state.availableTasks)
     _ | Nothing
-      = do putStrLn "We have \{show (S remain)} tasks in flight, waiting"
-           doneTask <- workNotif.wait
-           coordinator doneChannel empty availableWorkers remain
-    _ | Just (next, jobs) = do
-           putStrLn "Coord: \{show (S availableWorkers)} workers available, sending task \{show next}, \{show $ S remain} tasks remain"
-           task.send (Just next)
-           coordinator doneChannel jobs availableWorkers (S remain)
+      = do putStrLn "Coord: We have \{show (S remain)} tasks in flight, waiting"
+           outcome  <- workNotif.wait
+           let (newState, count) = updateStateFromOutcome outcome dag state
+           coordinator newState (S availableWorkers) (remain `minus` count)
+    _ | Just (next, jobs)
+      = putStrLn "Coord: \{show (S availableWorkers)} workers available, sending task \{show next}, \{show $ S remain} tasks remain"
+        >> if (state.hasFailedDependency `contains'` next)
+              then do
+                putStrLn "skipping task \{show next}, one of its dependencies failed"
+                coordinator ({availableTasks := jobs} state) availableWorkers remain
+              else do
+                task.send (Just next)
+                coordinator ({availableTasks := jobs} state) availableWorkers (S remain)
 
-parameters {0 key : Type} {0 value : Type} {auto ord : Ord key} (perform : value -> IO ()) (dag : DAG key value)
+parameters {0 key : Type} {0 value : Type} {0 error : Type}
+  {auto ord : Ord key} (perform : value -> IO (List error)) (dag : DAG key value)
 
   export
-  execConcurrently : Show key => (threads : Nat) -> IO ()
+  execConcurrently : Show key => Show error => (threads : Nat) -> IO (List error)
   execConcurrently threads = do
+    putStrLn "Starting concurrent execution on \{show threads} threads"
     startTime <- clockTime Monotonic
     tasks <- makeChannel
     workNotif <- makeChannel
     done <- makeChannel
     -- spawn the coordinator
-    ignore $ fork (coordinator tasks workNotif dag done (fromList dag.getRoots) threads dag.nodeCount)
+    let roots = fromList dag.getRoots
+    putStrLn "Starting coordinator with roots \{show roots}"
+    let coordinatorInit = MkSt done roots [] empty
+    ignore $ fork (coordinator tasks workNotif dag coordinatorInit threads dag.nodeCount)
     -- spawn the workers
     ignore $ for [1 .. threads] $ \n => do
       putStrLn "Spawning worker \{show n}"
       fork (runWorker tasks workNotif dag n perform)
 
     -- wait until the coordinator runs out of tasks
-    done.wait
+    errors <- done.wait
     endTime <- clockTime Monotonic
     let duration = endTime `timeDifference` startTime
 
@@ -143,8 +193,20 @@ parameters {0 key : Type} {0 value : Type} {auto ord : Ord key} (perform : value
       tasks.send Nothing
 
     putStrLn "done with time \{show duration}"
+    pure errors
 
   export
-  linear : IO ()
-  linear = evalStateT (fromList dag.getRoots) (execLinearly perform dag)
+  linear : Show error => IO ()
+  linear = case !(evalStateT (fromList dag.getRoots, []) (execLinearly perform dag)) of
+                [] => pure ()
+                xs => putStrLn "failed with errors \{show xs}"
+
+export
+execConcurrentlyNoError :
+  Ord key =>
+  Show key =>
+  (perform : value -> IO ()) -> DAG key value ->
+  (threads : Nat) -> IO ()
+execConcurrentlyNoError perform dag threads = ignore $ execConcurrently {error = Void} (map (const []) . perform) dag threads
+
 
