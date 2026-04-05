@@ -57,7 +57,7 @@ mkOp tm@(PApp fc (PRef opFC kn) x)
            _ => pure tm
 mkOp tm = pure tm
 
-mkSectionL : {auto c : Ref Ctxt Defs} ->
+mkSectionL : {auto c : ReadOnly Ctxt Defs} ->
              {auto s : Ref Syn SyntaxInfo} ->
              IPTerm -> Core IPTerm
 mkSectionL tm@(PLam fc rig info (PRef _ bd) ty
@@ -95,7 +95,7 @@ addBracket fc tm = if needed tm then PBracketed fc tm else tm
     needed (PBang {}) = False
     needed tm = True
 
-bracket : {auto c : Ref Ctxt Defs} ->
+bracket : {auto c : ReadOnly Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
           (outer : Nat) -> (inner : Nat) ->
           IPTerm -> Core IPTerm
@@ -118,11 +118,11 @@ appPrec = 999
 argPrec : Nat
 argPrec = 1000
 
-showImplicits : {auto c : Ref Ctxt Defs} ->
+showImplicits : {auto c : ReadOnly Ctxt Defs} ->
                 Core Bool
 showImplicits = showImplicits <$> getPPrint
 
-showFullEnv : {auto c : Ref Ctxt Defs} ->
+showFullEnv : {auto c : ReadOnly Ctxt Defs} ->
               Core Bool
 showFullEnv = showFullEnv <$> getPPrint
 
@@ -171,10 +171,10 @@ extractDouble tm = case tm of
 
 ||| Put the special names of primitive operations (+, *, ++, etc.) back as syntax.
 ||| Returns `Nothing` in case there was nothing to resugar.
-sugarPrimAppM : {auto c : Ref Ctxt Defs} ->
+sugarPrimAppM : {auto c : ReadOnly Ctxt Defs} ->
                 IPTerm -> Core (Maybe IPTerm)
 sugarPrimAppM (PApp fc (PApp fc' (PRef opFC (MkKindedName nt (UN $ Basic n) rn)) l) r) = do
-  defs <- get Ctxt
+  defs <- read Ctxt
   case definition <$> !(lookupCtxtExact rn defs.gamma) of
       Just (Builtin {arity=2} f) =>
          let nm' = (UN $ Basic $ show @{Sugared} f)
@@ -186,7 +186,7 @@ sugarPrimAppM (PApp fc (PApp fc' (PRef opFC (MkKindedName nt (UN $ Basic n) rn))
       _ => pure Nothing
 sugarPrimAppM _ = pure Nothing
 
-sugarPrimApp : {auto c : Ref Ctxt Defs} ->
+sugarPrimApp : {auto c : ReadOnly Ctxt Defs} ->
                IPTerm -> Core IPTerm
 sugarPrimApp tm = pure $ fromMaybe tm !(sugarPrimAppM tm)
 
@@ -271,7 +271,7 @@ toPRef fc (MkKindedName nt fn nm) = case dropNS nm of
   n          => pure (sugarApp (PRef fc (MkKindedName nt fn n)))
 
 mutual
-  toPTerm : {auto c : Ref Ctxt Defs} ->
+  toPTerm : {auto c : ReadOnly Ctxt Defs} ->
             {auto s : Ref Syn SyntaxInfo} ->
             (prec : Nat) -> IRawImp -> Core IPTerm
   toPTerm p (IVar fc nm) = do
@@ -406,7 +406,7 @@ mutual
   toPTerm p (IWithUnambigNames fc ns rhs) =
     PWithUnambigNames fc ns <$> toPTerm startPrec rhs
 
-  mkApp : {auto c : Ref Ctxt Defs} ->
+  mkApp : {auto c : ReadOnly Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
           IPTerm ->
           List (FC, Maybe (Maybe Name), IPTerm) ->
@@ -425,7 +425,7 @@ mutual
                       mkApp ap rest
               else mkApp fn rest
 
-  toPTermApp : {auto c : Ref Ctxt Defs} ->
+  toPTermApp : {auto c : ReadOnly Ctxt Defs} ->
                {auto s : Ref Syn SyntaxInfo} ->
                IRawImp -> List (FC, Maybe (Maybe Name), IPTerm) ->
                Core IPTerm
@@ -436,7 +436,7 @@ mutual
       = do a' <- toPTerm startPrec a
            toPTermApp f ((fc, Just (Just n), a') :: args)
   toPTermApp fn@(IVar fc n) args
-      = do defs <- get Ctxt
+      = do defs <- read Ctxt
            case !(lookupCtxtExact (rawName n) (gamma defs)) of
                 Nothing => do fn' <- toPTerm appPrec fn
                               mkApp fn' args
@@ -451,7 +451,7 @@ mutual
       = do fn' <- toPTerm appPrec fn
            mkApp fn' args
 
-  toPFieldUpdate : {auto c : Ref Ctxt Defs} ->
+  toPFieldUpdate : {auto c : ReadOnly Ctxt Defs} ->
                    {auto s : Ref Syn SyntaxInfo} ->
                    IFieldUpdate' KindedName -> Core (PFieldUpdate' KindedName)
   toPFieldUpdate (ISetField p v)
@@ -461,7 +461,7 @@ mutual
       = do v' <- toPTerm startPrec v
            pure (PSetFieldApp p v')
 
-  toPClause : {auto c : Ref Ctxt Defs} ->
+  toPClause : {auto c : ReadOnly Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
               ImpClause' KindedName -> Core (PClause' KindedName)
   toPClause (PatClause fc lhs rhs)
@@ -477,13 +477,13 @@ mutual
   toPClause (ImpossibleClause fc lhs)
       = pure (MkImpossible fc !(toPTerm startPrec lhs))
 
-  toPTypeDecl : {auto c : Ref Ctxt Defs} ->
+  toPTypeDecl : {auto c : ReadOnly Ctxt Defs} ->
                 {auto s : Ref Syn SyntaxInfo} ->
                 ImpTy' KindedName -> Core (PTypeDecl' KindedName)
   toPTypeDecl impTy
       = pure (MkFCVal impTy.fc $ MkPTy (pure ("", impTy.tyName)) "" !(toPTerm startPrec impTy.val))
 
-  toPData : {auto c : Ref Ctxt Defs} ->
+  toPData : {auto c : ReadOnly Ctxt Defs} ->
             {auto s : Ref Syn SyntaxInfo} ->
             ImpData' KindedName -> Core (PDataDecl' KindedName)
   toPData (MkImpData fc n ty opts cs)
@@ -492,14 +492,14 @@ mutual
   toPData (MkImpLater fc n ty)
       = pure (MkPLater fc n !(toPTerm startPrec ty))
 
-  toPField : {auto c : Ref Ctxt Defs} ->
+  toPField : {auto c : ReadOnly Ctxt Defs} ->
              {auto s : Ref Syn SyntaxInfo} ->
              IField' KindedName -> Core (PField' KindedName)
   toPField field
       = do bind' <- traverse (toPTerm startPrec) field.val
            pure (Mk [field.fc , "", field.rig, [field.name]] bind')
 
-  toPFnOpt : {auto c : Ref Ctxt Defs} ->
+  toPFnOpt : {auto c : ReadOnly Ctxt Defs} ->
              {auto s : Ref Syn SyntaxInfo} ->
              FnOpt' KindedName -> Core (PFnOpt' KindedName)
   toPFnOpt (ForeignFn cs)
@@ -507,7 +507,7 @@ mutual
            pure (PForeign cs')
   toPFnOpt o = pure $ IFnOpt o
 
-  toPDecl : {auto c : Ref Ctxt Defs} ->
+  toPDecl : {auto c : ReadOnly Ctxt Defs} ->
             {auto s : Ref Syn SyntaxInfo} ->
             ImpDecl' KindedName -> Core (Maybe (PDecl' KindedName))
   toPDecl (IClaim (MkWithData fc $ MkIClaimData rig vis opts ty))
@@ -552,7 +552,7 @@ mutual
   toPDecl (IBuiltin fc type name) = pure $ Just $ MkFCVal fc $ PBuiltin type name
 
 export
-cleanPTerm : {auto c : Ref Ctxt Defs} ->
+cleanPTerm : {auto c : ReadOnly Ctxt Defs} ->
              IPTerm -> Core IPTerm
 cleanPTerm ptm
    = do pp <- getPPrint
@@ -594,7 +594,7 @@ cleanPTerm ptm
       (\ n => PPi fc rig vis n arg ret) <$> (cleanBinderName vis n)
     cleanNode tm = pure tm
 
-toCleanPTerm : {auto c : Ref Ctxt Defs} ->
+toCleanPTerm : {auto c : ReadOnly Ctxt Defs} ->
                {auto s : Ref Syn SyntaxInfo} ->
                (prec : Nat) -> IRawImp -> Core IPTerm
 toCleanPTerm prec tti = do
@@ -603,7 +603,7 @@ toCleanPTerm prec tti = do
 
 export
 resugar : {vars : _} ->
-          {auto c : Ref Ctxt Defs} ->
+          {auto c : ReadOnly Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
           Env Term vars -> Term vars -> Core IPTerm
 resugar env tm
@@ -612,7 +612,7 @@ resugar env tm
 
 export
 resugarNoPatvars : {vars : _} ->
-                   {auto c : Ref Ctxt Defs} ->
+                   {auto c : ReadOnly Ctxt Defs} ->
                    {auto s : Ref Syn SyntaxInfo} ->
                    Env Term vars -> Term vars -> Core IPTerm
 resugarNoPatvars env tm
@@ -620,7 +620,7 @@ resugarNoPatvars env tm
          toCleanPTerm startPrec tti
 
 export
-pterm : {auto c : Ref Ctxt Defs} ->
+pterm : {auto c : ReadOnly Ctxt Defs} ->
         {auto s : Ref Syn SyntaxInfo} ->
         IRawImp -> Core IPTerm
 pterm raw = toCleanPTerm startPrec raw

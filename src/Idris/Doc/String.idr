@@ -74,23 +74,23 @@ prettyKindedName (Just kw) nm
   = annotate (Syntax Keyword) (pretty0 kw) <++> nm
 
 export
-prettyType : {auto c : Ref Ctxt Defs} ->
+prettyType : {auto c : ReadOnly Ctxt Defs} ->
              {auto s : Ref Syn SyntaxInfo} ->
              (IdrisSyntax -> ann) -> ClosedTerm -> Core (Doc ann)
 prettyType syn ty = do
-  defs <- get Ctxt
+  defs <- read Ctxt
   ty <- normaliseHoles defs Env.empty ty
   ty <- toFullNames ty
   ty <- resugar Env.empty ty
   pure (prettyBy syn ty)
 
 ||| Look up implementations
-getImplDocs : {auto c : Ref Ctxt Defs} ->
+getImplDocs : {auto c : ReadOnly Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
               (keep : ClosedTerm -> Core Bool) ->
               Core (List (Doc IdrisDocAnn))
 getImplDocs keep
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          docss <- for (concat $ values $ typeHints defs) $ \ (impl, _) =>
            do Just def <- lookupCtxtExact impl (gamma defs)
                 | _ => pure []
@@ -112,7 +112,7 @@ getImplDocs keep
                         vcat $ map (indent 2) docs]]
 
 ||| Look up implementations corresponding to the named type
-getHintsForType : {auto c : Ref Ctxt Defs} ->
+getHintsForType : {auto c : ReadOnly Ctxt Defs} ->
                   {auto s : Ref Syn SyntaxInfo} ->
                   Name -> Core (List (Doc IdrisDocAnn))
 getHintsForType nty
@@ -233,12 +233,12 @@ justUserDoc
 
 export
 getDocsForName : {auto o : Ref ROpts REPLOpts} ->
-                 {auto c : Ref Ctxt Defs} ->
+                 {auto c : ReadOnly Ctxt Defs} ->
                  {auto s : Ref Syn SyntaxInfo} ->
                  FC -> Name -> Config -> Core (Doc IdrisDocAnn)
 getDocsForName fc n config
     = do syn <- get Syn
-         defs <- get Ctxt
+         defs <- read Ctxt
          let extra = case nameRoot n of
                        "-" => [NS numNS (UN $ Basic "negate")]
                        _ => []
@@ -267,7 +267,7 @@ getDocsForName fc n config
 
     getDConDoc : {default True showType : Bool} -> Name -> Core (Doc IdrisDocAnn)
     getDConDoc con
-        = do defs <- get Ctxt
+        = do defs <- read Ctxt
              Just def <- lookupCtxtExact con (gamma defs)
                   -- should never happen, since we know that the DCon exists:
                   | Nothing => pure Empty
@@ -291,7 +291,7 @@ getDocsForName fc n config
     ||| The name corresponds to an implementation, typeset its type accordingly
     getImplDoc : Name -> Core (List (Doc IdrisDocAnn))
     getImplDoc n
-        = do defs <- get Ctxt
+        = do defs <- read Ctxt
              Just def <- lookupCtxtExact n (gamma defs)
                   | Nothing => pure []
              ty <- prettyType Syntax (type def)
@@ -368,7 +368,7 @@ getDocsForName fc n config
     getFieldDoc : Name -> Core (Doc IdrisDocAnn)
     getFieldDoc nm
       = do syn <- get Syn
-           defs <- get Ctxt
+           defs <- read Ctxt
            Just def <- lookupCtxtExact nm (gamma defs)
                 -- should never happen, since we know that the DCon exists:
                 | Nothing => pure Empty
@@ -391,7 +391,7 @@ getDocsForName fc n config
       = do let (Just ns, n) = displayName recName
                | _ => pure Nothing
            let recNS = ns <.> mkNamespace n
-           defs <- get Ctxt
+           defs <- read Ctxt
            let fields = getFieldNames (gamma defs) recNS
            case fields of
              [] => pure Nothing
@@ -432,7 +432,7 @@ getDocsForName fc n config
            _ => pure (Nothing, [])
 
     showDoc (MkConfig {showType, longNames, dropFirst, getTotality}) (n, str)
-        = do defs <- get Ctxt
+        = do defs <- read Ctxt
              Just def <- lookupCtxtExact n (gamma defs)
                   | Nothing => undefinedName fc n
              -- First get the extra stuff because this also tells us whether a
@@ -490,7 +490,7 @@ getDocsForImplementation t = do
   -- For now we only look at the top list
   ((_, tophs) :: _) <- hintGroups <$> getSearchData fc False intf
     | _ => pure Nothing
-  defs <- get Ctxt
+  defs <- read Ctxt
   impls <- map catMaybes $ for tophs $ \ hint => do
     -- get the return type of all the candidate hints
     Just (ix, def) <- lookupCtxtExactI hint (gamma defs)
@@ -658,11 +658,11 @@ getDocs (AModule mod) = do
     | _ => throw (ModuleNotFound replFC mod)
   pure (pretty0 modDoc)
 
-summarise : {auto c : Ref Ctxt Defs} ->
+summarise : {auto c : ReadOnly Ctxt Defs} ->
             {auto s : Ref Syn SyntaxInfo} ->
             Name -> Core (Doc IdrisDocAnn)
 summarise n -- n is fully qualified
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          Just def <- lookupCtxtExact n (gamma defs)
              | _ => pure ""
          ty <- prettyType Syntax (type def)
@@ -674,13 +674,13 @@ summarise n -- n is fully qualified
 -- Display all the exported names in the given namespace
 export
 getContents : {auto o : Ref ROpts REPLOpts} ->
-              {auto c : Ref Ctxt Defs} ->
+              {auto c : ReadOnly Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
               Namespace -> Core (Doc IdrisDocAnn)
 getContents ns
    = -- Get all the names, filter by any that match the given namespace
      -- and are visible, then display with their type
-     do defs <- get Ctxt
+     do defs <- read Ctxt
         ns <- allNames (gamma defs)
         let allNs = filter inNS ns
         allNs <- filterM (visible defs) allNs

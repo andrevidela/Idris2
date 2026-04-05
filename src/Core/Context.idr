@@ -1139,7 +1139,7 @@ getFieldNames ctxt recNS
 
 -- Find similar looking names in the context
 export
-getSimilarNames : {auto c : Ref Ctxt Defs} ->
+getSimilarNames : {auto c : ReadOnly Ctxt Defs} ->
                   -- Predicate run to customise the behavior of looking for similar names
                   -- Sometime we might want to hide names that we know make no sense.
                   {default Nothing keepPredicate : Maybe ((Name, GlobalDef) -> Core Bool)} ->
@@ -1147,7 +1147,7 @@ getSimilarNames : {auto c : Ref Ctxt Defs} ->
 getSimilarNames nm = case show <$> userNameRoot nm of
   Nothing => pure Nothing
   Just str => if length str <= 1 then pure (Just (str, [])) else
-    do defs <- get Ctxt
+    do defs <- read Ctxt
        let threshold : Nat := max 1 (assert_total (divNat (length str) 3))
        let test : Name -> Core (Maybe (Visibility, Nat)) := \ nm => do
                let (Just str') = show <$> userNameRoot nm
@@ -1201,10 +1201,10 @@ getVisibility fc n
               | Nothing => throw (UndefinedName fc n)
          pure $ visibility def
 
-maybeMisspelling : {auto c : Ref Ctxt Defs} ->
+maybeMisspelling : {auto c : ReadOnly Ctxt Defs} ->
                    Error -> Name -> Core a
 maybeMisspelling err nm = do
-  ns <- currentNS <$> get Ctxt
+  ns <- currentNS <$> read Ctxt
   Just (str, kept) <- getSimilarNames nm
     | Nothing => throw err
   let candidates = showSimilarNames ns nm str kept
@@ -1214,7 +1214,7 @@ maybeMisspelling err nm = do
 
 -- Throw an UndefinedName exception. But try to find similar names first.
 export
-undefinedName : {auto c : Ref Ctxt Defs} ->
+undefinedName : {auto c : ReadOnly Ctxt Defs} ->
                 FC -> Name -> Core a
 undefinedName loc nm = maybeMisspelling (UndefinedName loc nm) nm
 
@@ -1247,10 +1247,10 @@ canonicalName fc n
 
 -- If the name is aliased, get the alias
 export
-aliasName : {auto c : Ref Ctxt Defs} ->
+aliasName : {auto c : ReadOnly Ctxt Defs} ->
             Name -> Core Name
 aliasName fulln
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          let Just r = userNameRoot fulln
                 | Nothing => pure fulln
          let Just ps = lookup r (possibles (gamma defs))
@@ -1561,7 +1561,7 @@ toResolvedNames t
 
 -- Make the name look nicer for user display
 export
-prettyName : {auto c : Ref Ctxt Defs} ->
+prettyName : {auto c : ReadOnly Ctxt Defs} ->
              Name -> Core String
 prettyName (Nested (i, _) n)
     = do i' <- toFullNames (Resolved i)
@@ -1733,11 +1733,11 @@ record SearchData where
 
 ||| Get the auto search data for a name.
 export
-getSearchData : {auto c : Ref Ctxt Defs} ->
+getSearchData : {auto c : ReadOnly Ctxt Defs} ->
                 FC -> (defaults : Bool) -> Name ->
                 Core SearchData
 getSearchData fc defaults target
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          Just (TCon _ _ dets u _ _ _) <- lookupDefExact target (gamma defs)
               | _ => undefinedName fc target
          hs <- case lookup !(toFullNames target) (typeHints defs) of

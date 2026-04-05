@@ -148,7 +148,7 @@ emitWarnings : {auto c : Ref Ctxt Defs} ->
                {auto s : Ref Syn SyntaxInfo} ->
                Core (List Error)
 emitWarnings
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          let ws = reverse (warnings defs)
          session <- getSession
          if (session.warningsAsErrors)

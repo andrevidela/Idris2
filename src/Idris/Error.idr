@@ -142,21 +142,21 @@ pShowMN t env acc = case t of
   _ => acc
 
 pshow : {vars : _} ->
-        {auto c : Ref Ctxt Defs} ->
+        {auto c : ReadOnly Ctxt Defs} ->
         {auto s : Ref Syn SyntaxInfo} ->
         Env Term vars -> Term vars -> Core (Doc IdrisAnn)
 pshow env tm
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          ntm <- normaliseHoles defs env tm
          itm <- resugar env ntm
          pure (pShowMN ntm env $ prettyBy Syntax itm)
 
 pshowNoNorm : {vars : _} ->
-              {auto c : Ref Ctxt Defs} ->
+              {auto c : ReadOnly Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
               Env Term vars -> Term vars -> Core (Doc IdrisAnn)
 pshowNoNorm env tm
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          itm <- resugar env tm
          pure (pShowMN tm env $ prettyBy Syntax itm)
 
@@ -248,7 +248,7 @@ ploc2 fc1 fc2 =
       snd $ foldl (\(i, s), l => (S i, snoc s (space <+> annotate FileCtxt (pretty0 (pad size $ show $ i + 1) <++> pipe) <++> l))) (st, []) xs
 
 export
-pwarningRaw : {auto c : Ref Ctxt Defs} ->
+pwarningRaw : {auto c : ReadOnly Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
               {auto o : Ref ROpts REPLOpts} ->
               Warning -> Core (Doc IdrisAnn)
@@ -300,30 +300,28 @@ pwarning : {auto c : Ref Ctxt Defs} ->
            Warning -> Core (Doc IdrisAnn)
 pwarning wrn = pwarningRaw !(toFullNames wrn)
 
-perrorRaw : {auto c : Ref Ctxt Defs} ->
+perrorRaw : {auto c : ReadOnly Ctxt Defs} ->
             {auto s : Ref Syn SyntaxInfo} ->
             {auto o : Ref ROpts REPLOpts} ->
             Error -> Core (Doc IdrisAnn)
 perrorRaw (Fatal err) = perrorRaw err
 perrorRaw (CantConvert fc gam env l r)
-    = do defs <- get Ctxt
-         setCtxt gam
+    = do defs <- read Ctxt
+         newCtxt <- newReadOnlyRef Ctxt ({gamma := gam} defs)
          let res = errorDesc (hsep [ reflow "Mismatch between" <+> colon
-                  , code !(pshow env l)
+                  , code !(pshow @{newCtxt} env l)
                   , "and"
-                  , code !(pshow env r) <+> dot
+                  , code !(pshow @{newCtxt} env r) <+> dot
                   ]) <+> line <+> !(ploc fc)
-         put Ctxt defs
          pure res
 perrorRaw (CantSolveEq fc gam env l r)
-    = do defs <- get Ctxt
-         setCtxt gam
+    = do defs <- read Ctxt
+         newCtxt <- newReadOnlyRef Ctxt ({gamma := gam} defs)
          let res = errorDesc (hsep [ reflow "Can't solve constraint between" <+> colon
-                      , code !(pshow env l)
+                      , code !(pshow @{newCtxt} env l)
                       , "and"
-                      , code !(pshow env r) <+> dot
+                      , code !(pshow @{newCtxt} env r) <+> dot
                       ]) <+> line <+> !(ploc fc)
-         put Ctxt defs
          pure res
 perrorRaw (PatternVariableUnifies fc fct env n tm)
     = do let (min, max) = order fc fct
@@ -349,12 +347,11 @@ perrorRaw (CyclicMeta fc env n tm)
         <++> meta (pretty0 !(prettyName n)) <++> equals
         <++> code !(pshow env tm)) <+> line <+> !(ploc fc)
 perrorRaw (WhenUnifying _ gam env x y err)
-    = do defs <- get Ctxt
-         setCtxt gam
+    = do defs <- read Ctxt
+         newCtxt <- newReadOnlyRef Ctxt ({gamma := gam} defs)
          let res = errorDesc (reflow "When unifying:" <+> line
-                   <+> "    " <+> code !(pshow env x) <+> line <+> "and:" <+> line
-                   <+> "    " <+> code !(pshow env y)) <+> line <+> !(perrorRaw err)
-         put Ctxt defs
+                   <+> "    " <+> code !(pshow @{newCtxt} env x) <+> line <+> "and:" <+> line
+                   <+> "    " <+> code !(pshow @{newCtxt} env y)) <+> line <+> !(perrorRaw @{newCtxt} err)
          pure res
 perrorRaw (ValidCase fc env (Left tm))
     = pure $ errorDesc (code !(pshow env tm) <++> reflow "is not a valid impossible case.")
@@ -431,18 +428,20 @@ perrorRaw (AmbiguousName fc ns)
     = pure $ errorDesc (reflow "Ambiguous name" <++> code (cast $ prettyList ns))
         <+> line <+> !(ploc fc)
 perrorRaw (AmbiguousElab fc env ts_in)
-    = do pp <- getPPrint
+    = do readOnlyState <- read Ctxt
+         -- copy the read only state and modify it locally
+         mutableState <- newRef Ctxt readOnlyState
+         pp <- getPPrint @{fromRef mutableState}
          setPPrint ({ fullNamespace := True } pp)
          ts_show <- traverse (\ (gam, t) =>
                                   do defs <- get Ctxt
                                      setCtxt gam
-                                     res <- pshow env t
+                                     res <- pshow @{fromRef mutableState} env t
                                      put Ctxt defs
                                      pure res) ts_in
          let res = vsep [ errorDesc (reflow "Ambiguous elaboration. Possible results" <+> colon)
                         , indent 4 (vsep ts_show)
                         ] <+> line <+> !(ploc fc)
-         setPPrint pp
          pure res
 perrorRaw (AmbiguousSearch fc env tgt ts)
     = pure $ vsep [ errorDesc (reflow "Multiple solutions found in search of" <+> colon)
@@ -511,15 +510,14 @@ perrorRaw (BadUnboundImplicit fc env n ty)
         <++> reflow "with type" <++> code !(pshow env ty)
         <+> colon) <+> line <+> !(ploc fc) <+> line <+> reflow "Suggestion: try an explicit bind."
 perrorRaw (CantSolveGoal fc gam env g reason)
-    = do defs <- get Ctxt
-         setCtxt gam
+    = do defs <- read Ctxt
+         localState <- newReadOnlyRef Ctxt ({gamma := gam} defs)
          let (_ ** (env', g')) = dropEnv env g
-         let res = errorDesc (reflow "Can't find an implementation for" <++> code !(pshow env' g')
+         let res = errorDesc (reflow "Can't find an implementation for" <++> code !(pshow @{localState} env' g')
                      <+> dot) <+> line <+> !(ploc fc)
-         put Ctxt defs
          case reason of
               Nothing => pure res
-              Just r => do rdesc <- perrorRaw r
+              Just r => do rdesc <- perrorRaw @{c} r
                            pure (res <+> line <+>
                                  (reflow "Possible cause:" <++> rdesc))
   where
@@ -732,7 +730,7 @@ perrorRaw (ParseFail errs)
                <+> !(prettyErrors showCount k hs)
 
     listErrors : Core (Doc IdrisAnn)
-    listErrors = do showCount <- logErrorCount . session . options <$> get Ctxt
+    listErrors = do showCount <- logErrorCount . session . options <$> read Ctxt
                     prettyErrors showCount showCount . nub . reverse $ forget errs
 perrorRaw (ModuleNotFound fc ns)
     = pure $ errorDesc ("Module" <++> annotate FileCtxt (pretty0 ns) <++> reflow "not found")
@@ -744,7 +742,7 @@ perrorRaw ForceNeeded = pure $ errorDesc (reflow "Internal error when resolving 
 perrorRaw (InternalError str) = pure $ errorDesc (reflow "INTERNAL ERROR" <+> colon) <++> pretty0 str
 perrorRaw (UserError str) = pure . errorDesc $ pretty0 str
 perrorRaw (NoForeignCC fc specs) = do
-    let cgs = fst <$> availableCGs (options !(get Ctxt))
+    let cgs = fst <$> availableCGs (options !(read Ctxt))
     let res = vsep [ errorDesc (reflow ("The given specifier '" ++ show specs ++ "' was not accepted by any backend. Available backends") <+> colon)
                    , indent 2 (concatWith (\ x, y => x <+> ", " <+> y) (map reflow cgs))
                    , reflow "Some backends have additional specifier rules, refer to their documentation."
@@ -790,7 +788,7 @@ perrorRaw (MaybeMisspelling err ns) = pure $ !(perrorRaw err) <+> case ns of
 perrorRaw (WarningAsError warn) = pwarningRaw warn
 
 export
-perror : {auto c : Ref Ctxt Defs} ->
+perror : {auto c : ReadOnly Ctxt Defs} ->
          {auto s : Ref Syn SyntaxInfo} ->
          {auto o : Ref ROpts REPLOpts} ->
          Error -> Core (Doc IdrisAnn)
@@ -820,7 +818,7 @@ prettyMaybeLoc Nothing = emptyDoc
 prettyMaybeLoc (Just fc) = annotate FileCtxt (pretty0 fc) <+> colon
 
 export
-display : {auto c : Ref Ctxt Defs} ->
+display : {auto c : ReadOnly Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
           {auto o : Ref ROpts REPLOpts} ->
           Error -> Core (Doc IdrisAnn)
