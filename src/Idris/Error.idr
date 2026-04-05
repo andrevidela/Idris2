@@ -294,7 +294,7 @@ pwarningRaw (GenericWarn fc s)
     = pure $ vcat [pretty0 s, !(ploc fc)]
 
 export
-pwarning : {auto c : Ref Ctxt Defs} ->
+pwarning : {auto c : ReadOnly Ctxt Defs} ->
            {auto s : Ref Syn SyntaxInfo} ->
            {auto o : Ref ROpts REPLOpts} ->
            Warning -> Core (Doc IdrisAnn)
@@ -826,7 +826,7 @@ display err = do
   pure $ annotate Error "Error:" <++> !(perror err)
 
 export
-displayWarning : {auto c : Ref Ctxt Defs} ->
+displayWarning : {auto c : ReadOnly Ctxt Defs} ->
                  {auto s : Ref Syn SyntaxInfo} ->
                  {auto o : Ref ROpts REPLOpts} ->
                  Warning -> Core (Doc IdrisAnn)

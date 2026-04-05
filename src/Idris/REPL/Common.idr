@@ -129,14 +129,14 @@ emitProblem a replDocCreator idemodeDocCreator getFC status
 
 -- Display an error message from checking a source file
 export
-emitError : {auto c : Ref Ctxt Defs} ->
+emitError : {auto c : ReadOnly Ctxt Defs} ->
             {auto o : Ref ROpts REPLOpts} ->
             {auto s : Ref Syn SyntaxInfo} ->
             Error -> Core ()
 emitError e = emitProblem e display perror getErrorLoc MsgStatusError
 
 export
-emitWarning : {auto c : Ref Ctxt Defs} ->
+emitWarning : {auto c : ReadOnly Ctxt Defs} ->
               {auto o : Ref ROpts REPLOpts} ->
               {auto s : Ref Syn SyntaxInfo} ->
               Warning -> Core ()
