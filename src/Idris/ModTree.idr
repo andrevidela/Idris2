@@ -94,13 +94,30 @@ mkModTree loc done modFP mod
 data DoneMod : Type where
 data BuildOrder : Type where
 
-modTreeToDAG : ModTree -> DAG ModuleIdent BuildMod -> DAG ModuleIdent BuildMod
-modTreeToDAG (MkModTree nspace Nothing deps) acc = acc
-modTreeToDAG (MkModTree nspace (Just sourceFile)deps) acc
-  = let
-      currentBuildMod = (MkBuildMod sourceFile nspace [])
-      acc' = {items $= insert nspace currentBuildMod} acc
-    in foldr (\mod, acc => ?modTreeToDAG_rhs_0) acc' deps
+modTreeToDAG : ModTree -> DAG ModuleIdent BuildMod
+modTreeToDAG modTree = MkDAG'
+  (moduleItems modTree empty)
+  (moduleTree modTree empty)
+  where
+    -- we don't keep track of dependencies in the map of items
+    moduleItems : ModTree -> SortedMap ModuleIdent BuildMod -> SortedMap ModuleIdent BuildMod
+    moduleItems (MkModTree nspace Nothing deps) acc
+      = foldr moduleItems acc deps
+    moduleItems (MkModTree nspace (Just filename) deps) acc
+      = let dependencies = map (.nspace) deps
+        in foldr moduleItems
+          (insert nspace
+              (MkBuildMod filename nspace dependencies)
+              acc)
+          deps
+
+    moduleTree : ModTree ->
+      SortedMap ModuleIdent (SortedSet ModuleIdent) ->
+      SortedMap ModuleIdent (SortedSet ModuleIdent)
+    moduleTree (MkModTree nspace sourceFile deps) acc
+      = let dependencies = map (.nspace) deps
+            newAcc = insert nspace (fromList dependencies) acc
+        in foldr moduleTree newAcc deps
 
 -- Given a module tree, returns the modules in the reverse order they need to
 -- be built, including their dependencies
@@ -126,7 +143,7 @@ mkBuildMods mod
 -- Return an empty list if it turns out it's in the 'done' list
 export
 getModTree : {auto c : Ref Ctxt Defs} ->
-               {auto o : Ref ROpts REPLOpts} ->
+               -- {auto o : Ref ROpts REPLOpts} ->
                FC -> (done : List BuildMod) ->
                (mainFile : String) ->
                Core (Maybe ModTree)
@@ -145,7 +162,8 @@ getModDAG : {auto c : Ref Ctxt Defs} ->
 getModDAG loc done fname
   = do Just tree <- getModTree loc done fname
          | Nothing  => pure empty
-       let dag = modTreeToDAG tree empty
+       let dag = modTreeToDAG tree
+       -- coreLift $ printLn dag
        pure dag
 
 -- Given a main file name, return the list of modules that need to be
@@ -315,7 +333,14 @@ buildModsConcurrent :
     DAG ModuleIdent BuildMod ->
     Core (List Error)
 buildModsConcurrent loc taskCount dag
-  = execConcurrently (buildMod loc 0 taskCount) dag taskCount
+  = let builder : BuildMod -> IO (Either (List Error) ())
+        builder mod = coreRun (withLogLevel (mkLogLevel "import.file" 20) $ buildMod loc 0 taskCount mod)
+                              (pure . Left . singleton)
+                              (\case [] => pure (Right ()); n => pure (Left n))
+    in do
+      (_, []) <- coreLift $ execConcurrently dag builder 1 -- 8 threads
+        | errs => pure (join (snd errs))
+      pure []
 
 export
 buildDeps : {auto c : Ref Ctxt Defs} ->
@@ -355,6 +380,16 @@ getAllBuildMods fc done (f :: fs)
     = do ms <- getBuildMods fc done f
          getAllBuildMods fc (ms ++ done) fs
 
+getAllModDAG : {auto c : Ref Ctxt Defs} ->
+                  {auto o : Ref ROpts REPLOpts} ->
+                  FC -> (done : DAG ModuleIdent BuildMod) ->
+                  (allFiles : List String) ->
+                  Core (DAG ModuleIdent BuildMod)
+getAllModDAG fc done [] = pure done
+getAllModDAG fc done (f :: fs)
+    = do ms <- getModDAG fc (values done.items) f
+         getAllModDAG fc (ms `merge` done) fs
+
 export
 buildAll : {auto c : Ref Ctxt Defs} ->
            {auto s : Ref Syn SyntaxInfo} ->
@@ -362,10 +397,14 @@ buildAll : {auto c : Ref Ctxt Defs} ->
            (allFiles : List String) ->
            Core (List Error)
 buildAll allFiles
-    = do mods <- getAllBuildMods EmptyFC [] allFiles
-         -- There'll be duplicates, so if something is already built, drop it
-         let mods' = dropLater mods
-         buildMods EmptyFC 1 (length mods') mods'
+    = do mods <- getAllModDAG EmptyFC empty allFiles
+         coreLift $ printLn mods
+         buildModsConcurrent EmptyFC
+           (length $ Prelude.toList mods.items) mods
+--     = do mods <- getAllBuildMods EmptyFC [] allFiles
+--          -- There'll be duplicates, so if something is already built, drop it
+--          let mods' = dropLater mods
+--          buildMods EmptyFC 1 (length mods') mods'
   where
     dropLater : List BuildMod -> List BuildMod
     dropLater [] = []
