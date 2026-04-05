@@ -15,16 +15,16 @@ import Libraries.Data.List.SizeOf
 
 public export
 interface Convert tm where
-  convert : {auto c : Ref Ctxt Defs} ->
+  convert : {auto c : ReadOnlyRef Ctxt Defs} ->
             {vars : Scope} ->
             Defs -> Env Term vars ->
             tm vars -> tm vars -> Core Bool
-  convertInf : {auto c : Ref Ctxt Defs} ->
+  convertInf : {auto c : ReadOnlyRef Ctxt Defs} ->
                {vars : Scope} ->
                Defs -> Env Term vars ->
                tm vars -> tm vars -> Core Bool
 
-  convGen : {auto c : Ref Ctxt Defs} ->
+  convGen : {auto c : ReadOnlyRef Ctxt Defs} ->
             {vars : _} ->
             Ref QVar Int ->
             Bool -> -- skip forced arguments (must have checked the type
@@ -82,7 +82,7 @@ tryUpdate ms (Erased fc a) = Erased fc <$> traverse (tryUpdate ms) a
 tryUpdate ms (TType fc u) = pure $ TType fc u
 
 mutual
-  allConvNF : {auto c : Ref Ctxt Defs} ->
+  allConvNF : {auto c : ReadOnlyRef Ctxt Defs} ->
               {vars : _} ->
               Ref QVar Int -> Bool -> Defs -> Env Term vars ->
               List (NF vars) -> List (NF vars) -> Core Bool
@@ -123,7 +123,7 @@ mutual
       quickConvArg _ _ = False
   quickConv _ _ = False
 
-  allConv : {auto c : Ref Ctxt Defs} ->
+  allConv : {auto c : ReadOnlyRef Ctxt Defs} ->
             {vars : _} ->
             Ref QVar Int -> Bool -> Defs -> Env Term vars ->
             List (Closure vars) -> List (Closure vars) -> Core Bool
@@ -136,7 +136,7 @@ mutual
 
   -- If the case trees match in structure, get the list of variables which
   -- have to match in the call
-  getMatchingVarAlt : {auto c : Ref Ctxt Defs} ->
+  getMatchingVarAlt : {auto c : ReadOnlyRef Ctxt Defs} ->
                       {args, args' : _} ->
                       Defs ->
                       List (Var args, Var args') ->
@@ -180,7 +180,7 @@ mutual
       = getMatchingVars defs ms t t'
   getMatchingVarAlt defs _ _ _ = pure Nothing
 
-  getMatchingVarAlts : {auto c : Ref Ctxt Defs} ->
+  getMatchingVarAlts : {auto c : ReadOnlyRef Ctxt Defs} ->
                        {args, args' : _} ->
                        Defs ->
                        List (Var args, Var args') ->
@@ -193,7 +193,7 @@ mutual
            getMatchingVarAlts defs ms as as'
   getMatchingVarAlts defs _ _ _ = pure Nothing
 
-  getMatchingVars : {auto c : Ref Ctxt Defs} ->
+  getMatchingVars : {auto c : ReadOnlyRef Ctxt Defs} ->
                     {args, args' : _} ->
                     Defs ->
                     List (Var args, Var args') ->
@@ -211,7 +211,7 @@ mutual
   getMatchingVars defs ms Impossible Impossible = pure (Just ms)
   getMatchingVars _ _ _ _ = pure Nothing
 
-  chkSameDefs : {auto c : Ref Ctxt Defs} ->
+  chkSameDefs : {auto c : ReadOnlyRef Ctxt Defs} ->
                 {vars : _} ->
                 Ref QVar Int -> Bool -> Defs -> Env Term vars ->
                 Name -> Name ->
@@ -250,7 +250,7 @@ mutual
 
   -- If two names are standing for case blocks, check the blocks originate
   -- from the same place, and have the same scrutinee
-  chkConvCaseBlock : {auto c : Ref Ctxt Defs} ->
+  chkConvCaseBlock : {auto c : ReadOnlyRef Ctxt Defs} ->
                      {vars : _} ->
                      FC -> Ref QVar Int -> Bool -> Defs -> Env Term vars ->
                      NHead vars -> List (Closure vars) ->
@@ -299,7 +299,7 @@ mutual
       getScrutinee _ _ = Nothing
   chkConvCaseBlock _ _ _ _ _ _ _ _ _ = pure False
 
-  chkConvHead : {auto c : Ref Ctxt Defs} ->
+  chkConvHead : {auto c : ReadOnlyRef Ctxt Defs} ->
                 {vars : _} ->
                 Ref QVar Int -> Bool -> Defs -> Env Term vars ->
                 NHead vars -> NHead vars -> Core Bool
@@ -311,7 +311,7 @@ mutual
           else pure False
   chkConvHead q i defs env _ _ = pure False
 
-  convPiInfo : {auto c : Ref Ctxt Defs} ->
+  convPiInfo : {auto c : ReadOnlyRef Ctxt Defs} ->
                {vars : _} ->
                Ref QVar Int -> Bool -> Defs -> Env Term vars ->
                PiInfo (Closure vars) -> PiInfo (Closure vars) -> Core Bool
@@ -321,7 +321,7 @@ mutual
   convPiInfo q i defs env (DefImplicit x) (DefImplicit y) = convGen q i defs env x y
   convPiInfo q i defs env _ _ = pure False
 
-  convBinders : {auto c : Ref Ctxt Defs} ->
+  convBinders : {auto c : ReadOnlyRef Ctxt Defs} ->
                 {vars : _} ->
                 Ref QVar Int -> Bool -> Defs -> Env Term vars ->
                 Binder (Closure vars) -> Binder (Closure vars) -> Core Bool

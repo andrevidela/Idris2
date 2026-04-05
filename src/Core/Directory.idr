@@ -136,7 +136,7 @@ splitIdrisFileName fname
 -- Return the name of the first file available in the list
 -- Used in LSP.
 export
-firstAvailable : {auto c : Ref Ctxt Defs} ->
+firstAvailable : {auto c : ReadOnlyRef Ctxt Defs} ->
                  List String -> Core (Maybe String)
 firstAvailable [] = pure Nothing
 firstAvailable (f :: fs)
@@ -204,7 +204,7 @@ nsToPath loc ns
 -- Given a namespace, return the path to the source module relative
 -- to the working directory, if the module exists.
 export
-nsToSource : {auto c : Ref Ctxt Defs} ->
+nsToSource : {auto c : ReadOnlyRef Ctxt Defs} ->
              FC -> ModuleIdent -> Core String
 nsToSource loc ns
     = do d <- getDirs

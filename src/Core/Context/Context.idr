@@ -24,6 +24,8 @@ import Libraries.Data.SparseMatrix
 import Libraries.Utils.Binary
 import Libraries.Utils.Scheme
 
+import System.Concurrency
+
 %hide LabelledValue.label
 %hide KeyVal.label
 
@@ -31,6 +33,22 @@ public export
 data Ref : (l : label) -> Type -> Type where
      [search l]
      MkRef : IORef a -> Ref x a
+
+public export
+data ReadOnlyRef : (l : label) -> Type -> Type where
+     [search l]
+     MkReadRef : IORef a -> ReadOnlyRef x a
+
+-- A global reference that holds a commutative monoid
+-- and therefore is "append only" where the order doesn't matter
+public export
+data AppendRef : (l : label) -> Type -> Type where
+     [search l]
+     MkAppendRef : IORef a -> Mutex -> AppendRef x a
+
+%hint export
+fromRef : Ref l a -> ReadOnlyRef l a
+fromRef (MkRef ref) = MkReadRef ref
 
 public export
 data HoleInfo

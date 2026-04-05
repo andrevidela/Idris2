@@ -155,16 +155,16 @@ getCodegen : {auto o : Ref ROpts REPLOpts} ->
 getCodegen s = lookup s . extraCodegens <$> get ROpts
 
 export
-getConsoleWidth : {auto o : Ref ROpts REPLOpts} -> Core (Maybe Nat)
-getConsoleWidth = consoleWidth <$> get ROpts
+getConsoleWidth : {auto o : ReadOnlyRef ROpts REPLOpts} -> Core (Maybe Nat)
+getConsoleWidth = consoleWidth <$> read ROpts
 
 export
 setConsoleWidth : {auto o : Ref ROpts REPLOpts} -> Maybe Nat -> Core ()
 setConsoleWidth n = update ROpts { consoleWidth := n }
 
 export
-getColor : {auto o : Ref ROpts REPLOpts} -> Core Bool
-getColor = color <$> get ROpts
+getColor : {auto o : ReadOnlyRef ROpts REPLOpts} -> Core Bool
+getColor = color <$> read ROpts
 
 export
 setColor : {auto o : Ref ROpts REPLOpts} -> Bool -> Core ()

@@ -21,17 +21,17 @@ record QuoteOpts where
 
 public export
 interface Quote tm where
-    quote : {auto c : Ref Ctxt Defs} ->
+    quote : {auto c : ReadOnlyRef Ctxt Defs} ->
             {vars : Scope} ->
             Defs -> Env Term vars -> tm vars -> Core (Term vars)
-    quoteLHS : {auto c : Ref Ctxt Defs} ->
+    quoteLHS : {auto c : ReadOnlyRef Ctxt Defs} ->
                {vars : Scope} ->
                Defs -> Env Term vars -> tm vars -> Core (Term vars)
-    quoteOpts : {auto c : Ref Ctxt Defs} ->
+    quoteOpts : {auto c : ReadOnlyRef Ctxt Defs} ->
                 {vars : Scope} ->
                 QuoteOpts -> Defs -> Env Term vars -> tm vars -> Core (Term vars)
 
-    quoteGen : {auto c : Ref Ctxt Defs} ->
+    quoteGen : {auto c : ReadOnlyRef Ctxt Defs} ->
                {vars : _} ->
                Ref QVar Int -> QuoteOpts ->
                Defs -> Env Term vars -> tm vars -> Core (Term vars)
@@ -56,7 +56,7 @@ genName n
          pure (MN n i)
 
 mutual
-  quoteArg : {auto c : Ref Ctxt Defs} ->
+  quoteArg : {auto c : ReadOnlyRef Ctxt Defs} ->
               {bound, free : _} ->
               Ref QVar Int -> QuoteOpts -> Defs -> Bounds bound ->
               Env Term free -> Closure free ->
@@ -64,7 +64,7 @@ mutual
   quoteArg q opts defs bounds env a
       = quoteGenNF q opts defs bounds env !(evalClosure defs a)
 
-  quoteArgWithFC : {auto c : Ref Ctxt Defs} ->
+  quoteArgWithFC : {auto c : ReadOnlyRef Ctxt Defs} ->
                    {bound, free : _} ->
                    Ref QVar Int -> QuoteOpts -> Defs -> Bounds bound ->
                    Env Term free -> (FC, Closure free) ->
@@ -72,14 +72,14 @@ mutual
   quoteArgWithFC q opts defs bounds env
        = traversePair (quoteArg q opts defs bounds env)
 
-  quoteArgs : {auto c : Ref Ctxt Defs} ->
+  quoteArgs : {auto c : ReadOnlyRef Ctxt Defs} ->
               {bound, free : _} ->
               Ref QVar Int -> QuoteOpts -> Defs -> Bounds bound ->
               Env Term free -> List (Closure free) ->
               Core (List (Term (bound ++ free)))
   quoteArgs q opts defs bounds env = traverse (quoteArg q opts defs bounds env)
 
-  quoteArgsWithFC : {auto c : Ref Ctxt Defs} ->
+  quoteArgsWithFC : {auto c : ReadOnlyRef Ctxt Defs} ->
                     {bound, free : _} ->
                     Ref QVar Int -> QuoteOpts -> Defs -> Bounds bound ->
                     Env Term free -> List (FC, Closure free) ->
@@ -87,7 +87,7 @@ mutual
   quoteArgsWithFC q opts defs bounds env
       = traverse (quoteArgWithFC q opts defs bounds env)
 
-  quoteHead : {auto c : Ref Ctxt Defs} ->
+  quoteHead : {auto c : ReadOnlyRef Ctxt Defs} ->
               {bound, free : _} ->
               Ref QVar Int -> QuoteOpts -> Defs ->
               FC -> Bounds bound -> Env Term free -> NHead free ->
@@ -124,7 +124,7 @@ mutual
       = do args' <- quoteArgs q opts defs bounds env args
            pure $ Meta fc n i args'
 
-  quotePi : {auto c : Ref Ctxt Defs} ->
+  quotePi : {auto c : ReadOnlyRef Ctxt Defs} ->
             {bound, free : _} ->
             Ref QVar Int -> QuoteOpts -> Defs -> Bounds bound ->
             Env Term free -> PiInfo (Closure free) ->
@@ -136,7 +136,7 @@ mutual
       = do t' <- quoteGenNF q opts defs bounds env !(evalClosure defs t)
            pure (DefImplicit t')
 
-  quoteBinder : {auto c : Ref Ctxt Defs} ->
+  quoteBinder : {auto c : ReadOnlyRef Ctxt Defs} ->
                 {bound, free : _} ->
                 Ref QVar Int -> QuoteOpts -> Defs -> Bounds bound ->
                 Env Term free -> Binder (Closure free) ->
@@ -165,7 +165,7 @@ mutual
       = do ty' <- quoteGenNF q opts defs bounds env !(evalClosure defs ty)
            pure (PVTy fc r ty')
 
-  quoteGenNF : {auto c : Ref Ctxt Defs} ->
+  quoteGenNF : {auto c : ReadOnlyRef Ctxt Defs} ->
                {bound, vars : _} ->
                Ref QVar Int -> QuoteOpts ->
                Defs -> Bounds bound ->
@@ -243,7 +243,7 @@ export
 Quote Closure where
   quoteGen q opts defs env c = quoteGen q opts defs env !(evalClosure defs c)
 
-quoteWithPiGen : {auto _ : Ref Ctxt Defs} ->
+quoteWithPiGen : {auto _ : ReadOnlyRef Ctxt Defs} ->
                  {bound, vars : _} ->
                  Ref QVar Int -> QuoteOpts -> Defs -> Bounds bound ->
                  Env Term vars -> NF vars -> Core (Term (bound ++ vars))
@@ -264,7 +264,7 @@ quoteWithPiGen q opts defs bound env tm
 -- Quote back to a term, but only to find out how many Pi bindings there
 -- are, don't reduce anything else
 export
-quoteWithPi : {auto c : Ref Ctxt Defs} ->
+quoteWithPi : {auto c : ReadOnlyRef Ctxt Defs} ->
               {vars : Scope} ->
               Defs -> Env Term vars -> NF vars -> Core (Term vars)
 quoteWithPi defs env tm

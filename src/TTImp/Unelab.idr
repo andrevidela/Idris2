@@ -66,14 +66,14 @@ mutual
   |||
   ||| We will try to do our best...
   unelabCase : {vars : _} ->
-               {auto c : Ref Ctxt Defs} ->
+               {auto c : ReadOnlyRef Ctxt Defs} ->
                List (Name, Nat) ->
                Env Term vars ->
                Name ->
                List (Term vars) ->
                Core (Maybe IRawImp)
   unelabCase nest env n args
-      = do defs <- get Ctxt
+      = do defs <- read Ctxt
            Just glob <- lookupCtxtExact n (gamma defs)
                 | Nothing => pure Nothing
            let PMDef _ pargs treect _ pats = definition glob
@@ -184,7 +184,7 @@ mutual
   -- NOTE: There is *no guarantee* that this will elaborate back successfully!
   -- It's only intended for display
   unelabTy : {vars : _} ->
-             {auto c : Ref Ctxt Defs} ->
+             {auto c : ReadOnlyRef Ctxt Defs} ->
              (umode : UnelabMode) ->
              (nest : List (Name, Nat)) ->
              Env Term vars -> Term vars ->
@@ -193,7 +193,7 @@ mutual
       = dropParams nest !(unelabTy' umode nest env tm)
 
   unelabTy' : {vars : _} ->
-              {auto c : Ref Ctxt Defs} ->
+              {auto c : ReadOnlyRef Ctxt Defs} ->
               (umode : UnelabMode) ->
               (nest : List (Name, Nat)) ->
               Env Term vars -> Term vars ->
@@ -204,7 +204,7 @@ mutual
            let ty = gnf env (binderType (getBinder p env))
            pure (IVar fc (MkKindedName (Just Bound) nm nm), ty)
   unelabTy' umode nest env (Ref fc nt n)
-      = do defs <- get Ctxt
+      = do defs <- read Ctxt
            Just ty <- lookupTyExact n (gamma defs)
                | Nothing => case umode of
                                  ImplicitHoles => pure (Implicit fc True, gErased fc)
@@ -221,7 +221,7 @@ mutual
 
            pure (IVar fc (MkKindedName (Just nt) fn n'), gnf env (embed ty))
   unelabTy' umode nest env (Meta fc n i args)
-      = do defs <- get Ctxt
+      = do defs <- read Ctxt
            let mkn = nameRoot n
            def <- lookupDefExact (Resolved i) (gamma defs)
            let term = case def of
@@ -260,7 +260,7 @@ mutual
       = do (fn', gfnty) <- unelabTy umode nest env fn
            (arg', gargty) <- unelabTy umode nest env arg
            fnty <- getNF gfnty
-           defs <- get Ctxt
+           defs <- read Ctxt
            Nothing <-
               case umode of
                 (NoSugar _) => pure Nothing
@@ -294,15 +294,15 @@ mutual
                 _ => pure (tm', ty) -- Should never happen!
   unelabTy' umode nest env (TDelayed fc r tm)
       = do (tm', ty) <- unelabTy' umode nest env tm
-           defs <- get Ctxt
+           defs <- read Ctxt
            pure (IDelayed fc r tm', gErased fc)
   unelabTy' umode nest env (TDelay fc r _ tm)
       = do (tm', ty) <- unelabTy' umode nest env tm
-           defs <- get Ctxt
+           defs <- read Ctxt
            pure (IDelay fc tm', gErased fc)
   unelabTy' umode nest env (TForce fc r tm)
       = do (tm', ty) <- unelabTy' umode nest env tm
-           defs <- get Ctxt
+           defs <- read Ctxt
            pure (IForce fc tm', gErased fc)
   unelabTy' umode nest env (PrimVal fc c) = pure (IPrimVal fc c, gErased fc)
   unelabTy' umode nest env (Erased fc (Dotted t))
@@ -311,7 +311,7 @@ mutual
   unelabTy' umode nest env (TType fc _) = pure (IType fc, gType fc (MN "top" 0))
 
   unelabPi : {vars : _} ->
-             {auto c : Ref Ctxt Defs} ->
+             {auto c : ReadOnlyRef Ctxt Defs} ->
              (umode : UnelabMode) ->
              (nest : List (Name, Nat)) ->
              Env Term vars -> PiInfo (Term vars) ->
@@ -324,7 +324,7 @@ mutual
            pure (DefImplicit t')
 
   unelabBinder : {vars : _} ->
-                 {auto c : Ref Ctxt Defs} ->
+                 {auto c : ReadOnlyRef Ctxt Defs} ->
                  (umode : UnelabMode) ->
                  (nest : List (Name, Nat)) ->
                  FC -> Env Term vars -> (x : Name) ->
@@ -371,7 +371,7 @@ mutual
 
 export
 unelabNoSugar : {vars : _} ->
-                {auto c : Ref Ctxt Defs} ->
+                {auto c : ReadOnlyRef Ctxt Defs} ->
                 Env Term vars -> Term vars -> Core IRawImp
 unelabNoSugar env tm
     = do tm' <- unelabTy (NoSugar False) [] env tm
@@ -379,7 +379,7 @@ unelabNoSugar env tm
 
 export
 unelabUniqueBinders : {vars : _} ->
-                {auto c : Ref Ctxt Defs} ->
+                {auto c : ReadOnlyRef Ctxt Defs} ->
                 Env Term vars -> Term vars -> Core IRawImp
 unelabUniqueBinders env tm
     = do tm' <- unelabTy (NoSugar True) [] env tm
@@ -387,7 +387,7 @@ unelabUniqueBinders env tm
 
 export
 unelabNoPatvars : {vars : _} ->
-                  {auto c : Ref Ctxt Defs} ->
+                  {auto c : ReadOnlyRef Ctxt Defs} ->
                   Env Term vars -> Term vars -> Core IRawImp
 unelabNoPatvars env tm
     = do tm' <- unelabTy ImplicitHoles [] env tm
@@ -395,7 +395,7 @@ unelabNoPatvars env tm
 
 export
 unelabNest : {vars : _} ->
-             {auto c : Ref Ctxt Defs} ->
+             {auto c : ReadOnlyRef Ctxt Defs} ->
              UnelabMode ->
              List (Name, Nat) ->
              Env Term vars ->
@@ -421,7 +421,7 @@ unelabNest mode nest env tm
 
 export
 unelab : {vars : _} ->
-         {auto c : Ref Ctxt Defs} ->
+         {auto c : ReadOnlyRef Ctxt Defs} ->
          Env Term vars ->
          Term vars -> Core IRawImp
 unelab = unelabNest Full []

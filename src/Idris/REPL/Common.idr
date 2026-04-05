@@ -30,11 +30,11 @@ import System.File
 ||| messages, an unhandled error is an example of what should
 ||| *not* end up here.
 export
-iputStrLn : {auto c : Ref Ctxt Defs} ->
-            {auto o : Ref ROpts REPLOpts} ->
+iputStrLn : {auto c : ReadOnlyRef Ctxt Defs} ->
+            {auto o : ReadOnlyRef ROpts REPLOpts} ->
             Doc IdrisAnn -> Core ()
 iputStrLn msg
-    = do opts <- get ROpts
+    = do opts <- read ROpts
          case idemode opts of
               REPL InfoLvl  => coreLift $ putStrLn !(render msg)
               -- output silenced
@@ -96,75 +96,76 @@ printError msg = printWithStatus render msg MsgStatusError
 DocCreator : Type -> Type
 DocCreator a = a -> Core (Doc IdrisAnn)
 
-export
-emitProblem : {auto c : Ref Ctxt Defs} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            {auto s : Ref Syn SyntaxInfo} ->
-            a -> (DocCreator a) -> (DocCreator a) -> (a -> Maybe FC) -> MsgStatus -> Core ()
-emitProblem a replDocCreator idemodeDocCreator getFC status
-    = do opts <- get ROpts
-         case idemode opts of
-              REPL _ =>
-                  do msg <- replDocCreator a
-                     printWithStatus render msg status
-              IDEMode i _ f =>
-                  do msg <- idemodeDocCreator a
-                     -- TODO: Display a better message when the error doesn't contain a location
-                     case map toNonEmptyFC (getFC a) of
-                          Nothing => iputStrLn msg
-                          Just nfc@(origin, startPos, endPos) => do
-                            fname <- case origin of
-                              PhysicalIdrSrc ident => do
-                                -- recover the file name relative to the working directory.
-                                -- (This is what idris2-mode expects)
-                                let fc = MkFC (PhysicalIdrSrc ident) startPos endPos
-                                catch (nsToSource fc ident) (const $ pure "(File-Not-Found)")
-                              PhysicalPkgSrc fname =>
-                                pure fname
-                              Virtual Interactive =>
-                                pure "(Interactive)"
-                            let (str,spans) = !(renderWithDecorations annToProperties msg)
-                            send f (Warning (cast (the String fname, nfc)) str spans
-                                            i)
-
--- Display an error message from checking a source file
-export
-emitError : {auto c : Ref Ctxt Defs} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            {auto s : Ref Syn SyntaxInfo} ->
-            Error -> Core ()
-emitError e = emitProblem e display perror getErrorLoc MsgStatusError
-
-export
-emitWarning : {auto c : Ref Ctxt Defs} ->
+parameters {auto c : ReadOnlyRef Ctxt Defs}
+  export
+  emitProblem :
               {auto o : Ref ROpts REPLOpts} ->
               {auto s : Ref Syn SyntaxInfo} ->
-              Warning -> Core ()
-emitWarning w = emitProblem w displayWarning pwarning (Just . getWarningLoc) MsgStatusInfo
+              a -> (DocCreator a) -> (DocCreator a) -> (a -> Maybe FC) -> MsgStatus -> Core ()
+  emitProblem a replDocCreator idemodeDocCreator getFC status
+      = do opts <- get ROpts
+           case idemode opts of
+                REPL _ =>
+                    do msg <- replDocCreator a
+                       printWithStatus render msg status
+                IDEMode i _ f =>
+                    do msg <- idemodeDocCreator a
+                       -- TODO: Display a better message when the error doesn't contain a location
+                       case map toNonEmptyFC (getFC a) of
+                            Nothing => iputStrLn msg
+                            Just nfc@(origin, startPos, endPos) => do
+                              fname <- case origin of
+                                PhysicalIdrSrc ident => do
+                                  -- recover the file name relative to the working directory.
+                                  -- (This is what idris2-mode expects)
+                                  let fc = MkFC (PhysicalIdrSrc ident) startPos endPos
+                                  catch (nsToSource fc ident) (const $ pure "(File-Not-Found)")
+                                PhysicalPkgSrc fname =>
+                                  pure fname
+                                Virtual Interactive =>
+                                  pure "(Interactive)"
+                              let (str,spans) = !(renderWithDecorations annToProperties msg)
+                              send f (Warning (cast (the String fname, nfc)) str spans
+                                              i)
 
-export
-emitWarnings : {auto c : Ref Ctxt Defs} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               {auto s : Ref Syn SyntaxInfo} ->
-               Core (List Error)
-emitWarnings
-    = do defs <- get Ctxt
-         let ws = reverse (warnings defs)
-         session <- getSession
-         if (session.warningsAsErrors)
-           then let errs = WarningAsError <$> ws in
-                errs <$ traverse_ emitError errs
-           else [] <$ traverse_ emitWarning ws
+  -- Display an error message from checking a source file
+  export
+  emitError : {auto c : Ref Ctxt Defs} ->
+              {auto o : Ref ROpts REPLOpts} ->
+              {auto s : Ref Syn SyntaxInfo} ->
+              Error -> Core ()
+  emitError e = emitProblem e display perror getErrorLoc MsgStatusError
 
-export
-emitWarningsAndErrors : {auto c : Ref Ctxt Defs} ->
-                        {auto o : Ref ROpts REPLOpts} ->
-                        {auto s : Ref Syn SyntaxInfo} ->
-                        List Error -> Core (List Error)
-emitWarningsAndErrors errs = do
-  ws <- emitWarnings
-  traverse_ emitError errs
-  pure ws
+  export
+  emitWarning : {auto c : Ref Ctxt Defs} ->
+                {auto o : Ref ROpts REPLOpts} ->
+                {auto s : Ref Syn SyntaxInfo} ->
+                Warning -> Core ()
+  emitWarning w = emitProblem w displayWarning pwarning (Just . getWarningLoc) MsgStatusInfo
+
+  export
+  emitWarnings : {auto c : Ref Ctxt Defs} ->
+                 {auto o : Ref ROpts REPLOpts} ->
+                 {auto s : Ref Syn SyntaxInfo} ->
+                 Core (List Error)
+  emitWarnings
+      = do defs <- read Ctxt
+           let ws = reverse (warnings defs)
+           session <- getSession
+           if (session.warningsAsErrors)
+             then let errs = WarningAsError <$> ws in
+                  errs <$ traverse_ emitError errs
+             else [] <$ traverse_ emitWarning ws
+
+  export
+  emitWarningsAndErrors : {auto c : Ref Ctxt Defs} ->
+                          {auto o : Ref ROpts REPLOpts} ->
+                          {auto s : Ref Syn SyntaxInfo} ->
+                          List Error -> Core (List Error)
+  emitWarningsAndErrors errs = do
+    ws <- emitWarnings
+    traverse_ emitError errs
+    pure ws
 
 getFCLine : FC -> Maybe Int
 getFCLine = map startLine . isNonEmptyFC

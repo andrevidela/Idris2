@@ -72,6 +72,7 @@ mkModTree loc done modFP mod
                     case lookup mod all of
                          Nothing =>
                            do file <- maybe (nsToSource loc mod) pure modFP
+                              setCurrentElabSource file -- for error printing purposes
                               modInfo <- readHeader file mod
                               let imps = map path (imports modInfo)
                               if mod `elem` imps
@@ -143,7 +144,7 @@ mkBuildMods mod
 -- Return an empty list if it turns out it's in the 'done' list
 export
 getModTree : {auto c : Ref Ctxt Defs} ->
-               -- {auto o : Ref ROpts REPLOpts} ->
+               {auto o : Ref ROpts REPLOpts} ->
                FC -> (done : List BuildMod) ->
                (mainFile : String) ->
                Core (Maybe ModTree)
@@ -228,7 +229,7 @@ needsBuildingHash sourceFile ttcFile depFiles
 export
 needsBuilding :
   {auto c : Ref Ctxt Defs} ->
-  {auto o : Ref ROpts REPLOpts} ->
+  {auto o : ReadOnlyRef ROpts REPLOpts} ->
   (sourceFile, ttcFile : String) -> List String -> Core Bool
 needsBuilding sourceFile ttcFile depFiles
   = do -- if the ttc file does not exist there is no point in asking
@@ -250,7 +251,7 @@ needsBuilding sourceFile ttcFile depFiles
 
        -- in case we're loading the main file, make sure the TTC is
        -- using the appropriate default totality requirement
-       Just f <- mainfile <$> get ROpts
+       Just f <- mainfile <$> read ROpts
          | Nothing => pure False
        log "totality.requirement" 10 $ concat {t = List}
          [ "Checking totality requirement of "
@@ -270,13 +271,17 @@ needsBuilding sourceFile ttcFile depFiles
        pure True
 
 
-buildMod : {auto c : Ref Ctxt Defs} ->
-           {auto s : Ref Syn SyntaxInfo} ->
-           {auto o : Ref ROpts REPLOpts} ->
-           FC -> Nat -> Nat -> BuildMod ->
+buildMod : {auto o : Ref ROpts REPLOpts} ->
+           (loc : FC) ->
+           (opts : Options) ->
+           (timings : StringMap (Bool, Integer)) ->
+           (current, end : Nat) -> BuildMod ->
            Core (List Error)
-buildMod loc num len mod
-   = do clearCtxt; addPrimitives
+buildMod loc opts timings num len mod
+   = do defs <- initDefs
+        _ <- newRef Ctxt
+          ({ options := opts, timings := timings } defs)
+        addPrimitives
         lazyActive True; setUnboundImplicits True
 
         let sourceFile = buildFile mod
@@ -297,7 +302,7 @@ buildMod loc num len mod
 
         u <- newRef UST initUState
         m <- newRef MD (initMetadata (PhysicalIdrSrc modNamespace))
-        put Syn initSyntax
+        _ <- newRef Syn initSyntax
 
         errs <- ifThenElse (not rebuild) (pure []) $
            do let pad = minus (length $ show len) (length $ show num)
@@ -314,29 +319,36 @@ buildMod loc num len mod
         pure (ws ++ if null errs then ferrs else ferrs ++ errs)
 
 export
-buildMods : {auto c : Ref Ctxt Defs} ->
-            {auto s : Ref Syn SyntaxInfo} ->
+buildMods : {auto s : Ref Syn SyntaxInfo} ->
             {auto o : Ref ROpts REPLOpts} ->
-            FC -> Nat -> Nat -> List BuildMod ->
+            (loc : FC) ->
+            (opts : Options) ->
+            (timings : StringMap (Bool, Integer)) ->
+            (current, end : Nat) -> List BuildMod ->
             Core (List Error)
-buildMods fc num len [] = pure []
-buildMods fc num len (m :: ms)
-    = case !(buildMod fc num len m) of
-           [] => buildMods fc (1 + num) len ms
+buildMods fc opts timings num len [] = pure []
+buildMods fc opts timings num len (m :: ms)
+    = case !(buildMod fc opts timings num len m) of
+           [] => buildMods fc opts timings (1 + num) len ms
            errs => pure errs
 
 buildModsConcurrent :
     {auto c : Ref Ctxt Defs} ->
     {auto s : Ref Syn SyntaxInfo} ->
     {auto o : Ref ROpts REPLOpts} ->
-    (loc : FC) -> (taskCount : Nat) ->
+    (loc : FC) ->
+    (opts : Options) ->
+    (timings : StringMap (Bool, Integer)) ->
+    (taskCount : Nat) ->
     DAG ModuleIdent BuildMod ->
     Core (List Error)
-buildModsConcurrent loc taskCount dag
+buildModsConcurrent loc opts timings taskCount dag
   = let builder : BuildMod -> IO (Either (List Error) ())
-        builder mod = coreRun (withLogLevel (mkLogLevel "import.file" 20) $ buildMod loc 0 taskCount mod)
-                              (pure . Left . singleton)
-                              (\case [] => pure (Right ()); n => pure (Left n))
+        builder mod =
+          coreRun (withLogLevel (mkLogLevel "import.file" 20)
+                              $ buildMod loc opts timings 0 taskCount mod)
+                  (pure . Left . singleton)
+                  (\case [] => pure (Right ()); n => pure (Left n))
     in do
       (_, []) <- coreLift $ execConcurrently dag builder 1 -- 8 threads
         | errs => pure (join (snd errs))
@@ -353,7 +365,8 @@ buildDeps : {auto c : Ref Ctxt Defs} ->
 buildDeps fname
     = do mods <- getBuildMods EmptyFC [] fname
          log "import" 20 $ "Needs to rebuild: " ++ show mods
-         ok <- buildMods EmptyFC 1 (length mods) mods
+         (opts, timings) <- readPresistentOpts
+         ok <- buildMods EmptyFC opts timings 1 (length mods) mods
          case ok of
               [] => do -- On success, reload the main ttc in a clean context
                        clearCtxt; addPrimitives
@@ -397,14 +410,16 @@ buildAll : {auto c : Ref Ctxt Defs} ->
            (allFiles : List String) ->
            Core (List Error)
 buildAll allFiles
-    = do mods <- getAllModDAG EmptyFC empty allFiles
-         coreLift $ printLn mods
-         buildModsConcurrent EmptyFC
-           (length $ Prelude.toList mods.items) mods
---     = do mods <- getAllBuildMods EmptyFC [] allFiles
---          -- There'll be duplicates, so if something is already built, drop it
---          let mods' = dropLater mods
---          buildMods EmptyFC 1 (length mods') mods'
+--     = do mods <- getAllModDAG EmptyFC empty allFiles
+--          coreLift $ printLn mods
+--          (opts, timings) <- readPresistentOpts
+--          buildModsConcurrent EmptyFC opts timings
+--            (length $ Prelude.toList mods.items) mods
+    = do mods <- getAllBuildMods EmptyFC [] allFiles
+         -- There'll be duplicates, so if something is already built, drop it
+         let mods' = dropLater mods
+         (opts, timings) <- readPresistentOpts
+         buildMods EmptyFC opts timings 1 (length mods') mods'
   where
     dropLater : List BuildMod -> List BuildMod
     dropLater [] = []

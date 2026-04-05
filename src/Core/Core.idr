@@ -965,6 +965,15 @@ get : (0 x : label) -> {auto ref : Ref x a} -> Core a
 get x {ref = MkRef io} = coreLift (readIORef io)
 
 export %inline
+read : (0 x : label) -> {auto ref : ReadOnlyRef x a} -> Core a
+read x {ref = MkReadRef io} = coreLift (readIORef io)
+
+export %inline
+append : Monoid a => (0 x : label) -> {auto ref : AppendRef x a} -> a -> Core ()
+append _ {ref = MkAppendRef io lock} val
+  = coreLift (atomically lock (modifyIORef io (val <+>)))
+
+export %inline
 put : (0 x : label) -> {auto ref : Ref x a} -> a -> Core ()
 put x {ref = MkRef io} val = coreLift (writeIORef io val)
 

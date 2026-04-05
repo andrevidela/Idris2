@@ -142,11 +142,11 @@ pShowMN t env acc = case t of
   _ => acc
 
 pshow : {vars : _} ->
-        {auto c : Ref Ctxt Defs} ->
+        {auto c : ReadOnlyRef Ctxt Defs} ->
         {auto s : Ref Syn SyntaxInfo} ->
         Env Term vars -> Term vars -> Core (Doc IdrisAnn)
 pshow env tm
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          ntm <- normaliseHoles defs env tm
          itm <- resugar env ntm
          pure (pShowMN ntm env $ prettyBy Syntax itm)
@@ -306,17 +306,16 @@ perrorRaw : {auto c : Ref Ctxt Defs} ->
             Error -> Core (Doc IdrisAnn)
 perrorRaw (Fatal err) = perrorRaw err
 perrorRaw (CantConvert fc gam env l r)
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          setCtxt gam
          let res = errorDesc (hsep [ reflow "Mismatch between" <+> colon
                   , code !(pshow env l)
                   , "and"
                   , code !(pshow env r) <+> dot
                   ]) <+> line <+> !(ploc fc)
-         put Ctxt defs
          pure res
 perrorRaw (CantSolveEq fc gam env l r)
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          setCtxt gam
          let res = errorDesc (hsep [ reflow "Can't solve constraint between" <+> colon
                       , code !(pshow env l)

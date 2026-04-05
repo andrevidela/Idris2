@@ -208,15 +208,13 @@ addPrelude imps
 
 export
 readHeader : {auto c : Ref Ctxt Defs} ->
-             {auto o : Ref ROpts REPLOpts} ->
              (path : String) -> (origin : ModuleIdent) -> Core Module
 readHeader path origin
     = do Right res <- coreLift (readFile path)
             | Left err => throw (FileErr path err)
          -- Stop at the first :, that's definitely not part of the header, to
          -- save lexing the whole file unnecessarily
-         setCurrentElabSource res -- for error printing purposes
-         let Right (ws, decor, mod)
+         let Right (ws, _, mod)
             = runParserTo (PhysicalIdrSrc origin)
                           (isLitFile path) (is ':') res
                           (progHdr (PhysicalIdrSrc origin))
@@ -305,6 +303,7 @@ processMod sourceFileName ttcFileName msg sourcecode origin
 
         -- Just read the header to start with (this is to get the imports and
         -- see if we can avoid rebuilding if none have changed)
+        setCurrentElabSource sourceFileName -- for error printing purposes
         moduleHeader <- readHeader sourceFileName origin
         let ns = moduleNS moduleHeader
 
