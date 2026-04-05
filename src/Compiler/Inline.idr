@@ -563,6 +563,7 @@ addArityHash n
 
 export
 compileAndInlineAll : {auto c : Ref Ctxt Defs} ->
+                      {auto w : AppendOnly Warn Warning} ->
                       Core ()
 compileAndInlineAll
     = do defs <- get Ctxt

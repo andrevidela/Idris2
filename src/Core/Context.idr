@@ -1068,6 +1068,9 @@ record Defs where
 export
 data Ctxt : Type where
 
+-- Label for collecting warning during compilation
+export
+data Warn : Type where
 
 export
 clearDefs : Defs -> Core Defs
@@ -2557,8 +2560,8 @@ updateSession : {auto c : Ref Ctxt Defs} ->
 updateSession f = setSession (f !getSession)
 
 export
-recordWarning : {auto c : Ref Ctxt Defs} -> Warning -> Core ()
-recordWarning w = update Ctxt { warnings $= (w ::) }
+recordWarning : {auto w : AppendOnly Warn Warning} -> Warning -> Core ()
+recordWarning w = append Warn w
 
 export
 getTime : Core Integer
@@ -2606,6 +2609,7 @@ checkTimer
 -- incremental mode for the current CG
 export
 addImportedInc : {auto c : Ref Ctxt Defs} ->
+                 {auto w : AppendOnly Warn Warning} ->
                  ModuleIdent -> List (CG, String, List String) -> Core ()
 addImportedInc modNS inc
     = do s <- getSession
@@ -2662,6 +2666,7 @@ hide fc n
 -- Note: this is here at the bottom only becuase `recordWarning` is defined just above.
 export
 unhide : {auto c : Ref Ctxt Defs} ->
+         {auto w : AppendOnly Warn Warning} ->
        FC -> Name -> Core ()
 unhide fc n
     = do defs <- get Ctxt

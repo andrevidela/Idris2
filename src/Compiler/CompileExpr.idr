@@ -601,7 +601,9 @@ compileExp tm
 
 ||| Given a name, look up an expression, and compile it to a CExp in the environment
 export
-compileDef : {auto c : Ref Ctxt Defs} -> Name -> Core ()
+compileDef : {auto c : Ref Ctxt Defs} ->
+             {auto w : AppendOnly Warn Warning} ->
+             Name -> Core ()
 compileDef n
     = do defs <- get Ctxt
          Just gdef <- lookupCtxtExact n (gamma defs)

@@ -138,6 +138,7 @@ bindCaseLocals fc ((n, mn, envns) :: rest) argns rhs
 export
 caseBlock : {vars : _} ->
             {auto c : Ref Ctxt Defs} ->
+            {auto w : AppendOnly Warn Warning} ->
             {auto m : Ref MD Metadata} ->
             {auto u : Ref UST UState} ->
             {auto e : Ref EST (EState vars)} ->
@@ -362,6 +363,7 @@ caseBlock {vars} rigc elabinfo fc nest env opts scr scrtm scrty caseRig alts exp
 export
 checkCase : {vars : _} ->
             {auto c : Ref Ctxt Defs} ->
+            {auto w : AppendOnly Warn Warning} ->
             {auto m : Ref MD Metadata} ->
             {auto u : Ref UST UState} ->
             {auto e : Ref EST (EState vars)} ->

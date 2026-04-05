@@ -29,6 +29,7 @@ dropName n nest = { names $= drop } nest
 
 checkPiInfo : {vars : _} ->
               {auto c : Ref Ctxt Defs} ->
+              {auto w : AppendOnly Warn Warning} ->
               {auto m : Ref MD Metadata} ->
               {auto u : Ref UST UState} ->
               {auto e : Ref EST (EState vars)} ->
@@ -47,6 +48,7 @@ checkPiInfo rig elabinfo nest env (DefImplicit t) exp
 export
 checkPi : {vars : _} ->
           {auto c : Ref Ctxt Defs} ->
+          {auto w : AppendOnly Warn Warning} ->
           {auto m : Ref MD Metadata} ->
           {auto u : Ref UST UState} ->
           {auto e : Ref EST (EState vars)} ->
@@ -92,6 +94,7 @@ findLamRig (Just expty)
 
 inferLambda : {vars : _} ->
               {auto c : Ref Ctxt Defs} ->
+              {auto w : AppendOnly Warn Warning} ->
               {auto m : Ref MD Metadata} ->
               {auto u : Ref UST UState} ->
               {auto e : Ref EST (EState vars)} ->
@@ -136,6 +139,7 @@ getTyNF env x
 export
 checkLambda : {vars : _} ->
               {auto c : Ref Ctxt Defs} ->
+              {auto w : AppendOnly Warn Warning} ->
               {auto m : Ref MD Metadata} ->
               {auto u : Ref UST UState} ->
               {auto e : Ref EST (EState vars)} ->
@@ -205,6 +209,7 @@ weakenExp env (Just gtm)
 export
 checkLet : {vars : _} ->
            {auto c : Ref Ctxt Defs} ->
+           {auto w : AppendOnly Warn Warning} ->
            {auto m : Ref MD Metadata} ->
            {auto u : Ref UST UState} ->
            {auto e : Ref EST (EState vars)} ->

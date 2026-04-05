@@ -79,15 +79,17 @@ updateNS orig ns tm = updateNSApp tm
     updateNSApp (INamedApp fc f n arg) = INamedApp fc (updateNSApp f) n arg
     updateNSApp t = t
 
-checkCon : {vars : _} ->
-           {auto c : Ref Ctxt Defs} ->
-           {auto m : Ref MD Metadata} ->
-           {auto u : Ref UST UState} ->
-           {auto s : Ref Syn SyntaxInfo} ->
-           {auto o : Ref ROpts REPLOpts} ->
-           List ElabOpt -> NestedNames vars ->
-           Env Term vars -> Visibility -> (orig : Name) -> (resolved : Name) ->
-           ImpTy -> Core Constructor
+checkCon :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    List ElabOpt -> NestedNames vars ->
+    Env Term vars -> Visibility -> (orig : Name) -> (resolved : Name) ->
+    ImpTy -> Core Constructor
 checkCon {vars} opts nest env vis tn_in tn ty_raw
     = do let cn_in = ty_raw.tyName
          let fc = ty_raw.fc
@@ -391,16 +393,18 @@ calcConInfo fc type cons
      -- ... maybe more to come? The Bool just says when to stop looking
 
 export
-processData : {vars : _} ->
-              {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              List ElabOpt -> NestedNames vars ->
-              Env Term vars -> FC ->
-              WithDefault Visibility Private -> Maybe TotalReq ->
-              ImpData -> Core ()
+processData :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    List ElabOpt -> NestedNames vars ->
+    Env Term vars -> FC ->
+    WithDefault Visibility Private -> Maybe TotalReq ->
+    ImpData -> Core ()
 processData {vars} eopts nest env fc def_vis mbtot (MkImpLater dfc n_in ty_raw)
     = do n <- inCurrentNS n_in
          ty_raw <- bindTypeNames fc [] (toList vars) ty_raw

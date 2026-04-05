@@ -23,12 +23,14 @@ import Libraries.Data.WithDefault
 
 %default covering
 export
-getFnString : {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto o : Ref ROpts REPLOpts} ->
-               RawImp -> Core String
+getFnString :
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    RawImp -> Core String
 getFnString (IPrimVal _ (Str st)) = pure st
 getFnString tm
     = do inidx <- resolveName (UN $ Basic "[foreign]")
@@ -44,13 +46,15 @@ getFnString tm
 -- ExternFn <arity>, where the arity is assumed to be fixed (i.e.
 -- not dependent on any of the arguments)
 -- Similarly set foreign definitions. Possibly combine these?
-initDef : {vars : _} ->
-          {auto c : Ref Ctxt Defs} ->
-          {auto m : Ref MD Metadata} ->
-          {auto u : Ref UST UState} ->
-          {auto s : Ref Syn SyntaxInfo} ->
-          {auto o : Ref ROpts REPLOpts} ->
-          FC -> Name -> Env Term vars -> Term vars -> List FnOpt -> Core Def
+initDef :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    FC -> Name -> Env Term vars -> Term vars -> List FnOpt -> Core Def
 initDef fc n env ty []
     = do addUserHole False n
          pure None
@@ -133,15 +137,17 @@ checkForShadowing env (IPi fc _ _ nm argTy retTy)
 checkForShadowing env _ = empty
 
 export
-processType : {vars : _} ->
-              {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              List ElabOpt -> NestedNames vars -> Env Term vars ->
-              FC -> RigCount -> Visibility ->
-              List FnOpt -> ImpTy -> Core ()
+processType :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    List ElabOpt -> NestedNames vars -> Env Term vars ->
+    FC -> RigCount -> Visibility ->
+    List FnOpt -> ImpTy -> Core ()
 processType {vars} eopts nest env fc rig vis opts ty_raw
     = do let typeName = ty_raw.tyName
          n <- inCurrentNS typeName.val

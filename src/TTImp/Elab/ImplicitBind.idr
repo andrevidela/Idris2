@@ -411,6 +411,7 @@ getToBind {vars} fc elabmode impmode env excepts
 export
 checkBindVar : {vars : _} ->
                {auto c : Ref Ctxt Defs} ->
+               {auto w : AppendOnly Warn Warning} ->
                {auto m : Ref MD Metadata} ->
                {auto u : Ref UST UState} ->
                {auto e : Ref EST (EState vars)} ->
@@ -526,6 +527,7 @@ solvePolyConstraint (MkPolyConstraint fc env arg x y)
 export
 checkBindHere : {vars : _} ->
                 {auto c : Ref Ctxt Defs} ->
+                {auto w : AppendOnly Warn Warning} ->
                 {auto m : Ref MD Metadata} ->
                 {auto u : Ref UST UState} ->
                 {auto e : Ref EST (EState vars)} ->

@@ -24,16 +24,18 @@ extend env p nest (Bind _ n b@(Pi fc c pi ty) sc)
 extend env p nest tm = (_ ** (p, env, nest))
 
 export
-processParams : {vars : _} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto m : Ref MD Metadata} ->
-                {auto u : Ref UST UState} ->
-                {auto s : Ref Syn SyntaxInfo} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                NestedNames vars ->
-                Env Term vars ->
-                FC -> List ImpParameter -> List ImpDecl ->
-                Core ()
+processParams :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    NestedNames vars ->
+    Env Term vars ->
+    FC -> List ImpParameter -> List ImpDecl ->
+    Core ()
 processParams {vars} {c} {m} {u} nest env fc ps ds
     = do -- Turn the parameters into a function type, (x : ps) -> Type,
          -- then read off the environment from the elaborated type. This way

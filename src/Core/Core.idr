@@ -17,6 +17,7 @@ import Libraries.Data.WithData
 
 import public Data.IORef
 import System.File
+import System.Concurrency
 
 %hide Libraries.Data.Record.KeyVal.label
 %hide Libraries.Data.Record.LabelledValue.label
@@ -965,6 +966,11 @@ newReadOnlyRef : (0 x : label) -> t -> Core (ReadOnly x t)
 newReadOnlyRef x val
     = do ref <- coreLift (newIORef val)
          pure (MkReadRef ref)
+
+export %inline
+append : (0 x : label) -> {auto ref : AppendOnly x a} -> a -> Core ()
+append x {ref = MkAppendRef io lock} val
+  = coreLift $ atomically lock (modifyIORef io (val ::))
 
 export %inline
 read : (0 x : label) -> {auto ref : ReadOnly x a} -> Core a

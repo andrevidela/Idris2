@@ -18,6 +18,7 @@ import Libraries.Data.WithDefault
 export
 localHelper : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->
+             {auto w : AppendOnly Warn Warning} ->
              {auto m : Ref MD Metadata} ->
              {auto u : Ref UST UState} ->
              {auto e : Ref EST (EState vars)} ->
@@ -152,6 +153,7 @@ localHelper {vars} nest env nestdecls_in func
 export
 checkLocal : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->
+             {auto w : AppendOnly Warn Warning} ->
              {auto m : Ref MD Metadata} ->
              {auto u : Ref UST UState} ->
              {auto e : Ref EST (EState vars)} ->
@@ -181,6 +183,7 @@ getLocalTerm fc env f (a :: as)
 export
 checkCaseLocal : {vars : _} ->
                  {auto c : Ref Ctxt Defs} ->
+                 {auto w : AppendOnly Warn Warning} ->
                  {auto m : Ref MD Metadata} ->
                  {auto u : Ref UST UState} ->
                  {auto e : Ref EST (EState vars)} ->

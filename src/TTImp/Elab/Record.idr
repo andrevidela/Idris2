@@ -230,17 +230,19 @@ needType (WhenUnifying _ _ _ _ _ err) = needType err
 needType _ = False
 
 export
-checkUpdate : {vars : _} ->
-              {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto e : Ref EST (EState vars)} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              RigCount -> ElabInfo ->
-              NestedNames vars -> Env Term vars ->
-              FC -> List IFieldUpdate -> RawImp -> Maybe (Glued vars) ->
-              Core (Term vars, Glued vars)
+checkUpdate :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto e : Ref EST (EState vars)} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    RigCount -> ElabInfo ->
+    NestedNames vars -> Env Term vars ->
+    FC -> List IFieldUpdate -> RawImp -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 checkUpdate rig elabinfo nest env fc upds rec expected
     = do recty <- case expected of
                        Just ret => pure ret

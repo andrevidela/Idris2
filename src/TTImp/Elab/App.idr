@@ -41,6 +41,7 @@ onLHS _ = False
 -- names. Look in the Env first, then the global context.
 getNameType : {vars : _} ->
               {auto c : Ref Ctxt Defs} ->
+              {auto w : AppendOnly Warn Warning} ->
               {auto m : Ref MD Metadata} ->
               {auto e : Ref EST (EState vars)} ->
               ElabMode ->
@@ -105,6 +106,7 @@ getNameType elabMode rigc env fc x
 -- Get the type of a variable, looking it up in the nested names first.
 getVarType : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->
+             {auto w : AppendOnly Warn Warning} ->
              {auto m : Ref MD Metadata} ->
              {auto e : Ref EST (EState vars)} ->
              ElabMode ->
@@ -161,6 +163,7 @@ isHole _ = False
 mutual
   makeImplicit : {vars : _} ->
                  {auto c : Ref Ctxt Defs} ->
+                 {auto w : AppendOnly Warn Warning} ->
                  {auto m : Ref MD Metadata} ->
                  {auto u : Ref UST UState} ->
                  {auto e : Ref EST (EState vars)} ->
@@ -192,6 +195,7 @@ mutual
 
   makeAutoImplicit : {vars : _} ->
                      {auto c : Ref Ctxt Defs} ->
+                     {auto w : AppendOnly Warn Warning} ->
                      {auto m : Ref MD Metadata} ->
                      {auto u : Ref UST UState} ->
                      {auto e : Ref EST (EState vars)} ->
@@ -248,6 +252,7 @@ mutual
 
   makeDefImplicit : {vars : _} ->
                     {auto c : Ref Ctxt Defs} ->
+                    {auto w : AppendOnly Warn Warning} ->
                     {auto m : Ref MD Metadata} ->
                     {auto u : Ref UST UState} ->
                     {auto e : Ref EST (EState vars)} ->
@@ -416,6 +421,7 @@ mutual
   -- disambiguation when elaborating the argument.
   checkRestApp : {vars : _} ->
                  {auto c : Ref Ctxt Defs} ->
+                 {auto w : AppendOnly Warn Warning} ->
                  {auto m : Ref MD Metadata} ->
                  {auto u : Ref UST UState} ->
                  {auto e : Ref EST (EState vars)} ->
@@ -581,6 +587,7 @@ mutual
   -- Returns the checked term and its (weakly) normalised type
   checkAppWith' : {vars : _} ->
                  {auto c : Ref Ctxt Defs} ->
+                 {auto w : AppendOnly Warn Warning} ->
                  {auto m : Ref MD Metadata} ->
                  {auto u : Ref UST UState} ->
                  {auto e : Ref EST (EState vars)} ->
@@ -759,6 +766,7 @@ mutual
   ||| that it ought to be forced by another pattern somewhere else in the LHS.
   checkAppWith : {vars : _} ->
                  {auto c : Ref Ctxt Defs} ->
+                 {auto w : AppendOnly Warn Warning} ->
                  {auto m : Ref MD Metadata} ->
                  {auto u : Ref UST UState} ->
                  {auto e : Ref EST (EState vars)} ->
@@ -795,6 +803,7 @@ mutual
 export
 checkApp : {vars : _} ->
            {auto c : Ref Ctxt Defs} ->
+           {auto w : AppendOnly Warn Warning} ->
            {auto m : Ref MD Metadata} ->
            {auto u : Ref UST UState} ->
            {auto e : Ref EST (EState vars)} ->

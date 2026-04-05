@@ -7,13 +7,14 @@ import Core.Primitives
 
 %default covering
 
-addPrim : {auto c : Ref Ctxt Defs} ->
-          Prim -> Core ()
-addPrim p
-    = do addBuiltin (opName (fn p)) (type p) (totality p) (fn p)
-         compileDef (opName (fn p))
+parameters {auto c : Ref Ctxt Defs}
+           {auto w : AppendOnly Warn Warning}
+  addPrim : Prim -> Core ()
+  addPrim p
+      = do addBuiltin (opName (fn p)) (type p) (totality p) (fn p)
+           compileDef (opName (fn p))
 
-export
-addPrimitives : {auto c : Ref Ctxt Defs} -> Core ()
-addPrimitives
-    = traverse_ addPrim allPrimitives
+  export
+  addPrimitives : Core ()
+  addPrimitives
+      = traverse_ addPrim allPrimitives

@@ -24,6 +24,8 @@ import Libraries.Data.SparseMatrix
 import Libraries.Utils.Binary
 import Libraries.Utils.Scheme
 
+import System.Concurrency
+
 %hide LabelledValue.label
 %hide KeyVal.label
 
@@ -36,6 +38,11 @@ public export
 data ReadOnly : (l : label) -> Type -> Type where
      [search l]
      MkReadRef : IORef a -> ReadOnly x a
+
+public export
+data AppendOnly : (l : label) -> Type -> Type where
+     [search l]
+     MkAppendRef : IORef (List a) -> Mutex -> AppendOnly x a
 
 %hint %inline export
 fromRef : Ref l a -> ReadOnly l a

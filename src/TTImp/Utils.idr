@@ -187,6 +187,7 @@ findBindableNamesQuot env used (IRunElab fc _ x) = []
 export
 findUniqueBindableNames :
   {auto c : Ref Ctxt Defs} ->
+  {auto w : AppendOnly Warn Warning} ->
   FC -> (arg : Bool) -> (env : List Name) -> (used : List String) ->
   RawImp -> Core (List (Name, Name))
 findUniqueBindableNames fc arg env used t

@@ -455,6 +455,7 @@ getNSas (a, (b, c, d)) = (b, d)
 export
 readFromTTC : TTC extra =>
               {auto c : Ref Ctxt Defs} ->
+              {auto w : AppendOnly Warn Warning} ->
               {auto u : Ref UST UState} ->
               Bool -> -- set nested namespaces (for records, to use at the REPL)
               FC ->

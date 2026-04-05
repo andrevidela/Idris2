@@ -111,6 +111,7 @@ insertImpLam env tm _ = pure tm
 -- Implements 'checkImp' in TTImp.Elab.Check
 checkTerm : {vars : _} ->
             {auto c : Ref Ctxt Defs} ->
+            {auto w : AppendOnly Warn Warning} ->
             {auto m : Ref MD Metadata} ->
             {auto u : Ref UST UState} ->
             {auto e : Ref EST (EState vars)} ->
@@ -307,6 +308,7 @@ onLHS _ = False
 -- As above, but doesn't add any implicit lambdas, forces, delays, etc
 -- checkImp : {vars : _} ->
 --            {auto c : Ref Ctxt Defs} ->
+--            {auto w : AppendOnly Warn Warning} ->
 --            {auto m : Ref MD Metadata} ->
 --            {auto u : Ref UST UState} ->
 --            {auto e : Ref EST (EState vars)} ->

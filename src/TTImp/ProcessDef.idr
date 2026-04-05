@@ -279,20 +279,22 @@ combineLinear loc ((n, count) :: cs)
              combineAll newc cs
 
 export -- also used by Transforms
-checkLHS : {vars : _} ->
-           {auto c : Ref Ctxt Defs} ->
-           {auto m : Ref MD Metadata} ->
-           {auto u : Ref UST UState} ->
-           {auto s : Ref Syn SyntaxInfo} ->
-           {auto o : Ref ROpts REPLOpts} ->
-           Bool -> -- in transform
-           (mult : RigCount) ->
-           Int -> List ElabOpt -> NestedNames vars -> Env Term vars ->
-           FC -> RawImp ->
-           Core (RawImp, -- checked LHS with implicits added
-                 (vars' ** (Thin vars vars',
-                           Env Term vars', NestedNames vars',
-                           Term vars', Term vars')))
+checkLHS :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    Bool -> -- in transform
+    (mult : RigCount) ->
+    Int -> List ElabOpt -> NestedNames vars -> Env Term vars ->
+    FC -> RawImp ->
+    Core (RawImp, -- checked LHS with implicits added
+          (vars' ** (Thin vars vars',
+                    Env Term vars', NestedNames vars',
+                    Term vars', Term vars')))
 checkLHS {vars} trans mult n opts nest env fc lhs_in
     = do defs <- get Ctxt
          logRaw "declare.def.lhs" 30 "Raw LHS: " lhs_in
@@ -377,16 +379,18 @@ applyEnv env withname
 -- Check a pattern clause, returning the component of the 'Case' expression it
 -- represents, or Nothing if it's an impossible clause
 export
-checkClause : {vars : _} ->
-              {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              (mult : RigCount) -> (vis : Visibility) ->
-              (totreq : TotalReq) -> (hashit : Bool) ->
-              Int -> List ElabOpt -> NestedNames vars -> Env Term vars ->
-              ImpClause -> Core (Either RawImp Clause)
+checkClause :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    (mult : RigCount) -> (vis : Visibility) ->
+    (totreq : TotalReq) -> (hashit : Bool) ->
+    Int -> List ElabOpt -> NestedNames vars -> Env Term vars ->
+    ImpClause -> Core (Either RawImp Clause)
 checkClause mult vis totreq hashit n opts nest env (ImpossibleClause fc lhs)
     = do lhs_raw <- lhsInCurrentNS nest lhs
          handleUnify
@@ -810,8 +814,10 @@ toPats : Clause -> (vs ** (Env Term vs, Term vs, Term vs))
 toPats (MkClause {vars} env lhs rhs)
     = (_ ** (env, lhs, rhs))
 
-warnUnreachable : {auto c : Ref Ctxt Defs} ->
-                  Clause -> Core ()
+warnUnreachable :
+    -- {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    Clause -> Core ()
 warnUnreachable (MkClause env lhs rhs)
     = recordWarning (UnreachableClause (getLoc lhs) env lhs)
 
@@ -823,14 +829,16 @@ isAlias lhs
        args <- traverse (isExplicit >=> bitraverse pure isIBindVar) apps
        pure (hd, args)
 
-lookupOrAddAlias : {vars : _} ->
-                   {auto m : Ref MD Metadata} ->
-                   {auto c : Ref Ctxt Defs} ->
-                   {auto u : Ref UST UState} ->
-                   {auto s : Ref Syn SyntaxInfo} ->
-                   {auto o : Ref ROpts REPLOpts} ->
-                   List ElabOpt -> NestedNames vars -> Env Term vars -> FC ->
-                   Name -> List ImpClause -> Core (Maybe GlobalDef)
+lookupOrAddAlias :
+    {vars : _} ->
+    {auto m : Ref MD Metadata} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    List ElabOpt -> NestedNames vars -> Env Term vars -> FC ->
+    Name -> List ImpClause -> Core (Maybe GlobalDef)
 lookupOrAddAlias eopts nest env fc n [cl@(PatClause _ lhs _)]
   = do defs <- get Ctxt
        log "declare.def.alias" 20 $ "Looking at \{show cl}"
@@ -878,14 +886,16 @@ lookupOrAddAlias _ _ _ fc n _
        lookupCtxtExact n (gamma defs)
 
 export
-processDef : {vars : _} ->
-             {auto c : Ref Ctxt Defs} ->
-             {auto m : Ref MD Metadata} ->
-             {auto u : Ref UST UState} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             List ElabOpt -> NestedNames vars -> Env Term vars -> FC ->
-             Name -> List ImpClause -> Core ()
+processDef :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    List ElabOpt -> NestedNames vars -> Env Term vars -> FC ->
+    Name -> List ImpClause -> Core ()
 processDef opts nest env fc n_in cs_in
   = do n <- inCurrentNS n_in
        withDefStacked n $ do

@@ -33,22 +33,24 @@ projVis : Visibility -> Visibility
 projVis Public = Public
 projVis _ = Private
 
-elabRecord : {vars : _} ->
-             {auto c : Ref Ctxt Defs} ->
-             {auto m : Ref MD Metadata} ->
-             {auto u : Ref UST UState} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             List ElabOpt -> FC -> Env Term vars ->
-             NestedNames vars -> Maybe String ->
-             WithDefault Visibility Private ->
-             Maybe TotalReq ->
-             (tyName : Name) ->
-             (params : List ImpParameter) ->
-             (opts : List DataOpt) ->
-             (conName : Name) ->
-             List IField ->
-             Core ()
+elabRecord :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    List ElabOpt -> FC -> Env Term vars ->
+    NestedNames vars -> Maybe String ->
+    WithDefault Visibility Private ->
+    Maybe TotalReq ->
+    (tyName : Name) ->
+    (params : List ImpParameter) ->
+    (opts : List DataOpt) ->
+    (conName : Name) ->
+    List IField ->
+    Core ()
 elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conName_in fields
     = do tn <- inCurrentNS tn_in
          conName <- inCurrentNS conName_in
@@ -339,15 +341,17 @@ elabRecord {vars} eopts fc env nest newns def_vis mbtot tn_in params0 opts conNa
     elabGetters tn con _ done upds _ _ = pure ()
 
 export
-processRecord : {vars : _} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto m : Ref MD Metadata} ->
-                {auto u : Ref UST UState} ->
-                {auto s : Ref Syn SyntaxInfo} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                List ElabOpt -> NestedNames vars ->
-                Env Term vars -> Maybe String ->
-                WithDefault Visibility Private -> Maybe TotalReq ->
-                ImpRecord -> Core ()
+processRecord :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    List ElabOpt -> NestedNames vars ->
+    Env Term vars -> Maybe String ->
+    WithDefault Visibility Private -> Maybe TotalReq ->
+    ImpRecord -> Core ()
 processRecord eopts nest env newns def_vis mbtot rec@(MkWithData _ $ MkImpRecord header body)
     = elabRecord eopts rec.fc env nest newns def_vis mbtot header.name.val header.val body.opts body.name.val body.val

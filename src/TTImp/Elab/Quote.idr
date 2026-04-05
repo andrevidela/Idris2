@@ -144,17 +144,19 @@ mutual
       = pure $ ITransform fc n !(getUnquote l) !(getUnquote r)
   getUnquoteDecl d = pure d
 
-bindUnqs : {vars : _} ->
-           {auto c : Ref Ctxt Defs} ->
-           {auto m : Ref MD Metadata} ->
-           {auto u : Ref UST UState} ->
-           {auto e : Ref EST (EState vars)} ->
-           {auto s : Ref Syn SyntaxInfo} ->
-           {auto o : Ref ROpts REPLOpts} ->
-           List (Name, FC, RawImp) ->
-           RigCount -> ElabInfo -> NestedNames vars -> Env Term vars ->
-           Term vars ->
-           Core (Term vars)
+bindUnqs :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto e : Ref EST (EState vars)} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    List (Name, FC, RawImp) ->
+    RigCount -> ElabInfo -> NestedNames vars -> Env Term vars ->
+    Term vars ->
+    Core (Term vars)
 bindUnqs [] _ _ _ _ tm = pure tm
 bindUnqs ((qvar, fc, esctm) :: qs) rig elabinfo nest env tm
     = do defs <- get Ctxt
@@ -172,17 +174,19 @@ onLHS (InLHS _) = True
 onLHS _ = False
 
 export
-checkQuote : {vars : _} ->
-             {auto c : Ref Ctxt Defs} ->
-             {auto m : Ref MD Metadata} ->
-             {auto u : Ref UST UState} ->
-             {auto e : Ref EST (EState vars)} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             RigCount -> ElabInfo ->
-             NestedNames vars -> Env Term vars ->
-             FC -> RawImp -> Maybe (Glued vars) ->
-             Core (Term vars, Glued vars)
+checkQuote :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto e : Ref EST (EState vars)} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    RigCount -> ElabInfo ->
+    NestedNames vars -> Env Term vars ->
+    FC -> RawImp -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 checkQuote rig elabinfo nest env fc tm exp
     = do defs <- get Ctxt
          q <- newRef Unq []
@@ -195,13 +199,14 @@ checkQuote rig elabinfo nest env fc tm exp
          checkExp rig elabinfo env fc fullqtm (gnf env qty) exp
 
 export
-checkQuoteName : {vars : _} ->
-                 {auto c : Ref Ctxt Defs} ->
-                 {auto u : Ref UST UState} ->
-                 RigCount -> ElabInfo ->
-                 NestedNames vars -> Env Term vars ->
-                 FC -> Name -> Maybe (Glued vars) ->
-                 Core (Term vars, Glued vars)
+checkQuoteName :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    RigCount -> ElabInfo ->
+    NestedNames vars -> Env Term vars ->
+    FC -> Name -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 checkQuoteName rig elabinfo nest env fc n exp
     = do defs <- get Ctxt
          qnm <- reflect fc defs (onLHS (elabMode elabinfo)) env n
@@ -209,17 +214,19 @@ checkQuoteName rig elabinfo nest env fc n exp
          checkExp rig elabinfo env fc qnm (gnf env qty) exp
 
 export
-checkQuoteDecl : {vars : _} ->
-                 {auto c : Ref Ctxt Defs} ->
-                 {auto m : Ref MD Metadata} ->
-                 {auto u : Ref UST UState} ->
-                 {auto e : Ref EST (EState vars)} ->
-                 {auto s : Ref Syn SyntaxInfo} ->
-                 {auto o : Ref ROpts REPLOpts} ->
-                 RigCount -> ElabInfo ->
-                 NestedNames vars -> Env Term vars ->
-                 FC -> List ImpDecl -> Maybe (Glued vars) ->
-                 Core (Term vars, Glued vars)
+checkQuoteDecl :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto e : Ref EST (EState vars)} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    RigCount -> ElabInfo ->
+    NestedNames vars -> Env Term vars ->
+    FC -> List ImpDecl -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 checkQuoteDecl rig elabinfo nest env fc ds exp
     = do defs <- get Ctxt
          q <- newRef Unq []

@@ -164,35 +164,34 @@ addUsing uimpls tm
     tag : Int -> List a -> List (Int, a) -- to check uniqueness of resulting uimps
     tag t xs = zip (map (+t) [0..cast (length xs)]) xs
 
-export
-bindTypeNames : {auto c : Ref Ctxt Defs} ->
-                FC -> List (Maybe Name, RawImp) ->
-                List Name -> RawImp-> Core RawImp
-bindTypeNames fc uimpls env tm
-    = if !isUnboundImplicits
-             then do ns <- findUniqueBindableNames fc True env [] tm
-                     let btm = doBind ns tm
-                     pure (addUsing uimpls btm)
-             else pure tm
+parameters {auto c : Ref Ctxt Defs}
+           {auto w : AppendOnly Warn Warning}
+  export
+  bindTypeNames : FC -> List (Maybe Name, RawImp) ->
+                  List Name -> RawImp-> Core RawImp
+  bindTypeNames fc uimpls env tm
+      = if !isUnboundImplicits
+               then do ns <- findUniqueBindableNames fc True env [] tm
+                       let btm = doBind ns tm
+                       pure (addUsing uimpls btm)
+               else pure tm
 
-export
-bindTypeNamesUsed : {auto c : Ref Ctxt Defs} ->
-                    FC -> List String -> List Name -> RawImp -> Core RawImp
-bindTypeNamesUsed fc used env tm
-    = if !isUnboundImplicits
-         then do ns <- findUniqueBindableNames fc True env used tm
-                 pure (doBind ns tm)
-         else pure tm
+  export
+  bindTypeNamesUsed : FC -> List String -> List Name -> RawImp -> Core RawImp
+  bindTypeNamesUsed fc used env tm
+      = if !isUnboundImplicits
+           then do ns <- findUniqueBindableNames fc True env used tm
+                   pure (doBind ns tm)
+           else pure tm
 
-export
-piBindNames : {auto c : Ref Ctxt Defs} ->
-              FC -> List Name -> RawImp -> Core RawImp
-piBindNames loc env tm
-    = do ns <- findUniqueBindableNames loc True env [] tm
-         pure $ piBind (map fst ns) tm
-  where
-    piBind : List Name -> RawImp -> RawImp
-    piBind [] ty = ty
-    piBind (n :: ns) ty
-       = IPi loc erased Implicit (Just n) (Implicit loc False)
-       $ piBind ns ty
+  export
+  piBindNames : FC -> List Name -> RawImp -> Core RawImp
+  piBindNames loc env tm
+      = do ns <- findUniqueBindableNames loc True env [] tm
+           pure $ piBind (map fst ns) tm
+    where
+      piBind : List Name -> RawImp -> RawImp
+      piBind [] ty = ty
+      piBind (n :: ns) ty
+         = IPi loc erased Implicit (Just n) (Implicit loc False)
+         $ piBind ns ty

@@ -100,17 +100,19 @@ elabRewrite loc env expected rulety
          pure (MkLemma lemn pred predty)
 
 export
-checkRewrite : {vars : _} ->
-               {auto c : Ref Ctxt Defs} ->
-               {auto m : Ref MD Metadata} ->
-               {auto u : Ref UST UState} ->
-               {auto e : Ref EST (EState vars)} ->
-               {auto s : Ref Syn SyntaxInfo} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               RigCount -> ElabInfo ->
-               NestedNames vars -> Env Term vars ->
-               FC -> RawImp -> RawImp -> Maybe (Glued vars) ->
-               Core (Term vars, Glued vars)
+checkRewrite :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto e : Ref EST (EState vars)} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    RigCount -> ElabInfo ->
+    NestedNames vars -> Env Term vars ->
+    FC -> RawImp -> RawImp -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 checkRewrite rigc elabinfo nest env fc rule tm Nothing
     = throw (GenericMsg fc "Can't infer a type for rewrite")
 checkRewrite {vars} rigc elabinfo nest env ifc rule tm (Just expected)

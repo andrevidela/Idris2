@@ -17,6 +17,7 @@ import TTImp.TTImp
 export
 checkDelayed : {vars : _} ->
                {auto c : Ref Ctxt Defs} ->
+               {auto w : AppendOnly Warn Warning} ->
                {auto m : Ref MD Metadata} ->
                {auto u : Ref UST UState} ->
                {auto e : Ref EST (EState vars)} ->
@@ -34,6 +35,7 @@ checkDelayed rig elabinfo nest env fc r tm exp
 export
 checkDelay : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->
+             {auto w : AppendOnly Warn Warning} ->
              {auto m : Ref MD Metadata} ->
              {auto u : Ref UST UState} ->
              {auto e : Ref EST (EState vars)} ->
@@ -76,6 +78,7 @@ checkDelay rig elabinfo nest env fc tm mexpected
 export
 checkForce : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->
+             {auto w : AppendOnly Warn Warning} ->
              {auto m : Ref MD Metadata} ->
              {auto u : Ref UST UState} ->
              {auto e : Ref EST (EState vars)} ->

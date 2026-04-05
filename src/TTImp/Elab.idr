@@ -85,17 +85,19 @@ addHoleToSave n
          traverse_ addToSave ms
 
 export
-elabTermSub : {inner, vars : _} ->
-              {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              Int -> ElabMode -> List ElabOpt ->
-              NestedNames vars -> Env Term vars ->
-              Env Term inner -> Thin inner vars ->
-              RawImp -> Maybe (Glued vars) ->
-              Core (Term vars, Glued vars)
+elabTermSub :
+    {inner, vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    Int -> ElabMode -> List ElabOpt ->
+    NestedNames vars -> Env Term vars ->
+    Env Term inner -> Thin inner vars ->
+    RawImp -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 elabTermSub {vars} defining mode opts nest env env' sub tm ty
     = do let incase = elem InCase opts
          let inPE = elem InPartialEval opts
@@ -204,31 +206,35 @@ elabTermSub {vars} defining mode opts nest env env' sub tm ty
                Just _ => addHoles (insert n x acc) allhs hs
 
 export
-elabTerm : {vars : _} ->
-           {auto c : Ref Ctxt Defs} ->
-           {auto m : Ref MD Metadata} ->
-           {auto u : Ref UST UState} ->
-           {auto s : Ref Syn SyntaxInfo} ->
-           {auto o : Ref ROpts REPLOpts} ->
-           Int -> ElabMode -> List ElabOpt ->
-           NestedNames vars -> Env Term vars ->
-           RawImp -> Maybe (Glued vars) ->
-           Core (Term vars, Glued vars)
+elabTerm :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    Int -> ElabMode -> List ElabOpt ->
+    NestedNames vars -> Env Term vars ->
+    RawImp -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 elabTerm defining mode opts nest env tm ty
     = elabTermSub defining mode opts nest env env Refl tm ty
 
 export
-checkTermSub : {inner, vars : _} ->
-               {auto c : Ref Ctxt Defs} ->
-               {auto m : Ref MD Metadata} ->
-               {auto u : Ref UST UState} ->
-               {auto s : Ref Syn SyntaxInfo} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               Int -> ElabMode -> List ElabOpt ->
-               NestedNames vars -> Env Term vars ->
-               Env Term inner -> Thin inner vars ->
-               RawImp -> Glued vars ->
-               Core (Term vars)
+checkTermSub :
+    {inner, vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    Int -> ElabMode -> List ElabOpt ->
+    NestedNames vars -> Env Term vars ->
+    Env Term inner -> Thin inner vars ->
+    RawImp -> Glued vars ->
+    Core (Term vars)
 checkTermSub defining mode opts nest env env' sub tm ty
     = do defs <- case mode of
                       InType => branch -- might need to backtrack if there's
@@ -270,15 +276,17 @@ checkTermSub defining mode opts nest env env' sub tm ty
     bindImps loc env ns ty = bindImps' loc env ns ty
 
 export
-checkTerm : {vars : _} ->
-            {auto c : Ref Ctxt Defs} ->
-            {auto m : Ref MD Metadata} ->
-            {auto u : Ref UST UState} ->
-            {auto s : Ref Syn SyntaxInfo} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            Int -> ElabMode -> List ElabOpt ->
-            NestedNames vars -> Env Term vars ->
-            RawImp -> Glued vars ->
-            Core (Term vars)
+checkTerm :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    Int -> ElabMode -> List ElabOpt ->
+    NestedNames vars -> Env Term vars ->
+    RawImp -> Glued vars ->
+    Core (Term vars)
 checkTerm defining mode opts nest env tm ty
     = checkTermSub defining mode opts nest env env Refl tm ty

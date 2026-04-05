@@ -346,17 +346,19 @@ addAmbig [_] _ = id
 addAmbig _ (Just n) = { ambigTries $= (n ::) }
 
 export
-checkAlternative : {vars : _} ->
-                   {auto c : Ref Ctxt Defs} ->
-                   {auto m : Ref MD Metadata} ->
-                   {auto u : Ref UST UState} ->
-                   {auto e : Ref EST (EState vars)} ->
-                   {auto s : Ref Syn SyntaxInfo} ->
-                   {auto o : Ref ROpts REPLOpts} ->
-                   RigCount -> ElabInfo ->
-                   NestedNames vars -> Env Term vars ->
-                   FC -> AltType -> List RawImp -> Maybe (Glued vars) ->
-                   Core (Term vars, Glued vars)
+checkAlternative :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto e : Ref EST (EState vars)} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    RigCount -> ElabInfo ->
+    NestedNames vars -> Env Term vars ->
+    FC -> AltType -> List RawImp -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 checkAlternative rig elabinfo nest env fc (UniqueDefault def) alts mexpected
     = do checkAmbigDepth fc elabinfo
          expected <- maybe (do nm <- genName "altTy"

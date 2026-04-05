@@ -69,6 +69,7 @@ deepRefersTo def = do
 export
 elabScript : {vars : _} ->
              {auto c : Ref Ctxt Defs} ->
+             {auto w : AppendOnly Warn Warning} ->
              {auto m : Ref MD Metadata} ->
              {auto u : Ref UST UState} ->
              {auto s : Ref Syn SyntaxInfo} ->
@@ -352,6 +353,7 @@ elabScript rig fc nest env script exp
 export
 checkRunElab : {vars : _} ->
                {auto c : Ref Ctxt Defs} ->
+               {auto w : AppendOnly Warn Warning} ->
                {auto m : Ref MD Metadata} ->
                {auto u : Ref UST UState} ->
                {auto e : Ref EST (EState vars)} ->

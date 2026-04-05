@@ -678,30 +678,34 @@ anyOne fc es = anyOneErrs es [<] where
 -- Implemented in TTImp.Elab.Term; delaring just the type allows us to split
 -- the elaborator over multiple files more easily
 export
-check : {vars : _} ->
-        {auto c : Ref Ctxt Defs} ->
-        {auto m : Ref MD Metadata} ->
-        {auto u : Ref UST UState} ->
-        {auto e : Ref EST (EState vars)} ->
-        {auto s : Ref Syn SyntaxInfo} ->
-        {auto o : Ref ROpts REPLOpts} ->
-        RigCount -> ElabInfo ->
-        NestedNames vars -> Env Term vars -> RawImp ->
-        Maybe (Glued vars) ->
-        Core (Term vars, Glued vars)
+check :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto e : Ref EST (EState vars)} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    RigCount -> ElabInfo ->
+    NestedNames vars -> Env Term vars -> RawImp ->
+    Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 
 -- As above, but doesn't add any implicit lambdas, forces, delays, etc
 export
-checkImp : {vars : _} ->
-           {auto c : Ref Ctxt Defs} ->
-           {auto m : Ref MD Metadata} ->
-           {auto u : Ref UST UState} ->
-           {auto e : Ref EST (EState vars)} ->
-           {auto s : Ref Syn SyntaxInfo} ->
-           {auto o : Ref ROpts REPLOpts} ->
-           RigCount -> ElabInfo ->
-           NestedNames vars -> Env Term vars -> RawImp -> Maybe (Glued vars) ->
-           Core (Term vars, Glued vars)
+checkImp :
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto w : AppendOnly Warn Warning} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto e : Ref EST (EState vars)} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    RigCount -> ElabInfo ->
+    NestedNames vars -> Env Term vars -> RawImp -> Maybe (Glued vars) ->
+    Core (Term vars, Glued vars)
 
 -- Implemented in TTImp.ProcessDecls
 export
