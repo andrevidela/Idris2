@@ -477,6 +477,7 @@ compileMain mainn mfilename exec
 withWarnings : Ref Ctxt Defs =>
                Ref Syn SyntaxInfo =>
                Ref ROpts REPLOpts =>
+               WarnQueue =>
                Core a -> Core a
 withWarnings op = do o <- catch op $ \err =>
                            do emit
@@ -487,7 +488,6 @@ withWarnings op = do o <- catch op $ \err =>
     emit : Core ()
     emit = do
       ignore emitWarnings
-      update Ctxt { warnings := [] }
 
 prepareCompilation : {auto c : Ref Ctxt Defs} ->
                      {auto s : Ref Syn SyntaxInfo} ->

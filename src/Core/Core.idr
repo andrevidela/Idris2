@@ -974,10 +974,22 @@ newAppendOnlyRef x type
          mutex <- coreLift makeMutex
          pure (MkAppendRef ref mutex)
 
+||| Atomically append an element to the queue
 export %inline
 append : (0 x : label) -> {auto ref : AppendOnly x a} -> a -> Core ()
 append x {ref = MkAppendRef io lock} val
   = coreLift $ atomically lock (modifyIORef io (val ::))
+
+||| Read the content of the queue and flushes it
+export %inline
+readAndFlushQueue : (0 x : label) -> {auto ref : AppendOnly x a} -> Core (List a)
+readAndFlushQueue x {ref = MkAppendRef io lock}
+  = coreLift $ do
+      mutexAcquire lock
+      val <- readIORef io
+      writeIORef io []
+      mutexRelease lock
+      pure val
 
 export %inline
 read : (0 x : label) -> {auto ref : ReadOnly x a} -> Core a

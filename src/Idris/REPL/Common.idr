@@ -143,13 +143,13 @@ emitWarning : {auto c : ReadOnly Ctxt Defs} ->
 emitWarning w = emitProblem w displayWarning pwarning (Just . getWarningLoc) MsgStatusInfo
 
 export
-emitWarnings : {auto c : Ref Ctxt Defs} ->
+emitWarnings : {auto w : WarnQueue} ->
+               {auto c : ReadOnly Ctxt Defs} ->
                {auto o : Ref ROpts REPLOpts} ->
                {auto s : Ref Syn SyntaxInfo} ->
                Core (List Error)
 emitWarnings
-    = do defs <- read Ctxt
-         let ws = reverse (warnings defs)
+    = do ws <- reverse <$> readAndFlushQueue Warn
          session <- getSession
          if (session.warningsAsErrors)
            then let errs = WarningAsError <$> ws in
@@ -160,6 +160,7 @@ export
 emitWarningsAndErrors : {auto c : Ref Ctxt Defs} ->
                         {auto o : Ref ROpts REPLOpts} ->
                         {auto s : Ref Syn SyntaxInfo} ->
+                        WarnQueue =>
                         List Error -> Core (List Error)
 emitWarningsAndErrors errs = do
   ws <- emitWarnings

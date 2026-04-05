@@ -1056,8 +1056,6 @@ record Defs where
   timer : Maybe (Integer, String)
      -- ^ for timing and checking timeouts; the maximum time after which a
      -- timeout should be thrown
-  warnings : List Warning
-     -- ^ as yet unreported warnings
   schemeEvalLoaded : Bool
   foreignExports : NameMap (List (String, String))
        -- ^ For functions which are callable from a foreign language. This
@@ -1072,6 +1070,7 @@ data Ctxt : Type where
 export
 data Warn : Type where
 
+-- A concurrency safe global queue for warnings
 public export 0
 WarnQueue : Type
 WarnQueue = AppendOnly Warn Warning
@@ -1115,7 +1114,6 @@ initDefs
            , peFailures = empty
            , timings = empty
            , timer = Nothing
-           , warnings = []
            , schemeEvalLoaded = False
            , foreignExports = empty
            , defsStack = [<]
