@@ -56,19 +56,23 @@ missingIncremental ttcFile
                   pure False)
           (\error => pure False)
 
-processDecls : {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto s : Ref Syn SyntaxInfo} ->
-               {auto m : Ref MD Metadata} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               List PDecl -> Core (List Error)
+processDecls :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto m : Ref MD Metadata} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    List PDecl -> Core (List Error)
 
-processDecl : {auto c : Ref Ctxt Defs} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto m : Ref MD Metadata} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              PDecl -> Core (List Error)
+processDecl :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto m : Ref MD Metadata} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    PDecl -> Core (List Error)
 
 -- Special cases to avoid treating these big blocks as units
 -- This should give us better error recovery (the whole block won't fail
@@ -92,15 +96,17 @@ processDecls decls
              | Just err => pure (if null errs then [err] else errs)
          pure errs
 
-readModule : {auto c : Ref Ctxt Defs} ->
-             {auto u : Ref UST UState} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             (full : Bool) -> -- load everything transitively (needed for REPL and compiling)
-             FC ->
-             (visible : Bool) -> -- Is import visible to top level module?
-             (imp : ModuleIdent) -> -- Module name to import
-             (as : Namespace) -> -- Namespace to import into
-             Core ()
+readModule :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    WarnQueue =>
+    (full : Bool) -> -- load everything transitively (needed for REPL and compiling)
+    FC ->
+    (visible : Bool) -> -- Is import visible to top level module?
+    (imp : ModuleIdent) -> -- Module name to import
+    (as : Namespace) -> -- Namespace to import into
+    Core ()
 readModule full loc vis imp as
     = do defs <- get Ctxt
          let False = (imp, vis, as) `elem` map snd (allImported defs)
@@ -121,25 +127,24 @@ readModule full loc vis imp as
                           let as = snd (snd mimp)
                           when (reexp || full) $ readModule full loc reexp m as) more
          setNS modNS
+parameters
+    {auto c : Ref Ctxt Defs}
+    {auto u : Ref UST UState}
+    {auto s : Ref Syn SyntaxInfo}
+    {auto w : WarnQueue}
 
-readImport : {auto c : Ref Ctxt Defs} ->
-             {auto u : Ref UST UState} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             Bool -> Import -> Core ()
-readImport full imp
-    = do readModule full (loc imp) True (path imp) (nameAs imp)
-         addImported (path imp, reexport imp, nameAs imp)
+  readImport : Bool -> Import -> Core ()
+  readImport full imp
+      = do readModule full (loc imp) True (path imp) (nameAs imp)
+           addImported (path imp, reexport imp, nameAs imp)
 
-||| Adds new import to the namespace without changing the current top-level namespace
-export
-addImport : {auto c : Ref Ctxt Defs} ->
-            {auto u : Ref UST UState} ->
-            {auto s : Ref Syn SyntaxInfo} ->
-            Import -> Core ()
-addImport imp
-    = do topNS <- getNS
-         readImport True imp
-         setNS topNS
+  ||| Adds new import to the namespace without changing the current top-level namespace
+  export
+  addImport : Import -> Core ()
+  addImport imp
+      = do topNS <- getNS
+           readImport True imp
+           setNS topNS
 
 readImportMeta : {auto c : Ref Ctxt Defs} ->
                  Import -> Core (Bool, (Namespace, Int))
@@ -153,52 +158,52 @@ prelude : Import
 prelude = MkImport (MkFC (Virtual Interactive) (0, 0) (0, 0)) False
                      (nsAsModuleIdent preludeNS) preludeNS
 
-export
-readPrelude : {auto c : Ref Ctxt Defs} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              Bool -> Core ()
-readPrelude full
-    = do readImport full prelude
-         setNS mainNS
+parameters
+    {auto c : Ref Ctxt Defs}
+    {auto u : Ref UST UState}
+    {auto s : Ref Syn SyntaxInfo}
+    {auto w : WarnQueue}
 
--- Import a TTC for use as the main file (e.g. at the REPL)
-export
-readAsMain : {auto c : Ref Ctxt Defs} ->
-             {auto u : Ref UST UState} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             (fname : String) -> Core ()
-readAsMain fname
-    = do Just (syn, _, more) <- readFromTTC {extra = SyntaxInfo}
+    export
+    readPrelude : Bool -> Core ()
+    readPrelude full
+        = do readImport full prelude
+             setNS mainNS
+
+    -- Import a TTC for use as the main file (e.g. at the REPL)
+    export
+    readAsMain : (fname : String) -> Core ()
+    readAsMain fname
+        = do Just (syn, _, more) <- readFromTTC {extra = SyntaxInfo}
                                              True EmptyFC True fname (nsAsModuleIdent emptyNS) emptyNS
               | Nothing => throw (InternalError "Already loaded")
 
-         replNS <- getNS
-         replNestedNS <- getNestedNS
-         extendSyn syn
+             replNS <- getNS
+             replNestedNS <- getNestedNS
+             extendSyn syn
 
-         -- Read the main file's top level imported modules, so we have access
-         -- to their names (and any of their public imports)
-         ustm <- get UST
-         traverse_ (\ mimp =>
-                       do let m = fst mimp
-                          let as = snd (snd mimp)
-                          readModule True emptyFC True m as
-                          addImported (m, True, as)) more
+             -- Read the main file's top level imported modules, so we have access
+             -- to their names (and any of their public imports)
+             ustm <- get UST
+             traverse_ (\ mimp =>
+                           do let m = fst mimp
+                              let as = snd (snd mimp)
+                              readModule True emptyFC True m as
+                              addImported (m, True, as)) more
 
-         -- also load the prelude, if required, so that we have access to it
-         -- at the REPL.
-         when (not (noprelude !getSession)) $
-              readModule True emptyFC True (nsAsModuleIdent preludeNS) preludeNS
+             -- also load the prelude, if required, so that we have access to it
+             -- at the REPL.
+             when (not (noprelude !getSession)) $
+                  readModule True emptyFC True (nsAsModuleIdent preludeNS) preludeNS
 
-         -- We're in the namespace from the first TTC, so use the next name
-         -- from that for the fresh metavariable name generation
-         -- TODO: Maybe we should record this per namespace, since this is
-         -- a little bit of a hack? Or maybe that will have too much overhead.
-         update UST { nextName := nextName ustm }
+             -- We're in the namespace from the first TTC, so use the next name
+             -- from that for the fresh metavariable name generation
+             -- TODO: Maybe we should record this per namespace, since this is
+             -- a little bit of a hack? Or maybe that will have too much overhead.
+             update UST { nextName := nextName ustm }
 
-         setNS replNS
-         setNestedNS replNestedNS
+             setNS replNS
+             setNestedNS replNestedNS
 
 addPrelude : List Import -> List Import
 addPrelude imps
@@ -207,9 +212,11 @@ addPrelude imps
        else imps
 
 export
-readHeader : {auto c : Ref Ctxt Defs} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             (path : String) -> (origin : ModuleIdent) -> Core Module
+readHeader :
+    {auto c : Ref Ctxt Defs} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    (path : String) -> (origin : ModuleIdent) -> Core Module
 readHeader path origin
     = do Right res <- coreLift (readFile path)
             | Left err => throw (FileErr path err)
@@ -287,17 +294,19 @@ findCG
 ||| Process everything in the module; return the syntax information which
 ||| needs to be written to the TTC (e.g. exported infix operators)
 ||| Returns 'Nothing' if it didn't reload anything
-processMod : {auto c : Ref Ctxt Defs} ->
-             {auto u : Ref UST UState} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             {auto m : Ref MD Metadata} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             (sourceFileName : String) ->
-             (ttcFileName : String) ->
-             (msg : Doc IdrisAnn) ->
-             (sourcecode : String) ->
-             (origin : ModuleIdent) ->
-             Core (Maybe (List Error))
+processMod :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto m : Ref MD Metadata} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    (sourceFileName : String) ->
+    (ttcFileName : String) ->
+    (msg : Doc IdrisAnn) ->
+    (sourcecode : String) ->
+    (origin : ModuleIdent) ->
+    Core (Maybe (List Error))
 processMod sourceFileName ttcFileName msg sourcecode origin
     = catch (do
         setCurrentElabSource sourcecode
@@ -405,16 +414,18 @@ processMod sourceFileName ttcFileName msg sourcecode origin
 -- Process a file. Returns any errors, rather than throwing them, because there
 -- might be lots of errors collected across a whole file.
 export
-process : {auto c : Ref Ctxt Defs} ->
-          {auto m : Ref MD Metadata} ->
-          {auto u : Ref UST UState} ->
-          {auto s : Ref Syn SyntaxInfo} ->
-          {auto o : Ref ROpts REPLOpts} ->
-          (msgPrefix : Doc IdrisAnn) ->
-          (buildMsg : Doc IdrisAnn) ->
-          FileName ->
-          (moduleIdent : ModuleIdent) ->
-          Core (List Error)
+process :
+    {auto c : Ref Ctxt Defs} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    (msgPrefix : Doc IdrisAnn) ->
+    (buildMsg : Doc IdrisAnn) ->
+    FileName ->
+    (moduleIdent : ModuleIdent) ->
+    Core (List Error)
 process msgPrefix buildMsg sourceFileName ident
     = do Right res <- coreLift (readFile sourceFileName)
                | Left err => pure [FileErr sourceFileName err]

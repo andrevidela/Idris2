@@ -111,10 +111,12 @@ mkPrec Prefix = Prefix
 -- modules as long as the fixities are consistent. If they aren't, the fixity
 -- can be hidden with %hide, this is handled by `removeFixity`.
 -- Once conflicts are handled we return the operator precedence we found.
-checkConflictingFixities : {auto s : Ref Syn SyntaxInfo} ->
-                           {auto c : Ref Ctxt Defs} ->
-                           (isPrefix : Bool) ->
-                           WithFC (OpStr' Name) -> Core (OpPrec, FixityDeclarationInfo)
+checkConflictingFixities :
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto c : Ref Ctxt Defs} ->
+    WarnQueue =>
+    (isPrefix : Bool) ->
+    WithFC (OpStr' Name) -> Core (OpPrec, FixityDeclarationInfo)
 checkConflictingFixities isPrefix opn
   = do let op = nameRoot opn.val.toName
        foundFixities <- getFixityInfo op
@@ -217,9 +219,11 @@ checkValidFixity _ InfixR 0 = True
 checkValidFixity _ _ _ = False
 
 parameters (side : Side)
-  toTokList : {auto s : Ref Syn SyntaxInfo} ->
-              {auto c : Ref Ctxt Defs} ->
-              PTerm -> Core (List (Tok ((OpStr, FixityDeclarationInfo), Maybe (OperatorLHSInfo PTerm)) PTerm))
+  toTokList :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      WarnQueue =>
+      PTerm -> Core (List (Tok ((OpStr, FixityDeclarationInfo), Maybe (OperatorLHSInfo PTerm)) PTerm))
   toTokList (POp fc (MkWithData _ l) opn r)
       = do (precInfo, fixInfo) <- checkConflictingFixities False opn
            unless (side == LHS) -- do not check for conflicting fixity on the LHS
@@ -283,13 +287,15 @@ idiomise fc dons mns fn
 data Bang : Type where
 
 mutual
-  desugarB : {auto s : Ref Syn SyntaxInfo} ->
-             {auto b : Ref Bang BangData} ->
-             {auto c : Ref Ctxt Defs} ->
-             {auto m : Ref MD Metadata} ->
-             {auto u : Ref UST UState} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             Side -> List Name -> PTerm -> Core RawImp
+  desugarB :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto b : Ref Bang BangData} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto m : Ref MD Metadata} ->
+      {auto u : Ref UST UState} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      Side -> List Name -> PTerm -> Core RawImp
   desugarB side ps (PRef fc x) = do
     let ns = mbNamespace !(get Bang)
     let pur = UN $ Basic "pure"
@@ -597,40 +603,45 @@ mutual
   desugarB side ps (PWithUnambigNames fc ns rhs)
       = IWithUnambigNames fc ns <$> desugarB side ps rhs
 
-  desugarUpdate : {auto s : Ref Syn SyntaxInfo} ->
-                  {auto b : Ref Bang BangData} ->
-                  {auto c : Ref Ctxt Defs} ->
-                  {auto u : Ref UST UState} ->
-                  {auto m : Ref MD Metadata} ->
-                  {auto o : Ref ROpts REPLOpts} ->
-                  Side -> List Name -> PFieldUpdate -> Core IFieldUpdate
+  desugarUpdate :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto b : Ref Bang BangData} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      Side -> List Name -> PFieldUpdate -> Core IFieldUpdate
   desugarUpdate side ps (PSetField p v)
       = pure (ISetField p !(desugarB side ps v))
   desugarUpdate side ps (PSetFieldApp p v)
       = pure (ISetFieldApp p !(desugarB side ps v))
 
-  expandList : {auto s : Ref Syn SyntaxInfo} ->
-               {auto b : Ref Bang BangData} ->
-               {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto m : Ref MD Metadata} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               Side -> List Name ->
-               (nilFC : FC) -> List (FC, PTerm) -> Core RawImp
+  expandList :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto b : Ref Bang BangData} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      Side -> List Name ->
+      (nilFC : FC) -> List (FC, PTerm) -> Core RawImp
   expandList side ps nilFC [] = pure (IVar nilFC (UN $ Basic "Nil"))
   expandList side ps nilFC ((consFC, x) :: xs)
       = pure $ apply (IVar consFC (UN $ Basic "::"))
                 [!(desugarB side ps x), !(expandList side ps nilFC xs)]
 
-  expandSnocList
-             : {auto s : Ref Syn SyntaxInfo} ->
-               {auto b : Ref Bang BangData} ->
-               {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto m : Ref MD Metadata} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               Side -> List Name -> (nilFC : FC) ->
-               SnocList (FC, PTerm) -> Core RawImp
+  expandSnocList :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto b : Ref Bang BangData} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      Side -> List Name -> (nilFC : FC) ->
+      SnocList (FC, PTerm) -> Core RawImp
   expandSnocList side ps nilFC [<] = pure (IVar nilFC (UN $ Basic "Lin"))
   expandSnocList side ps nilFC (xs :< (consFC, x))
       = pure $ apply (IVar consFC (UN $ Basic ":<"))
@@ -644,13 +655,15 @@ mutual
                let fc = virtualiseFC fc in
                IApp fc (IVar fc f) tm
 
-  expandString : {auto s : Ref Syn SyntaxInfo} ->
-                 {auto b : Ref Bang BangData} ->
-                 {auto c : Ref Ctxt Defs} ->
-                 {auto m : Ref MD Metadata} ->
-                 {auto u : Ref UST UState} ->
-                 {auto o : Ref ROpts REPLOpts} ->
-                 Side -> List Name -> FC -> Nat -> List PStr -> Core RawImp
+  expandString :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto b : Ref Bang BangData} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto m : Ref MD Metadata} ->
+      {auto u : Ref UST UState} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      Side -> List Name -> FC -> Nat -> List PStr -> Core RawImp
   expandString side ps fc hashtag xs
     = do xs <- traverse toRawImp (filter notEmpty $ mergeStrLit xs)
          pure $ case xs of
@@ -742,12 +755,14 @@ mutual
               \case StrLiteral fc str => StrLiteral fc (fst $ break isNL str)
                     other => other
 
-  expandDo : {auto s : Ref Syn SyntaxInfo} ->
-             {auto c : Ref Ctxt Defs} ->
-             {auto u : Ref UST UState} ->
-             {auto m : Ref MD Metadata} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             Side -> List Name -> FC -> Maybe Namespace -> List PDo -> Core RawImp
+  expandDo :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      Side -> List Name -> FC -> Maybe Namespace -> List PDo -> Core RawImp
   expandDo side ps fc ns [] = throw (GenericMsg fc "Do block cannot be empty")
   expandDo side ps _ ns [DoExp fc tm] = desugarDo side ps ns tm
   expandDo side ps fc ns [e]
@@ -886,12 +901,14 @@ mutual
            pure (PApp loc (PRef opFC op.toName) arg')
   desugarTree side ps (Leaf t) = pure t
 
-  desugarType : {auto s : Ref Syn SyntaxInfo} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto u : Ref UST UState} ->
-                {auto m : Ref MD Metadata} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                List Name -> PTypeDecl -> Core (List ImpTy)
+  desugarType :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> PTypeDecl -> Core (List ImpTy)
   desugarType ps pty@(MkWithData _ $ MkPTy names d ty)
       = flip Core.traverse (forget names) $ \(doc, n) : (String, WithFC Name) =>
           do addDocString n.val (d ++ doc)
@@ -910,15 +927,17 @@ mutual
   getClauseFn (INamedApp _ f _ _) = getClauseFn f
   getClauseFn tm = throw $ GenericMsg (getFC tm) "Head term in pattern must be a function name"
 
-  desugarLHS : {auto s : Ref Syn SyntaxInfo} ->
-               {auto c : Ref Ctxt Defs} ->
-               {auto m : Ref MD Metadata} ->
-               {auto u : Ref UST UState} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               List Name -> (arg : Bool) -> PTerm ->
-               Core (IMaybe (not arg) Name, List Name, RawImp)
-                  -- ^ we only look for the head name of the expression...
-                  --   if we are actually looking at a headed thing!
+  desugarLHS :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto m : Ref MD Metadata} ->
+      {auto u : Ref UST UState} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> (arg : Bool) -> PTerm ->
+      Core (IMaybe (not arg) Name, List Name, RawImp)
+         -- ^ we only look for the head name of the expression...
+         --   if we are actually looking at a headed thing!
   desugarLHS ps arg lhs =
     do rawlhs <- desugar LHS ps lhs
        inm <- iunless arg $ getClauseFn rawlhs
@@ -936,23 +955,26 @@ mutual
        pure (inm, bound, blhs)
 
   desugarWithProblem :
-    {auto s : Ref Syn SyntaxInfo} ->
-    {auto c : Ref Ctxt Defs} ->
-    {auto u : Ref UST UState} ->
-    {auto m : Ref MD Metadata} ->
-    {auto o : Ref ROpts REPLOpts} ->
-    List Name -> PWithProblem ->
-    Core (RigCount, RawImp, Maybe (RigCount, Name))
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> PWithProblem ->
+      Core (RigCount, RawImp, Maybe (RigCount, Name))
   desugarWithProblem ps (MkPWithProblem rig wval mnm)
     = (rig,,mnm) <$> desugar AnyExpr ps wval
 
-  desugarClause : {auto s : Ref Syn SyntaxInfo} ->
-                  {auto c : Ref Ctxt Defs} ->
-                  {auto u : Ref UST UState} ->
-                  {auto m : Ref MD Metadata} ->
-                  {auto o : Ref ROpts REPLOpts} ->
-                  List Name -> (arg : Bool) -> PClause ->
-                  Core (IMaybe (not arg) Name, ImpClause)
+  desugarClause :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> (arg : Bool) -> PClause ->
+      Core (IMaybe (not arg) Name, ImpClause)
   desugarClause ps arg (MkPatClause fc lhs rhs wheres)
       = do ws <- traverse (desugarDecl ps) wheres
 
@@ -976,13 +998,15 @@ mutual
       = do (nm, _, lhs') <- desugarLHS ps arg lhs
            pure (nm, ImpossibleClause fc lhs')
 
-  desugarData : {auto s : Ref Syn SyntaxInfo} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto u : Ref UST UState} ->
-                {auto m : Ref MD Metadata} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                List Name -> (doc : String) ->
-                PDataDecl -> Core ImpData
+  desugarData :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> (doc : String) ->
+      PDataDecl -> Core ImpData
   desugarData ps doc (MkPData fc n tycon opts datacons)
       = do addDocString n doc
            syn <- get Syn
@@ -999,13 +1023,15 @@ mutual
            pure $ MkImpLater fc n !(bindTypeNames fc (usingImpl syn)
                                                   ps !(desugar AnyExpr ps tycon))
 
-  desugarField : {auto s : Ref Syn SyntaxInfo} ->
-                 {auto c : Ref Ctxt Defs} ->
-                 {auto u : Ref UST UState} ->
-                 {auto m : Ref MD Metadata} ->
-                 {auto o : Ref ROpts REPLOpts} ->
-                 List Name -> Namespace -> PField ->
-                 Core (List IField)
+  desugarField :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> Namespace -> PField ->
+      Core (List IField)
   desugarField ps ns field
       = flip Core.traverse field.names $ \n : WithFC Name => do
            addDocStringNS ns n.val field.doc
@@ -1021,12 +1047,14 @@ mutual
           toRF n = n
 
   export
-  desugarFnOpt : {auto s : Ref Syn SyntaxInfo} ->
-                 {auto c : Ref Ctxt Defs} ->
-                 {auto u : Ref UST UState} ->
-                 {auto m : Ref MD Metadata} ->
-                 {auto o : Ref ROpts REPLOpts} ->
-                 List Name -> PFnOpt -> Core FnOpt
+  desugarFnOpt :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> PFnOpt -> Core FnOpt
   desugarFnOpt ps (IFnOpt f) = pure f
   desugarFnOpt ps (PForeign tms)
       = do tms' <- traverse (desugar AnyExpr ps) tms
@@ -1036,12 +1064,14 @@ mutual
            pure (ForeignExport tms')
 
   %inline
-  mapDesugarPiInfo : {auto s : Ref Syn SyntaxInfo} ->
-                     {auto c : Ref Ctxt Defs} ->
-                     {auto u : Ref UST UState} ->
-                     {auto m : Ref MD Metadata} ->
-                     {auto o : Ref ROpts REPLOpts} ->
-                     List Name -> PiInfo PTerm -> Core (PiInfo RawImp)
+  mapDesugarPiInfo :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> PiInfo PTerm -> Core (PiInfo RawImp)
   mapDesugarPiInfo ps = PiInfo.traverse (desugar AnyExpr ps)
 
   displayFixity : Maybe Visibility -> BindingModifier -> Fixity -> Nat -> OpStr -> String
@@ -1087,12 +1117,14 @@ mutual
   -- Given a high level declaration, return a list of TTImp declarations
   -- which process it, and update any necessary state on the way.
   export
-  desugarDecl : {auto s : Ref Syn SyntaxInfo} ->
-                {auto c : Ref Ctxt Defs} ->
-                {auto u : Ref UST UState} ->
-                {auto m : Ref MD Metadata} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                List Name -> PDecl -> Core (List ImpDecl)
+  desugarDecl :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto u : Ref UST UState} ->
+      {auto m : Ref MD Metadata} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      List Name -> PDecl -> Core (List ImpDecl)
   desugarDecl ps claim@(MkWithData _ (PClaim (MkPClaim rig vis fnopts ty)))
       = do opts <- traverse (desugarFnOpt ps) fnopts
            verifyTotalityModifiers claim.fc opts
@@ -1423,12 +1455,14 @@ mutual
   desugarDecl ps bt@(MkWithData _ $ PBuiltin type name) = pure [IBuiltin bt.fc type name]
 
   export
-  desugarDo : {auto s : Ref Syn SyntaxInfo} ->
-              {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              Side -> List Name -> Maybe Namespace -> PTerm -> Core RawImp
+  desugarDo :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto m : Ref MD Metadata} ->
+      {auto u : Ref UST UState} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      Side -> List Name -> Maybe Namespace -> PTerm -> Core RawImp
   desugarDo s ps doNamespace tm
       = do b <- newRef Bang (initBangs doNamespace)
            tm' <- desugarB s ps tm
@@ -1436,11 +1470,13 @@ mutual
            pure $ bindBangs (bangNames bd) doNamespace tm'
 
   export
-  desugar : {auto s : Ref Syn SyntaxInfo} ->
-            {auto c : Ref Ctxt Defs} ->
-            {auto m : Ref MD Metadata} ->
-            {auto u : Ref UST UState} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            Side -> List Name -> PTerm -> Core RawImp
+  desugar :
+      {auto s : Ref Syn SyntaxInfo} ->
+      {auto c : Ref Ctxt Defs} ->
+      {auto m : Ref MD Metadata} ->
+      {auto u : Ref UST UState} ->
+      {auto o : Ref ROpts REPLOpts} ->
+      WarnQueue =>
+      Side -> List Name -> PTerm -> Core RawImp
 
   desugar s ps tm = desugarDo s ps Nothing tm

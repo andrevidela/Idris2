@@ -117,6 +117,7 @@ elabImplementation : {vars : _} ->
                      {auto s : Ref Syn SyntaxInfo} ->
                      {auto m : Ref MD Metadata} ->
                      {auto o : Ref ROpts REPLOpts} ->
+                     {auto w : AppendOnly Warn Warning} ->
                      FC -> Visibility -> List FnOpt -> Pass ->
                      Env Term vars -> NestedNames vars ->
                      (implicits : List (AddFC (ImpParameter' RawImp))) ->

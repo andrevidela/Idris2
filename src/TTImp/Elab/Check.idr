@@ -715,6 +715,7 @@ processDecl : {vars : _} ->
               {auto u : Ref UST UState} ->
               {auto s : Ref Syn SyntaxInfo} ->
               {auto o : Ref ROpts REPLOpts} ->
+              {auto w : AppendOnly Warn Warning} ->
               List ElabOpt -> NestedNames vars ->
               Env Term vars -> ImpDecl -> Core ()
 

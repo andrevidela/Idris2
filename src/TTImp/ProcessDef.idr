@@ -698,6 +698,7 @@ mkRunTime : {auto c : Ref Ctxt Defs} ->
             {auto u : Ref UST UState} ->
             {auto s : Ref Syn SyntaxInfo} ->
             {auto o : Ref ROpts REPLOpts} ->
+            {auto w : AppendOnly Warn Warning} ->
             FC -> Name -> Core ()
 mkRunTime fc n
     = do logC "compile.casetree" 5 $ do pure $ "Making run time definition for " ++ show !(toFullNames n)
@@ -802,6 +803,7 @@ compileRunTime : {auto c : Ref Ctxt Defs} ->
                  {auto u : Ref UST UState} ->
                  {auto s : Ref Syn SyntaxInfo} ->
                  {auto o : Ref ROpts REPLOpts} ->
+                 {auto w : AppendOnly Warn Warning} ->
                  FC -> Name -> Core ()
 compileRunTime fc atotal
     = do defs <- get Ctxt

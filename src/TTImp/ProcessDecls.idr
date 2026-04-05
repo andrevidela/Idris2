@@ -38,6 +38,7 @@ processFailing :
   {auto u : Ref UST UState} ->
   {auto s : Ref Syn SyntaxInfo} ->
   {auto o : Ref ROpts REPLOpts} ->
+  {auto w : AppendOnly Warn Warning} ->
   List ElabOpt ->
   NestedNames vars -> Env Term vars ->
   FC -> Maybe String ->  List ImpDecl -> Core ()
@@ -108,6 +109,7 @@ process : {vars : _} ->
           {auto u : Ref UST UState} ->
           {auto s : Ref Syn SyntaxInfo} ->
           {auto o : Ref ROpts REPLOpts} ->
+          {auto w : AppendOnly Warn Warning} ->
           List ElabOpt ->
           NestedNames vars -> Env Term vars -> ImpDecl -> Core ()
 process eopts nest env (IClaim dat@(MkWithData fc (MkIClaimData rig vis opts ty)))
@@ -145,6 +147,7 @@ processDecls : {vars : _} ->
                {auto u : Ref UST UState} ->
                {auto s : Ref Syn SyntaxInfo} ->
                {auto o : Ref ROpts REPLOpts} ->
+               {auto w : AppendOnly Warn Warning} ->
                NestedNames vars -> Env Term vars -> List ImpDecl -> Core Bool
 processDecls nest env decls
     = do traverse_ (processDecl [] nest env) decls
@@ -156,6 +159,7 @@ processTTImpDecls : {vars : _} ->
                     {auto u : Ref UST UState} ->
                     {auto s : Ref Syn SyntaxInfo} ->
                     {auto o : Ref ROpts REPLOpts} ->
+                    {auto w : AppendOnly Warn Warning} ->
                     NestedNames vars -> Env Term vars -> List ImpDecl -> Core Bool
 processTTImpDecls {vars} nest env decls
     = do traverse_ (\d => do d' <- bindNames d
@@ -191,6 +195,7 @@ processTTImpFile : {auto c : Ref Ctxt Defs} ->
                    {auto u : Ref UST UState} ->
                    {auto s : Ref Syn SyntaxInfo} ->
                    {auto o : Ref ROpts REPLOpts} ->
+                   {auto w : AppendOnly Warn Warning} ->
                    String -> Core Bool
 processTTImpFile fname
     = do modIdent <- ctxtPathToNS fname

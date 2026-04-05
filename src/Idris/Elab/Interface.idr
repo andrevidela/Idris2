@@ -87,6 +87,7 @@ mkTy fc imp ((n, c, argty) :: args) ret
 
 mkIfaceData : {vars : _} ->
               {auto c : Ref Ctxt Defs} ->
+              {auto w : AppendOnly Warn Warning} ->
               FC -> WithDefault Visibility Private -> Env Term vars ->
               List (Maybe Name, RigCount, RawImp) ->
               Name -> Name -> List (Name, (RigCount, RawImp)) ->
@@ -120,6 +121,7 @@ mkIfaceData {vars} ifc def_vis env constraints n conName ps dets meths
 -- to allow us to build the data declaration
 getMethDecl : {vars : _} ->
               {auto c : Ref Ctxt Defs} ->
+              {auto w : AppendOnly Warn Warning} ->
               Env Term vars -> NestedNames vars ->
               (params : List (Name, (RigCount, RawImp))) ->
               (mnames : List Name) ->
@@ -148,6 +150,7 @@ bindIFace fc ity sc = IPi fc top AutoImplicit (Just constructorBindName) ity sc
 -- Get the top level function for implementing a method
 getMethToplevel : {vars : _} ->
                   {auto c : Ref Ctxt Defs} ->
+                  {auto w : AppendOnly Warn Warning} ->
                   {auto u : Ref UST UState} ->
                   Env Term vars -> Visibility ->
                   Name -> Name ->
@@ -203,6 +206,7 @@ getMethToplevel {vars} env vis iname cname allmeths bindNames params (mname, sig
 -- arguments to the record, appearing before the method arguments.
 getConstraintHint : {vars : _} ->
                     {auto c : Ref Ctxt Defs} ->
+                    {auto w : AppendOnly Warn Warning} ->
                     FC -> Env Term vars -> Visibility ->
                     Name -> Name ->
                     (constraints : List Name) ->
@@ -274,6 +278,7 @@ getImplParams _ = []
 export
 elabInterface : {vars : _} ->
                 {auto c : Ref Ctxt Defs} ->
+                {auto w : AppendOnly Warn Warning} ->
                 {auto u : Ref UST UState} ->
                 {auto s : Ref Syn SyntaxInfo} ->
                 {auto m : Ref MD Metadata} ->

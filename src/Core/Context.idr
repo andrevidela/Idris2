@@ -1072,6 +1072,10 @@ data Ctxt : Type where
 export
 data Warn : Type where
 
+public export 0
+WarnQueue : Type
+WarnQueue = AppendOnly Warn Warning
+
 export
 clearDefs : Defs -> Core Defs
 clearDefs defs
@@ -2609,7 +2613,7 @@ checkTimer
 -- incremental mode for the current CG
 export
 addImportedInc : {auto c : Ref Ctxt Defs} ->
-                 {auto w : AppendOnly Warn Warning} ->
+                 WarnQueue =>
                  ModuleIdent -> List (CG, String, List String) -> Core ()
 addImportedInc modNS inc
     = do s <- getSession

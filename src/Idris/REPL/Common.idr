@@ -175,12 +175,14 @@ updateErrorLine []       = update ROpts { errorLine := Nothing }
 updateErrorLine (e :: _) = update ROpts { errorLine := getErrorLoc e >>= getFCLine }
 
 export
-resetContext : {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto s : Ref Syn SyntaxInfo} ->
-               {auto m : Ref MD Metadata} ->
-               (origin : OriginDesc) ->
-               Core ()
+resetContext :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto m : Ref MD Metadata} ->
+    WarnQueue =>
+    (origin : OriginDesc) ->
+    Core ()
 resetContext origin
     = do defs <- get Ctxt
          put Ctxt ({ options := clearNames (options defs) } !initDefs)

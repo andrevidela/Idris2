@@ -453,18 +453,19 @@ getNSas (a, (b, c, d)) = (b, d)
 -- (we need to return these, rather than do it here, because after loading
 -- the data that's when we process the extra data...)
 export
-readFromTTC : TTC extra =>
-              {auto c : Ref Ctxt Defs} ->
-              {auto w : AppendOnly Warn Warning} ->
-              {auto u : Ref UST UState} ->
-              Bool -> -- set nested namespaces (for records, to use at the REPL)
-              FC ->
-              Bool -> -- importing as public
-              (fname : String) -> -- file containing the module
-              (modNS : ModuleIdent) -> -- module namespace
-              (importAs : Namespace) -> -- namespace to import as
-              Core (Maybe (extra, Int,
-                           List (ModuleIdent, Bool, Namespace)))
+readFromTTC :
+    TTC extra =>
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    WarnQueue =>
+    Bool -> -- set nested namespaces (for records, to use at the REPL)
+    FC ->
+    Bool -> -- importing as public
+    (fname : String) -> -- file containing the module
+    (modNS : ModuleIdent) -> -- module namespace
+    (importAs : Namespace) -> -- namespace to import as
+    Core (Maybe (extra, Int,
+                 List (ModuleIdent, Bool, Namespace)))
 readFromTTC nestedns loc reexp fname modNS importAs
     = do defs <- get Ctxt
          -- If it's already in the context, with the same visibility flag,
