@@ -47,6 +47,7 @@ splitPaths = map trim . split (==pathSeparator)
 -- Add extra data from the "IDRIS2_x" environment variables
 updateEnv : {auto c : Ref Ctxt Defs} ->
             {auto o : Ref ROpts REPLOpts} ->
+            WarnQueue =>
             Core ()
 updateEnv
     = do defs <- get Ctxt
@@ -139,6 +140,7 @@ stMain cgs opts
          let updated = foldl (\o, (s, _) => addCG (s, Other s) o) (options defs) cgs
          c <- newRef Ctxt ({ options := updated } defs)
          s <- newRef Syn initSyntax
+         w <- newAppendOnlyRef Warn Warning
          setCG {c} $ maybe Chez (Other . fst) (head' cgs)
          addPrimitives
 

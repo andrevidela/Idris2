@@ -397,16 +397,17 @@ getItDecls
 
 ||| Produce the elaboration of a PTerm, along with its inferred type
 inferAndElab :
-  {vars : _} ->
-  {auto c : Ref Ctxt Defs} ->
-  {auto u : Ref UST UState} ->
-  {auto s : Ref Syn SyntaxInfo} ->
-  {auto m : Ref MD Metadata} ->
-  {auto o : Ref ROpts REPLOpts} ->
-  ElabMode ->
-  PTerm ->
-  Env Term vars ->
-  Core (TermWithType vars)
+    {vars : _} ->
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto m : Ref MD Metadata} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    ElabMode ->
+    PTerm ->
+    Env Term vars ->
+    Core (TermWithType vars)
 inferAndElab emode itm env
   = do ttimp <- desugar AnyExpr (toList vars) itm
        let ttimpWithIt = ILocal replFC !getItDecls ttimp
@@ -422,12 +423,14 @@ inferAndElab emode itm env
        ty <- getTerm gty
        pure (tm `WithType` ty)
 
-processEdit : {auto c : Ref Ctxt Defs} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto m : Ref MD Metadata} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              EditCmd -> Core EditResult
+processEdit :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto m : Ref MD Metadata} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    EditCmd -> Core EditResult
 processEdit (TypeAt line col name)
     = do defs <- get Ctxt
          meta <- get MD
@@ -729,6 +732,7 @@ prepareExp :
     {auto s : Ref Syn SyntaxInfo} ->
     {auto m : Ref MD Metadata} ->
     {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
     PTerm -> Core ClosedTerm
 prepareExp ctm
     = do ttimp <- desugar AnyExpr [] (PApp replFC (PRef replFC (UN $ Basic "unsafePerformIO")) ctm)
@@ -747,6 +751,7 @@ processLocal : {vars : _} ->
              {auto e : Ref EST (EState vars)} ->
              {auto s : Ref Syn SyntaxInfo} ->
              {auto o : Ref ROpts REPLOpts} ->
+             WarnQueue =>
              List ElabOpt ->
              NestedNames vars -> Env Term vars ->
              List ImpDecl -> (scope : List ImpDecl) ->
@@ -754,80 +759,67 @@ processLocal : {vars : _} ->
 processLocal {vars} eopts nest env nestdecls_in scope
     = localHelper nest env nestdecls_in $ \nest' => traverse_ (processDecl eopts nest' env) scope
 
-export
-execExp : {auto c : Ref Ctxt Defs} ->
-          {auto u : Ref UST UState} ->
-          {auto s : Ref Syn SyntaxInfo} ->
-          {auto m : Ref MD Metadata} ->
-          {auto o : Ref ROpts REPLOpts} ->
-          PTerm -> Core REPLResult
-execExp ctm
-    = do Just cg <- findCG
-           | Nothing =>
-              do iputStrLn (reflow "No such code generator available")
-                 pure CompilationFailed
-         tm_erased <- prepareExp ctm
-         logTimeWhen !getEvalTiming 0 "Execution" $
-           execute cg tm_erased
-         pure $ Executed ctm
+parameters
+    {auto c : Ref Ctxt Defs}
+    {auto m : Ref MD Metadata}
+    {auto u : Ref UST UState}
+    {auto s : Ref Syn SyntaxInfo}
+    {auto o : Ref ROpts REPLOpts}
+    {auto w : WarnQueue}
+  export
+  execExp : PTerm -> Core REPLResult
+  execExp ctm
+      = do Just cg <- findCG
+             | Nothing =>
+                do iputStrLn (reflow "No such code generator available")
+                   pure CompilationFailed
+           tm_erased <- prepareExp ctm
+           logTimeWhen !getEvalTiming 0 "Execution" $
+             execute cg tm_erased
+           pure $ Executed ctm
 
 
-execDecls : {auto c : Ref Ctxt Defs} ->
-            {auto u : Ref UST UState} ->
-            {auto s : Ref Syn SyntaxInfo} ->
-            {auto m : Ref MD Metadata} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            List PDecl -> Core REPLResult
-execDecls decls = do
-  traverse_ execDecl decls
-  pure DefDeclared
-  where
-    execDecl : PDecl -> Core ()
-    execDecl decl = do
-      i <- desugarDecl [] decl
-      inidx <- resolveName (UN $ Basic "[defs]")
-      _ <- newRef EST (initEStateSub inidx Env.empty Refl)
-      processLocal [] (MkNested []) Env.empty !getItDecls i
+  execDecls : List PDecl -> Core REPLResult
+  execDecls decls = do
+    traverse_ execDecl decls
+    pure DefDeclared
+    where
+      execDecl : PDecl -> Core ()
+      execDecl decl = do
+        i <- desugarDecl [] decl
+        inidx <- resolveName (UN $ Basic "[defs]")
+        _ <- newRef EST (initEStateSub inidx Env.empty Refl)
+        processLocal [] (MkNested []) Env.empty !getItDecls i
 
-export
-compileExp : {auto c : Ref Ctxt Defs} ->
-             {auto u : Ref UST UState} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             {auto m : Ref MD Metadata} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             PTerm -> String -> Core REPLResult
-compileExp ctm outfile
-    = do Just cg <- findCG
-              | Nothing =>
-                   do iputStrLn (reflow "No such code generator available")
-                      pure CompilationFailed
-         tm_erased <- prepareExp ctm
-         ok <- compile cg tm_erased outfile
-         maybe (pure CompilationFailed)
-               (pure . Compiled)
-               ok
+  export
+  compileExp : PTerm -> String -> Core REPLResult
+  compileExp ctm outfile
+      = do Just cg <- findCG
+                | Nothing =>
+                     do iputStrLn (reflow "No such code generator available")
+                        pure CompilationFailed
+           tm_erased <- prepareExp ctm
+           ok <- compile cg tm_erased outfile
+           maybe (pure CompilationFailed)
+                 (pure . Compiled)
+                 ok
 
-export
-loadMainFile : {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto s : Ref Syn SyntaxInfo} ->
-               {auto m : Ref MD Metadata} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               String -> Core REPLResult
-loadMainFile f
-    = do update ROpts { evalResultName := Nothing }
-         modIdent <- ctxtPathToNS f
-         resetContext (PhysicalIdrSrc modIdent)
-         Right res <- coreLift (readFile f)
-            | Left err => do setSource ""
-                             pure (ErrorLoadingFile f err)
-         errs <- logTime 1 "Build deps" $ buildDeps f
-         updateErrorLine errs
-         setSource res
-         resetProofState
-         case errs of
-           [] => pure (FileLoaded f)
-           _ => pure (ErrorsBuildingFile f errs)
+  export
+  loadMainFile : String -> Core REPLResult
+  loadMainFile f
+      = do update ROpts { evalResultName := Nothing }
+           modIdent <- ctxtPathToNS f
+           resetContext (PhysicalIdrSrc modIdent)
+           Right res <- coreLift (readFile f)
+              | Left err => do setSource ""
+                               pure (ErrorLoadingFile f err)
+           errs <- logTime 1 "Build deps" $ buildDeps f
+           updateErrorLine errs
+           setSource res
+           resetProofState
+           case errs of
+             [] => pure (FileLoaded f)
+             _ => pure (ErrorsBuildingFile f errs)
 
 ||| Given a REPLEval mode for evaluation,
 ||| produce the normalization function that normalizes terms
@@ -844,6 +836,7 @@ inferAndNormalize : {auto c : Ref Ctxt Defs} ->
   {auto s : Ref Syn SyntaxInfo} ->
   {auto m : Ref MD Metadata} ->
   {auto o : Ref ROpts REPLOpts} ->
+  WarnQueue =>
   REPLEval ->
   PTerm ->
   Core (TermWithType Scope.empty)
@@ -871,6 +864,7 @@ process : {auto c : Ref Ctxt Defs} ->
           {auto s : Ref Syn SyntaxInfo} ->
           {auto m : Ref MD Metadata} ->
           {auto o : Ref ROpts REPLOpts} ->
+          WarnQueue =>
           REPLCmd -> Core REPLResult
 process (NewDefn decls) = execDecls decls
 process (Eval itm)
@@ -1102,6 +1096,7 @@ processCatch : {auto c : Ref Ctxt Defs} ->
                {auto s : Ref Syn SyntaxInfo} ->
                {auto m : Ref MD Metadata} ->
                {auto o : Ref ROpts REPLOpts} ->
+               WarnQueue =>
                REPLCmd -> Core REPLResult
 processCatch cmd
     = do c' <- branch
@@ -1138,6 +1133,7 @@ interpret : {auto c : Ref Ctxt Defs} ->
             {auto s : Ref Syn SyntaxInfo} ->
             {auto m : Ref MD Metadata} ->
             {auto o : Ref ROpts REPLOpts} ->
+            WarnQueue =>
             String -> Core REPLResult
 interpret inp
     = do setCurrentElabSource inp
@@ -1153,6 +1149,7 @@ mutual
             {auto s : Ref Syn SyntaxInfo} ->
             {auto m : Ref MD Metadata} ->
             {auto o : Ref ROpts REPLOpts} ->
+            WarnQueue =>
             String -> Core ()
   replCmd "" = pure ()
   replCmd cmd
@@ -1165,6 +1162,7 @@ mutual
          {auto s : Ref Syn SyntaxInfo} ->
          {auto m : Ref MD Metadata} ->
          {auto o : Ref ROpts REPLOpts} ->
+         WarnQueue =>
          Core ()
   repl
       = do ns <- getNS
@@ -1208,11 +1206,14 @@ mutual
   handleMissing (AllCasesCovered fn) = pretty0 fn <+> colon <++> reflow "All cases covered"
 
   export
-  handleResult : {auto c : Ref Ctxt Defs} ->
-         {auto u : Ref UST UState} ->
-         {auto s : Ref Syn SyntaxInfo} ->
-         {auto m : Ref MD Metadata} ->
-         {auto o : Ref ROpts REPLOpts} -> REPLResult -> Core ()
+  handleResult :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto m : Ref MD Metadata} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    REPLResult -> Core ()
   handleResult Exited = iputStrLn (reflow "Bye for now!")
   handleResult other = do { displayResult other ; repl }
 

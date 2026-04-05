@@ -44,6 +44,7 @@ yaffleMain sourceFileName args
          u <- newRef UST initUState
          s <- newRef Syn initSyntax
          o <- newRef ROpts (defaultOpts (Just sourceFileName) (REPL ErrorLvl) [])
+         w <- newAppendOnlyRef Warn Warning
          whenJust t $ setLogTimings
          addPrimitives
          case extension sourceFileName of

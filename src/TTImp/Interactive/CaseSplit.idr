@@ -243,11 +243,13 @@ getUpdates defs orig updated
          findUpdates defs orig updated
          pure (updates !(get UPD))
 
-mkCase : {auto c : Ref Ctxt Defs} ->
-         {auto u : Ref UST UState} ->
-         {auto s : Ref Syn SyntaxInfo} ->
-         {auto o : Ref ROpts REPLOpts} ->
-         Int -> RawImp -> RawImp -> Core ClauseUpdate
+mkCase :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    Int -> RawImp -> RawImp -> Core ClauseUpdate
 mkCase {c} {u} fn orig lhs_raw
     = do m <- newRef MD (initMetadata $ Virtual Interactive)
          defs <- get Ctxt
@@ -304,12 +306,14 @@ combine (Invalid :: xs) acc = combine xs acc
 combine (x :: xs) acc = combine xs (x :: acc)
 
 export
-getSplitsLHS : {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto s : Ref Syn SyntaxInfo} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               FC -> Nat -> ClosedTerm -> Name ->
-               Core (SplitResult (List ClauseUpdate))
+getSplitsLHS :
+    {auto c : Ref Ctxt Defs} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    FC -> Nat -> ClosedTerm -> Name ->
+    Core (SplitResult (List ClauseUpdate))
 getSplitsLHS fc envlen lhs_in n
     = do let lhs = substLets lhs_in
          logTerm "interaction.casesplit" 3 "Splitting" lhs_in
@@ -331,13 +335,15 @@ getSplitsLHS fc envlen lhs_in n
          pure (combine cases [])
 
 export
-getSplits : {auto c : Ref Ctxt Defs} ->
-            {auto m : Ref MD Metadata} ->
-            {auto u : Ref UST UState} ->
-            {auto s : Ref Syn SyntaxInfo} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            (NonEmptyFC -> ClosedTerm -> Bool) -> Name ->
-            Core (SplitResult (List ClauseUpdate))
+getSplits :
+    {auto c : Ref Ctxt Defs} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    (NonEmptyFC -> ClosedTerm -> Bool) -> Name ->
+    Core (SplitResult (List ClauseUpdate))
 getSplits p n
     = do Just (loc, envlen, lhs_in) <- findLHSAt p
               | Nothing => pure (SplitFail CantFindLHS)

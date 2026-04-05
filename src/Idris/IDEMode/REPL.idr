@@ -131,134 +131,131 @@ data IDEResult
 replWrap : Core REPLResult -> Core IDEResult
 replWrap m = pure $ REPL !m
 
-process : {auto c : Ref Ctxt Defs} ->
-          {auto u : Ref UST UState} ->
-          {auto s : Ref Syn SyntaxInfo} ->
-          {auto m : Ref MD Metadata} ->
-          {auto o : Ref ROpts REPLOpts} ->
-          IDECommand -> Core IDEResult
-process (Interpret cmd)
-    = replWrap $ interpret cmd
-process (LoadFile fname_in _)
-    = do let fname = case !(findIpkg (Just fname_in)) of
-                          Nothing => fname_in
-                          Just f' => f'
-         replWrap $ Idris.REPL.process (Load fname) >>= outputSyntaxHighlighting fname
+parameters
+    {auto c : Ref Ctxt Defs}
+    {auto u : Ref UST UState}
+    {auto s : Ref Syn SyntaxInfo}
+    {auto m : Ref MD Metadata}
+    {auto o : Ref ROpts REPLOpts}
+    {auto w : WarnQueue}
+  process : IDECommand -> Core IDEResult
+  process (Interpret cmd)
+      = replWrap $ interpret cmd
+  process (LoadFile fname_in _)
+      = do let fname = case !(findIpkg (Just fname_in)) of
+                            Nothing => fname_in
+                            Just f' => f'
+           replWrap $ Idris.REPL.process (Load fname) >>= outputSyntaxHighlighting fname
 
-process (NameAt name Nothing)
-    = do defs <- get Ctxt
-         glob <- lookupCtxtName (UN (mkUserName name)) (gamma defs)
-         let dat = map (\(name, _, gdef) => (name, gdef.location)) glob
-         pure (NameLocList dat)
-process (NameAt n (Just _))
-    = do todoCmd "name-at <name> <line> <column>"
-         pure $ REPL $ Edited $ DisplayEdit emptyDoc
-process (TypeOf n Nothing)
-    = replWrap $ Idris.REPL.process (Check (PRef replFC (UN $ mkUserName n)))
-process (TypeOf n (Just (l, c)))
-    = replWrap $ Idris.REPL.process
-               $ Editing (TypeAt (fromInteger l) (fromInteger c) (UN $ mkUserName n))
-process (CaseSplit l c n)
-    = replWrap $ Idris.REPL.process
-    $ Editing $ CaseSplit False (fromInteger l) (fromInteger c)
-    $ UN $ mkUserName n
-process (AddClause l n)
-    = replWrap $ Idris.REPL.process
-    $ Editing $ AddClause False (fromInteger l)
-    $ UN $ mkUserName n
-process (AddMissing l n)
-    = do todoCmd "add-missing"
-         pure $ REPL $ Edited $ DisplayEdit emptyDoc
-process (Intro l h) =
-   do replWrap $ Idris.REPL.process
-               $ Editing
-               $ Intro False (fromInteger l) (UN $ Basic h) {- hole name -}
-process (Refine l h expr) =
-   do let Right (_, _, e) = runParser (Virtual Interactive) Nothing expr aPTerm
-        | Left err => pure $ REPL $ REPLError (pretty0 $ show err)
-      replWrap $ Idris.REPL.process
-               $ Editing
-               $ Refine False (fromInteger l) (UN $ Basic h) {- hole name -} e
-process (ExprSearch l n hs all)
-    = replWrap $ Idris.REPL.process (Editing (ExprSearch False (fromInteger l)
-                     (UN $ Basic n) (map (UN . Basic) hs.list)))
-process ExprSearchNext
-    = replWrap $ Idris.REPL.process (Editing ExprSearchNext)
-process (GenerateDef l n)
-    = replWrap $ Idris.REPL.process (Editing (GenerateDef False (fromInteger l) (UN $ Basic n) 0))
-process GenerateDefNext
-    = replWrap $ Idris.REPL.process (Editing GenerateDefNext)
-process (MakeLemma l n)
-    = replWrap $ Idris.REPL.process (Editing (MakeLemma False (fromInteger l) (UN $ mkUserName n)))
-process (MakeCase l n)
-    = replWrap $ Idris.REPL.process (Editing (MakeCase False (fromInteger l) (UN $ mkUserName n)))
-process (MakeWith l n)
-    = replWrap $ Idris.REPL.process (Editing (MakeWith False (fromInteger l) (UN $ mkUserName n)))
-process (DocsFor n modeOpt)
-    = replWrap $ Idris.REPL.process (Doc $ APTerm (PRef EmptyFC (UN $ mkUserName n)))
-process (Apropos n)
-    = do todoCmd "apropros"
-         pure $ REPL $ Printed emptyDoc
-process (Directive n)
-    = do todoCmd "directive"
-         pure $ REPL $ Printed emptyDoc
-process (WhoCalls n)
-    = do todoCmd "who-calls"
-         pure $ NameList []
-process (CallsWho n)
-    = do todoCmd "calls-who"
-         pure $ NameList []
-process (BrowseNamespace ns)
-    = replWrap $ Idris.REPL.process (Browse (mkNamespace ns))
-process (NormaliseTerm tm)
-    = do todoCmd "normalise-term"
-         pure $ Term tm
-process (ShowTermImplicits tm)
-    = do todoCmd "show-term-implicits"
-         pure $ Term tm
-process (HideTermImplicits tm)
-    = do todoCmd "hide-term-implicits"
-         pure $ Term tm
-process (ElaborateTerm tm)
-    = do todoCmd "elaborate-term"
-         pure $ TTTerm tm
-process (PrintDefinition n)
-    = do todoCmd "print-definition"
-         pure $ REPL $ Printed (pretty0 n)
-process (ReplCompletions line)
-    = do Just (ctxt, compl) <- completion line
-           | Nothing => pure (REPL $ REPLError $ vcat [ "I can't make sense of the completion task:", pretty0 line])
-         pure (CompletionList compl ctxt)
-process (EnableSyntax b)
-    = do setSynHighlightOn b
-         pure $ REPL $ Printed (reflow "Syntax highlight option changed to" <++> byShow b)
-process Version
-    = replWrap $ Idris.REPL.process ShowVersion
-process (Metavariables _)
-    = FoundHoles <$> getUserHolesData
-process GetOptions
-    = replWrap $ Idris.REPL.process GetOpts
+  process (NameAt name Nothing)
+      = do defs <- get Ctxt
+           glob <- lookupCtxtName (UN (mkUserName name)) (gamma defs)
+           let dat = map (\(name, _, gdef) => (name, gdef.location)) glob
+           pure (NameLocList dat)
+  process (NameAt n (Just _))
+      = do todoCmd "name-at <name> <line> <column>"
+           pure $ REPL $ Edited $ DisplayEdit emptyDoc
+  process (TypeOf n Nothing)
+      = replWrap $ Idris.REPL.process (Check (PRef replFC (UN $ mkUserName n)))
+  process (TypeOf n (Just (l, c)))
+      = replWrap $ Idris.REPL.process
+                 $ Editing (TypeAt (fromInteger l) (fromInteger c) (UN $ mkUserName n))
+  process (CaseSplit l c n)
+      = replWrap $ Idris.REPL.process
+      $ Editing $ CaseSplit False (fromInteger l) (fromInteger c)
+      $ UN $ mkUserName n
+  process (AddClause l n)
+      = replWrap $ Idris.REPL.process
+      $ Editing $ AddClause False (fromInteger l)
+      $ UN $ mkUserName n
+  process (AddMissing l n)
+      = do todoCmd "add-missing"
+           pure $ REPL $ Edited $ DisplayEdit emptyDoc
+  process (Intro l h) =
+     do replWrap $ Idris.REPL.process
+                 $ Editing
+                 $ Intro False (fromInteger l) (UN $ Basic h) {- hole name -}
+  process (Refine l h expr) =
+     do let Right (_, _, e) = runParser (Virtual Interactive) Nothing expr aPTerm
+          | Left err => pure $ REPL $ REPLError (pretty0 $ show err)
+        replWrap $ Idris.REPL.process
+                 $ Editing
+                 $ Refine False (fromInteger l) (UN $ Basic h) {- hole name -} e
+  process (ExprSearch l n hs all)
+      = replWrap $ Idris.REPL.process (Editing (ExprSearch False (fromInteger l)
+                       (UN $ Basic n) (map (UN . Basic) hs.list)))
+  process ExprSearchNext
+      = replWrap $ Idris.REPL.process (Editing ExprSearchNext)
+  process (GenerateDef l n)
+      = replWrap $ Idris.REPL.process (Editing (GenerateDef False (fromInteger l) (UN $ Basic n) 0))
+  process GenerateDefNext
+      = replWrap $ Idris.REPL.process (Editing GenerateDefNext)
+  process (MakeLemma l n)
+      = replWrap $ Idris.REPL.process (Editing (MakeLemma False (fromInteger l) (UN $ mkUserName n)))
+  process (MakeCase l n)
+      = replWrap $ Idris.REPL.process (Editing (MakeCase False (fromInteger l) (UN $ mkUserName n)))
+  process (MakeWith l n)
+      = replWrap $ Idris.REPL.process (Editing (MakeWith False (fromInteger l) (UN $ mkUserName n)))
+  process (DocsFor n modeOpt)
+      = replWrap $ Idris.REPL.process (Doc $ APTerm (PRef EmptyFC (UN $ mkUserName n)))
+  process (Apropos n)
+      = do todoCmd "apropros"
+           pure $ REPL $ Printed emptyDoc
+  process (Directive n)
+      = do todoCmd "directive"
+           pure $ REPL $ Printed emptyDoc
+  process (WhoCalls n)
+      = do todoCmd "who-calls"
+           pure $ NameList []
+  process (CallsWho n)
+      = do todoCmd "calls-who"
+           pure $ NameList []
+  process (BrowseNamespace ns)
+      = replWrap $ Idris.REPL.process (Browse (mkNamespace ns))
+  process (NormaliseTerm tm)
+      = do todoCmd "normalise-term"
+           pure $ Term tm
+  process (ShowTermImplicits tm)
+      = do todoCmd "show-term-implicits"
+           pure $ Term tm
+  process (HideTermImplicits tm)
+      = do todoCmd "hide-term-implicits"
+           pure $ Term tm
+  process (ElaborateTerm tm)
+      = do todoCmd "elaborate-term"
+           pure $ TTTerm tm
+  process (PrintDefinition n)
+      = do todoCmd "print-definition"
+           pure $ REPL $ Printed (pretty0 n)
+  process (ReplCompletions line)
+      = do Just (ctxt, compl) <- completion line
+             | Nothing => pure (REPL $ REPLError $ vcat [ "I can't make sense of the completion task:", pretty0 line])
+           pure (CompletionList compl ctxt)
+  process (EnableSyntax b)
+      = do setSynHighlightOn b
+           pure $ REPL $ Printed (reflow "Syntax highlight option changed to" <++> byShow b)
+  process Version
+      = replWrap $ Idris.REPL.process ShowVersion
+  process (Metavariables _)
+      = FoundHoles <$> getUserHolesData
+  process GetOptions
+      = replWrap $ Idris.REPL.process GetOpts
 
-processCatch : {auto c : Ref Ctxt Defs} ->
-               {auto u : Ref UST UState} ->
-               {auto s : Ref Syn SyntaxInfo} ->
-               {auto m : Ref MD Metadata} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               IDECommand -> Core IDEResult
-processCatch cmd
-    = do c' <- branch
-         u' <- get UST
-         s' <- get Syn
-         o' <- get ROpts
-         catch (do res <- process cmd
-                   commit
-                   pure res)
-               (\err => do put Ctxt c'
-                           put UST u'
-                           put Syn s'
-                           put ROpts o'
-                           msg <- perror err
-                           pure $ REPL $ REPLError msg)
+  processCatch : IDECommand -> Core IDEResult
+  processCatch cmd
+      = do c' <- branch
+           u' <- get UST
+           s' <- get Syn
+           o' <- get ROpts
+           catch (do res <- process cmd
+                     commit
+                     pure res)
+                 (\err => do put Ctxt c'
+                             put UST u'
+                             put Syn s'
+                             put ROpts o'
+                             msg <- perror err
+                             pure $ REPL $ REPLError msg)
 
 idePutStrLn : {auto c : Ref Ctxt Defs} -> File -> Integer -> String -> Core ()
 idePutStrLn outf i msg
@@ -456,53 +453,50 @@ handleIDEResult : {auto c : Ref Ctxt Defs} ->
 handleIDEResult outf i (REPL Exited) = idePutStrLn outf i "Bye for now!"
 handleIDEResult outf i other = displayIDEResult outf i other
 
-loop : {auto c : Ref Ctxt Defs} ->
-       {auto u : Ref UST UState} ->
-       {auto s : Ref Syn SyntaxInfo} ->
-       {auto m : Ref MD Metadata} ->
-       {auto o : Ref ROpts REPLOpts} ->
-       Core ()
-loop
-    = do res <- getOutput
-         case res of
-              REPL _ => printError $ reflow "Running idemode but output isn't"
-              IDEMode idx inf outf => do
-                (pref, inp) <- coreLift $ getInput inf
-                log "ide-mode.recv" 50 $ "Received: \{fromMaybe "" pref}\{inp}"
-                end <- coreLift $ fEOF inf
-                unless end $ do
-                  case parseSExp inp of
-                    Left err =>
-                      do printIDEError outf idx (reflow "Parse error:" <++> !(perror err))
-                         loop
-                    Right sexp =>
-                      case getMsg sexp of
-                        Just (cmd, i) =>
-                          do updateOutput i
-                             res <- processCatch cmd
-                             handleIDEResult outf i res
-                             loop
-                        Nothing =>
-                          do printIDEError outf idx (reflow "Unrecognised command:" <++> pretty0 (show sexp))
-                             loop
-  where
-    updateOutput : Integer -> Core ()
-    updateOutput idx
-        = do IDEMode _ i o <- getOutput
-                 | _ => pure ()
-             setOutput (IDEMode idx i o)
+parameters
+    {auto c : Ref Ctxt Defs}
+    {auto u : Ref UST UState}
+    {auto s : Ref Syn SyntaxInfo}
+    {auto m : Ref MD Metadata}
+    {auto o : Ref ROpts REPLOpts}
+    {auto w : WarnQueue}
+  loop : Core ()
+  loop
+      = do res <- getOutput
+           case res of
+                REPL _ => printError $ reflow "Running idemode but output isn't"
+                IDEMode idx inf outf => do
+                  (pref, inp) <- coreLift $ getInput inf
+                  log "ide-mode.recv" 50 $ "Received: \{fromMaybe "" pref}\{inp}"
+                  end <- coreLift $ fEOF inf
+                  unless end $ do
+                    case parseSExp inp of
+                      Left err =>
+                        do printIDEError outf idx (reflow "Parse error:" <++> !(perror err))
+                           loop
+                      Right sexp =>
+                        case getMsg sexp of
+                          Just (cmd, i) =>
+                            do updateOutput i
+                               res <- processCatch cmd
+                               handleIDEResult outf i res
+                               loop
+                          Nothing =>
+                            do printIDEError outf idx (reflow "Unrecognised command:" <++> pretty0 (show sexp))
+                               loop
+    where
+      updateOutput : Integer -> Core ()
+      updateOutput idx
+          = do IDEMode _ i o <- getOutput
+                   | _ => pure ()
+               setOutput (IDEMode idx i o)
 
-export
-replIDE : {auto c : Ref Ctxt Defs} ->
-          {auto u : Ref UST UState} ->
-          {auto s : Ref Syn SyntaxInfo} ->
-          {auto m : Ref MD Metadata} ->
-          {auto o : Ref ROpts REPLOpts} ->
-          Core ()
-replIDE
-    = do res <- getOutput
-         case res of
-              REPL _ => printError $ reflow "Running idemode but output isn't"
-              IDEMode _ inf outf => do
-                send outf (ProtocolVersion 2 1) -- TODO: Move this info somewhere more central
-                loop
+  export
+  replIDE : Core ()
+  replIDE
+      = do res <- getOutput
+           case res of
+                REPL _ => printError $ reflow "Running idemode but output isn't"
+                IDEMode _ inf outf => do
+                  send outf (ProtocolVersion 2 1) -- TODO: Move this info somewhere more central
+                  loop

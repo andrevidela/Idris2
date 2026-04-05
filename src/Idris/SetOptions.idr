@@ -86,6 +86,7 @@ getPackageDirs dname = do
 export
 candidateDirs :
     Ref Ctxt Defs =>
+    WarnQueue =>
     String -> String -> PkgVersionBounds ->
     Core (List (String, Maybe PkgVersion))
 candidateDirs dname pkgName bounds = do
@@ -141,6 +142,7 @@ candidateDirs dname pkgName bounds = do
 export
 findPkgDirs :
     Ref Ctxt Defs =>
+    WarnQueue =>
     String ->
     PkgVersionBounds ->
     Core (List (String, Maybe PkgVersion))
@@ -163,6 +165,7 @@ findPkgDirs p bounds = do
 export
 findPkgDir :
     Ref Ctxt Defs =>
+    WarnQueue =>
     String ->
     PkgVersionBounds ->
     Core (Maybe String)
@@ -180,8 +183,10 @@ findPkgDir p bounds = do
 ||| Attempt to find and add a package with the given name and bounds
 ||| in one of the known package paths.
 export
-addPkgDir : {auto c : Ref Ctxt Defs} ->
-            String -> PkgVersionBounds -> Core ()
+addPkgDir :
+    {auto c : Ref Ctxt Defs} ->
+    WarnQueue =>
+    String -> PkgVersionBounds -> Core ()
 addPkgDir p bounds = do
     Just p <- findPkgDir p bounds
         | Nothing => pure ()
@@ -405,6 +410,7 @@ setIncrementalCG failOnError cgn
 export
 preOptions : {auto c : Ref Ctxt Defs} ->
              {auto o : Ref ROpts REPLOpts} ->
+             WarnQueue =>
              List CLOpt -> Core Bool
 preOptions [] = pure True
 preOptions (NoBanner :: opts)
@@ -563,6 +569,7 @@ postOptions : {auto c : Ref Ctxt Defs} ->
               {auto s : Ref Syn SyntaxInfo} ->
               {auto m : Ref MD Metadata} ->
               {auto o : Ref ROpts REPLOpts} ->
+              WarnQueue =>
               REPLResult -> List CLOpt -> Core Bool
 postOptions _ [] = pure True
 postOptions res@(ErrorLoadingFile {}) (OutputFile _ :: rest)

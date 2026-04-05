@@ -52,14 +52,16 @@ Show BuildMod where
 
 data AllMods : Type where
 
-mkModTree : {auto c : Ref Ctxt Defs} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            {auto a : Ref AllMods (List (ModuleIdent, ModTree))} ->
-            FC ->
-            (done : List ModuleIdent) -> -- if 'mod' is here we have a cycle
-            (modFP : Maybe FileName) -> -- Sometimes we know already know what the file name is
-            (mod : ModuleIdent) ->      -- Otherwise we'll compute it from the module name
-            Core ModTree
+mkModTree :
+    {auto c : Ref Ctxt Defs} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    {auto a : Ref AllMods (List (ModuleIdent, ModTree))} ->
+    WarnQueue =>
+    FC ->
+    (done : List ModuleIdent) -> -- if 'mod' is here we have a cycle
+    (modFP : Maybe FileName) -> -- Sometimes we know already know what the file name is
+    (mod : ModuleIdent) ->      -- Otherwise we'll compute it from the module name
+    Core ModTree
 mkModTree loc done modFP mod
   = if mod `elem` done
        then throw (CyclicImports (done ++ [mod]))
@@ -116,11 +118,13 @@ mkBuildMods mod
 -- built for that main file, in the order they need to be built
 -- Return an empty list if it turns out it's in the 'done' list
 export
-getBuildMods : {auto c : Ref Ctxt Defs} ->
-               {auto o : Ref ROpts REPLOpts} ->
-               FC -> (done : List BuildMod) ->
-               (mainFile : String) ->
-               Core (List BuildMod)
+getBuildMods :
+    {auto c : Ref Ctxt Defs} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    FC -> (done : List BuildMod) ->
+    (mainFile : String) ->
+    Core (List BuildMod)
 getBuildMods loc done fname
     = do a <- newRef AllMods []
          fname_ns <- ctxtPathToNS fname
@@ -220,11 +224,13 @@ needsBuilding sourceFile ttcFile depFiles
        pure True
 
 
-buildMod : {auto c : Ref Ctxt Defs} ->
-           {auto s : Ref Syn SyntaxInfo} ->
-           {auto o : Ref ROpts REPLOpts} ->
-           FC -> Nat -> Nat -> BuildMod ->
-           Core (List Error)
+buildMod :
+    {auto c : Ref Ctxt Defs} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    FC -> Nat -> Nat -> BuildMod ->
+    Core (List Error)
 buildMod loc num len mod
    = do clearCtxt; addPrimitives
         lazyActive True; setUnboundImplicits True
@@ -264,11 +270,13 @@ buildMod loc num len mod
         pure (ws ++ if null errs then ferrs else ferrs ++ errs)
 
 export
-buildMods : {auto c : Ref Ctxt Defs} ->
-            {auto s : Ref Syn SyntaxInfo} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            FC -> Nat -> Nat -> List BuildMod ->
-            Core (List Error)
+buildMods :
+    {auto c : Ref Ctxt Defs} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    FC -> Nat -> Nat -> List BuildMod ->
+    Core (List Error)
 buildMods fc num len [] = pure []
 buildMods fc num len (m :: ms)
     = case !(buildMod fc num len m) of
@@ -276,13 +284,15 @@ buildMods fc num len (m :: ms)
            errs => pure errs
 
 export
-buildDeps : {auto c : Ref Ctxt Defs} ->
-            {auto s : Ref Syn SyntaxInfo} ->
-            {auto m : Ref MD Metadata} ->
-            {auto u : Ref UST UState} ->
-            {auto o : Ref ROpts REPLOpts} ->
-            (mainFile : String) ->
-            Core (List Error)
+buildDeps :
+    {auto c : Ref Ctxt Defs} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto m : Ref MD Metadata} ->
+    {auto u : Ref UST UState} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    (mainFile : String) ->
+    Core (List Error)
 buildDeps fname
     = do mods <- getBuildMods EmptyFC [] fname
          log "import" 20 $ "Needs to rebuild: " ++ show mods
@@ -303,24 +313,28 @@ buildDeps fname
                        pure []
               errs => pure errs -- Error happened, give up
 
-getAllBuildMods : {auto c : Ref Ctxt Defs} ->
-                  {auto o : Ref ROpts REPLOpts} ->
-                  FC -> (done : List BuildMod) ->
-                  (allFiles : List String) ->
-                  Core (List BuildMod)
+getAllBuildMods :
+    {auto c : Ref Ctxt Defs} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    WarnQueue =>
+    FC -> (done : List BuildMod) ->
+    (allFiles : List String) ->
+    Core (List BuildMod)
 getAllBuildMods fc done [] = pure done
 getAllBuildMods fc done (f :: fs)
     = do ms <- getBuildMods fc done f
          getAllBuildMods fc (ms ++ done) fs
 
 export
-buildAll : {auto c : Ref Ctxt Defs} ->
-           {auto s : Ref Syn SyntaxInfo} ->
-           {auto o : Ref ROpts REPLOpts} ->
-           (allFiles : List String) ->
-           Core (List Error)
+buildAll :
+    {auto c : Ref Ctxt Defs} ->
+    {auto s : Ref Syn SyntaxInfo} ->
+    {auto o : Ref ROpts REPLOpts} ->
+    (allFiles : List String) ->
+    Core (List Error)
 buildAll allFiles
-    = do mods <- getAllBuildMods EmptyFC [] allFiles
+    = do warningCollector <- newAppendOnlyRef Warn Warning
+         mods <- getAllBuildMods EmptyFC [] allFiles
          -- There'll be duplicates, so if something is already built, drop it
          let mods' = dropLater mods
          buildMods EmptyFC 1 (length mods') mods'

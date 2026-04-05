@@ -796,98 +796,81 @@ getLHSData defs (Just tm)
                Ref _ _ n => Just (MkRecData n sc)
                _ => Nothing
 
-firstLinearOK : {auto c : Ref Ctxt Defs} ->
-                {auto m : Ref MD Metadata} ->
-                {auto u : Ref UST UState} ->
-                {auto s : Ref Syn SyntaxInfo} ->
-                {auto o : Ref ROpts REPLOpts} ->
-                FC -> Search (ClosedTerm, ExprDefs) ->
+parameters
+    {auto c : Ref Ctxt Defs}
+    {auto m : Ref MD Metadata}
+    {auto u : Ref UST UState}
+    {auto s : Ref Syn SyntaxInfo}
+    {auto o : Ref ROpts REPLOpts}
+    {auto w : WarnQueue}
+  firstLinearOK :
+      FC -> Search (ClosedTerm, ExprDefs) ->
+      Core (Search RawImp)
+  firstLinearOK fc [] = noResult
+  firstLinearOK fc ((t, ds) :: next)
+      = handleUnify
+              (do unless (isNil ds) $
+                     traverse_ (processDecl [InCase] (MkNested []) Env.empty) ds
+                  ignore $ linearCheck fc linear False Env.empty t
+                  defs <- get Ctxt
+                  nft <- normaliseHoles defs Env.empty t
+                  raw <- unelab Env.empty !(toFullNames nft)
+                  pure (map rawName raw :: firstLinearOK fc !next))
+              (\err =>
+                  do next' <- next
+                     firstLinearOK fc next')
+
+  export
+  exprSearchOpts : SearchOpts -> FC -> Name -> List Name ->
+                   Core (Search RawImp)
+  exprSearchOpts opts fc n_in hints
+      = do defs <- get Ctxt
+           Just (n, idx, gdef) <- lookupHoleName n_in defs
+               | Nothing => undefinedName fc n_in
+           -- the REPL does this step, but doing it here too because
+           -- expression search might be invoked some other way
+           let Hole _ _ = definition gdef
+               | PMDef pi [] (STerm _ tm) _ _
+                   => do raw <- unelab Env.empty !(toFullNames !(normaliseHoles defs Env.empty tm))
+                         one (map rawName raw)
+               | _ => throw (GenericMsg fc "Name is already defined")
+           lhs <- findHoleLHS !(getFullName (Resolved idx))
+           log "interaction.search" 10 $ "LHS hole data " ++ show (n, lhs)
+           opts' <- if getRecData opts
+                       then do d <- getLHSData defs lhs
+                               pure ({ recData := d } opts)
+                       else pure opts
+           validHints <- concat <$> for hints (\hint => do
+             defs <- get Ctxt
+             entries <- lookupCtxtName hint (gamma defs)
+             pure $ map (Resolved . fst . snd) entries)
+           res <- search fc (multiplicity gdef) opts' validHints (type gdef) n
+           firstLinearOK fc res
+    where
+      lookupHoleName : Name -> Defs -> Core (Maybe (Name, Int, GlobalDef))
+      lookupHoleName n defs
+          = case !(lookupCtxtExactI n (gamma defs)) of
+                 Just (idx, res) => pure $ Just (n, idx, res)
+                 Nothing => case !(lookupCtxtName n (gamma defs)) of
+                                 [res] => pure $ Just res
+                                 _ => pure Nothing
+
+  exprSearch' : FC -> Name -> List Name ->
                 Core (Search RawImp)
-firstLinearOK fc [] = noResult
-firstLinearOK fc ((t, ds) :: next)
-    = handleUnify
-            (do unless (isNil ds) $
-                   traverse_ (processDecl [InCase] (MkNested []) Env.empty) ds
-                ignore $ linearCheck fc linear False Env.empty t
-                defs <- get Ctxt
-                nft <- normaliseHoles defs Env.empty t
-                raw <- unelab Env.empty !(toFullNames nft)
-                pure (map rawName raw :: firstLinearOK fc !next))
-            (\err =>
-                do next' <- next
-                   firstLinearOK fc next')
+  exprSearch' = exprSearchOpts (initSearchOpts True 5)
 
-export
-exprSearchOpts : {auto c : Ref Ctxt Defs} ->
-                 {auto m : Ref MD Metadata} ->
-                 {auto u : Ref UST UState} ->
-                 {auto s : Ref Syn SyntaxInfo} ->
-                 {auto o : Ref ROpts REPLOpts} ->
-                 SearchOpts -> FC -> Name -> List Name ->
-                 Core (Search RawImp)
-exprSearchOpts opts fc n_in hints
-    = do defs <- get Ctxt
-         Just (n, idx, gdef) <- lookupHoleName n_in defs
-             | Nothing => undefinedName fc n_in
-         -- the REPL does this step, but doing it here too because
-         -- expression search might be invoked some other way
-         let Hole _ _ = definition gdef
-             | PMDef pi [] (STerm _ tm) _ _
-                 => do raw <- unelab Env.empty !(toFullNames !(normaliseHoles defs Env.empty tm))
-                       one (map rawName raw)
-             | _ => throw (GenericMsg fc "Name is already defined")
-         lhs <- findHoleLHS !(getFullName (Resolved idx))
-         log "interaction.search" 10 $ "LHS hole data " ++ show (n, lhs)
-         opts' <- if getRecData opts
-                     then do d <- getLHSData defs lhs
-                             pure ({ recData := d } opts)
-                     else pure opts
-         validHints <- concat <$> for hints (\hint => do
-           defs <- get Ctxt
-           entries <- lookupCtxtName hint (gamma defs)
-           pure $ map (Resolved . fst . snd) entries)
-         res <- search fc (multiplicity gdef) opts' validHints (type gdef) n
-         firstLinearOK fc res
-  where
-    lookupHoleName : Name -> Defs -> Core (Maybe (Name, Int, GlobalDef))
-    lookupHoleName n defs
-        = case !(lookupCtxtExactI n (gamma defs)) of
-               Just (idx, res) => pure $ Just (n, idx, res)
-               Nothing => case !(lookupCtxtName n (gamma defs)) of
-                               [res] => pure $ Just res
-                               _ => pure Nothing
+  export
+  exprSearch : FC -> Name -> List Name ->
+               Core (Search RawImp)
+  exprSearch fc n hints
+      = do startTimer (searchTimeout !getSession) "expression search"
+           res <- exprSearch' fc n hints
+           clearTimer
+           pure res
 
-exprSearch' : {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              FC -> Name -> List Name ->
-              Core (Search RawImp)
-exprSearch' = exprSearchOpts (initSearchOpts True 5)
-
-export
-exprSearch : {auto c : Ref Ctxt Defs} ->
-             {auto m : Ref MD Metadata} ->
-             {auto u : Ref UST UState} ->
-             {auto s : Ref Syn SyntaxInfo} ->
-             {auto o : Ref ROpts REPLOpts} ->
-             FC -> Name -> List Name ->
-             Core (Search RawImp)
-exprSearch fc n hints
-    = do startTimer (searchTimeout !getSession) "expression search"
-         res <- exprSearch' fc n hints
-         clearTimer
-         pure res
-
-export
-exprSearchN : {auto c : Ref Ctxt Defs} ->
-              {auto m : Ref MD Metadata} ->
-              {auto u : Ref UST UState} ->
-              {auto s : Ref Syn SyntaxInfo} ->
-              {auto o : Ref ROpts REPLOpts} ->
-              FC -> Nat -> Name -> List Name ->
-              Core (List RawImp)
-exprSearchN fc max n hints
-    = do (res, _) <- searchN max (exprSearch fc n hints)
-         pure res
+  export
+  exprSearchN : FC -> Nat -> Name -> List Name ->
+                Core (List RawImp)
+  exprSearchN fc max n hints
+      = do (res, _) <- searchN max (exprSearch fc n hints)
+           pure res

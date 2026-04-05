@@ -967,6 +967,13 @@ newReadOnlyRef x val
     = do ref <- coreLift (newIORef val)
          pure (MkReadRef ref)
 
+export
+newAppendOnlyRef : (0 x : label) -> (0 t : Type) -> Core (AppendOnly x t)
+newAppendOnlyRef x type
+    = do ref <- coreLift (newIORef [])
+         mutex <- coreLift makeMutex
+         pure (MkAppendRef ref mutex)
+
 export %inline
 append : (0 x : label) -> {auto ref : AppendOnly x a} -> a -> Core ()
 append x {ref = MkAppendRef io lock} val

@@ -27,6 +27,7 @@ parameters
   {auto m : Ref MD Metadata}
   {auto u : Ref UST UState}
   {auto r : Ref ROpts REPLOpts}
+  {auto w : WarnQueue}
   (hidx : Int)
   (hole : Name)
   (env : Env Term lhsCtxt)
