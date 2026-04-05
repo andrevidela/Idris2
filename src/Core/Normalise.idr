@@ -13,7 +13,7 @@ import Core.Value
 -- Expand all the pi bindings at the start of a term, but otherwise don't
 -- reduce
 export
-normalisePis : {auto c : Ref Ctxt Defs} ->
+normalisePis : {auto c : ReadOnly Ctxt Defs} ->
                {vars : Scope} ->
                Defs -> Env Term vars -> Term vars -> Core (Term vars)
 normalisePis defs env tm
@@ -23,7 +23,7 @@ normalisePis defs env tm
               _ => pure tm
 
 export
-glueBack : {auto c : Ref Ctxt Defs} ->
+glueBack : {auto c : ReadOnly Ctxt Defs} ->
            {vars : _} ->
            Defs -> Env Term vars -> NF vars -> Glued vars
 glueBack defs env nf
@@ -33,7 +33,7 @@ glueBack defs env nf
              (const (pure nf))
 
 export
-glueClosure : {auto c : Ref Ctxt Defs} ->
+glueClosure : {auto c : ReadOnly Ctxt Defs} ->
               {vars : _} ->
               Defs -> Env Term vars -> Closure vars -> Glued vars
 glueClosure defs env clos
@@ -43,27 +43,27 @@ glueClosure defs env clos
              (const (evalClosure defs clos))
 
 export
-normalise : {auto c : Ref Ctxt Defs} ->
+normalise : {auto c : ReadOnly Ctxt Defs} ->
             {free : _} ->
             Defs -> Env Term free -> Term free -> Core (Term free)
 normalise defs env tm = quote defs env !(nf defs env tm)
 
 export
-normaliseOpts : {auto c : Ref Ctxt Defs} ->
+normaliseOpts : {auto c : ReadOnly Ctxt Defs} ->
                 {free : _} ->
                 EvalOpts -> Defs -> Env Term free -> Term free -> Core (Term free)
 normaliseOpts opts defs env tm
     = quote defs env !(nfOpts opts defs env tm)
 
 export
-normaliseHoles : {auto c : Ref Ctxt Defs} ->
+normaliseHoles : {auto c : ReadOnly Ctxt Defs} ->
                  {free : _} ->
                  Defs -> Env Term free -> Term free -> Core (Term free)
 normaliseHoles defs env tm
     = quote defs env !(nfOpts withHoles defs env tm)
 
 export
-normaliseLHS : {auto c : Ref Ctxt Defs} ->
+normaliseLHS : {auto c : ReadOnly Ctxt Defs} ->
                {free : _} ->
                Defs -> Env Term free -> Term free -> Core (Term free)
 normaliseLHS defs env (Bind fc n b sc)
@@ -72,7 +72,7 @@ normaliseLHS defs env tm
     = quote defs env !(nfOpts onLHS defs env tm)
 
 export
-tryNormaliseSizeLimit : {auto c : Ref Ctxt Defs} ->
+tryNormaliseSizeLimit : {auto c : ReadOnly Ctxt Defs} ->
                      {free : _} ->
                      Defs -> Nat ->
                      Env Term free -> Term free -> Core (Term free)
@@ -83,7 +83,7 @@ tryNormaliseSizeLimit defs limit env tm
 -- The size limit here is the depth of stuck applications. If it gets past
 -- that size, return the original
 export
-normaliseSizeLimit : {auto c : Ref Ctxt Defs} ->
+normaliseSizeLimit : {auto c : ReadOnly Ctxt Defs} ->
                      {free : _} ->
                      Defs -> Nat ->
                      Env Term free -> Term free -> Core (Term free)
@@ -93,14 +93,14 @@ normaliseSizeLimit defs limit env tm
             (\err => pure tm)
 
 export
-normaliseArgHoles : {auto c : Ref Ctxt Defs} ->
+normaliseArgHoles : {auto c : ReadOnly Ctxt Defs} ->
                     {free : _} ->
                     Defs -> Env Term free -> Term free -> Core (Term free)
 normaliseArgHoles defs env tm
     = quote defs env !(nfOpts withArgHoles defs env tm)
 
 export
-normaliseAll : {auto c : Ref Ctxt Defs} ->
+normaliseAll : {auto c : ReadOnly Ctxt Defs} ->
                {free : _} ->
                Defs -> Env Term free -> Term free -> Core (Term free)
 normaliseAll defs env tm
@@ -110,7 +110,7 @@ normaliseAll defs env tm
 -- binders is the slow part of normalisation so whenever we can avoid it, it's
 -- a big win
 export
-normaliseScope : {auto c : Ref Ctxt Defs} ->
+normaliseScope : {auto c : ReadOnly Ctxt Defs} ->
                  {free : _} ->
                  Defs -> Env Term free -> Term free -> Core (Term free)
 normaliseScope defs env (Bind fc n b sc)
@@ -118,10 +118,10 @@ normaliseScope defs env (Bind fc n b sc)
 normaliseScope defs env tm = normalise defs env tm
 
 export
-etaContract : {auto _ : Ref Ctxt Defs} ->
+etaContract : {auto _ : ReadOnly Ctxt Defs} ->
               {vars : _} -> Term vars -> Core (Term vars)
 etaContract tm = do
-  defs <- get Ctxt
+  defs <- read Ctxt
   logTerm "eval.eta" 5 "Attempting to eta contract subterms of" tm
   nf <- normalise defs (mkEnv EmptyFC _) tm
   logTerm "eval.eta" 5 "Evaluated to" nf
@@ -154,7 +154,7 @@ getValArity defs env (NBind fc x (Pi {}) sc)
 getValArity defs env val = pure 0
 
 export
-getArity : {auto c : Ref Ctxt Defs} ->
+getArity : {auto c : ReadOnly Ctxt Defs} ->
            {vars : _} ->
            Defs -> Env Term vars -> Term vars -> Core Nat
 getArity defs env tm = getValArity defs env !(nf defs env tm)
@@ -162,11 +162,11 @@ getArity defs env tm = getValArity defs env !(nf defs env tm)
 -- Log message with a value, translating back to human readable names first
 export
 logNF : {vars : _} ->
-        {auto c : Ref Ctxt Defs} ->
+        {auto c : ReadOnly Ctxt Defs} ->
         LogTopic -> Nat -> Lazy String -> Env Term vars -> NF vars -> Core ()
 logNF s n msg env tmnf
     = when !(logging s n) $
-        do defs <- get Ctxt
+        do defs <- read Ctxt
            tm <- quote defs env tmnf
            tm' <- toFullNames tm
            logString s.topic n (msg ++ ": " ++ show tm')
@@ -175,18 +175,18 @@ logNF s n msg env tmnf
 -- readable names first
 export
 logTermNF' : {vars : _} ->
-             {auto c : Ref Ctxt Defs} ->
+             {auto c : ReadOnly Ctxt Defs} ->
              LogTopic ->
              Nat -> Lazy String -> Env Term vars -> Term vars -> Core ()
 logTermNF' s n msg env tm
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          tmnf <- normaliseHoles defs env tm
          tm' <- toFullNames tmnf
          logString s.topic n (msg ++ ": " ++ show tm')
 
 export
 logTermNF : {vars : _} ->
-            {auto c : Ref Ctxt Defs} ->
+            {auto c : ReadOnly Ctxt Defs} ->
             LogTopic ->
             Nat -> Lazy String -> Env Term vars -> Term vars -> Core ()
 logTermNF s n msg env tm
@@ -194,24 +194,24 @@ logTermNF s n msg env tm
 
 export
 logGlue : {vars : _} ->
-          {auto c : Ref Ctxt Defs} ->
+          {auto c : ReadOnly Ctxt Defs} ->
           LogTopic ->
           Nat -> Lazy String -> Glued vars -> Core ()
 logGlue s n msg gtm
     = when !(logging s n) $
-        do defs <- get Ctxt
+        do defs <- read Ctxt
            tm <- getTerm gtm
            tm' <- toFullNames tm
            logString s.topic n (msg ++ ": " ++ show tm')
 
 export
 logGlueNF : {vars : _} ->
-            {auto c : Ref Ctxt Defs} ->
+            {auto c : ReadOnly Ctxt Defs} ->
             LogTopic ->
             Nat -> Lazy String -> Env Term vars -> Glued vars -> Core ()
 logGlueNF s n msg env gtm
     = when !(logging s n) $
-        do defs <- get Ctxt
+        do defs <- read Ctxt
            tm <- getTerm gtm
            tmnf <- normaliseHoles defs env tm
            tm' <- toFullNames tmnf
@@ -219,7 +219,7 @@ logGlueNF s n msg env gtm
 
 export
 logEnv : {vars : _} ->
-         {auto c : Ref Ctxt Defs} ->
+         {auto c : ReadOnly Ctxt Defs} ->
          LogTopic ->
          Nat -> String -> Env Term vars -> Core ()
 logEnv s n msg env
@@ -240,7 +240,7 @@ logEnv s n msg env
                            show (piInfo b) ++ " " ++
                            show x) bs (binderType b)
              dumpEnv bs
-replace' : {auto c : Ref Ctxt Defs} ->
+replace' : {auto c : ReadOnly Ctxt Defs} ->
            {vars : _} ->
            Int -> Defs -> Env Term vars ->
            (lhs : NF vars) -> (parg : Term vars) -> (exp : NF vars) ->
@@ -304,7 +304,7 @@ replace' {vars} tmpi defs env lhs parg tm
                    quote empty env tm
 
 export
-replace : {auto c : Ref Ctxt Defs} ->
+replace : {auto c : ReadOnly Ctxt Defs} ->
           {vars : _} ->
           Defs -> Env Term vars ->
           (orig : NF vars) -> (new : Term vars) -> (tm : NF vars) ->
@@ -314,7 +314,7 @@ replace = replace' 0
 -- If the term is an application of a primitive conversion (fromInteger etc)
 -- and it's applied to a constant, fully normalise the term.
 export
-normalisePrims : {auto c : Ref Ctxt Defs} -> {vs : _} ->
+normalisePrims : {auto c : ReadOnly Ctxt Defs} -> {vs : _} ->
                  -- size heuristic for when to unfold
                  (Constant -> Bool) ->
                  -- view to check whether an argument is a constant
@@ -340,7 +340,7 @@ normalisePrims boundSafe viewConstant all prims n args tm env
               | _ => pure Nothing
         let True = boundSafe c -- that we should expand
               | _ => pure Nothing
-        defs <- get Ctxt
+        defs <- read Ctxt
         tm <- if all
                  then normaliseAll defs env tm
                  else normalise defs env tm

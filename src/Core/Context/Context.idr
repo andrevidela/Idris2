@@ -33,6 +33,15 @@ data Ref : (l : label) -> Type -> Type where
      MkRef : IORef a -> Ref x a
 
 public export
+data ReadOnly : (l : label) -> Type -> Type where
+     [search l]
+     MkReadRef : IORef a -> ReadOnly x a
+
+%hint %inline export
+fromRef : Ref l a -> ReadOnly l a
+fromRef (MkRef ref) = MkReadRef ref
+
+public export
 data HoleInfo
         = NotHole
         | SolvedHole Nat

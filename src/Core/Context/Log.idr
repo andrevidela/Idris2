@@ -27,14 +27,14 @@ logString' lvl =
             (verbosity lvl)
 
 export
-logging' : {auto c : Ref Ctxt Defs} ->
+logging' : {auto c : ReadOnly Ctxt Defs} ->
            LogLevel -> Core Bool
 logging' lvl = do
     opts <- getSession
     pure $ verbosity lvl == 0 || (logEnabled opts && keepLog lvl (logLevel opts))
 
 export
-unverifiedLogging : {auto c : Ref Ctxt Defs} ->
+unverifiedLogging : {auto c : ReadOnly Ctxt Defs} ->
                     String -> Nat -> Core Bool
 unverifiedLogging str Z = pure True
 unverifiedLogging str n = do
@@ -43,14 +43,14 @@ unverifiedLogging str n = do
 
 %inline
 export
-logging : {auto c : Ref Ctxt Defs} ->
+logging : {auto c : ReadOnly Ctxt Defs} ->
           LogTopic -> Nat -> Core Bool
 logging s n = unverifiedLogging s.topic n
 
 ||| Log message with a term, translating back to human readable names first.
 export
 logTerm : {vars : _} ->
-          {auto c : Ref Ctxt Defs} ->
+          {auto c : ReadOnly Ctxt Defs} ->
           LogTopic -> Nat -> Lazy String -> Term vars -> Core ()
 logTerm s n msg tm
     = when !(logging s n)
@@ -73,14 +73,14 @@ log' lvl msg
 ||| This will enfore that additional computation happends only when needed.
 ||| `do` before `pure` in this case ensures the correct bounds.
 export
-log : {auto c : Ref Ctxt Defs} ->
+log : {auto c : ReadOnly Ctxt Defs} ->
       LogTopic -> Nat -> Lazy String -> Core ()
 log s n msg
     = when !(logging s n)
         $ logString s.topic n msg
 
 export
-unverifiedLogC : {auto c : Ref Ctxt Defs} ->
+unverifiedLogC : {auto c : ReadOnly Ctxt Defs} ->
                  String -> Nat -> Core String -> Core ()
 unverifiedLogC str n cmsg
     = when !(unverifiedLogging str n)
@@ -89,7 +89,7 @@ unverifiedLogC str n cmsg
 
 %inline
 export
-logC : {auto c : Ref Ctxt Defs} ->
+logC : {auto c : ReadOnly Ctxt Defs} ->
        LogTopic -> Nat -> Core String -> Core ()
 logC s = unverifiedLogC s.topic
 

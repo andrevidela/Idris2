@@ -1546,17 +1546,17 @@ reducibleInAny : List Namespace -> Name -> Visibility -> Bool
 reducibleInAny nss n vis = any (\ns => reducibleIn ns n vis) nss
 
 export
-toFullNames : {auto c : Ref Ctxt Defs} ->
+toFullNames : {auto c : ReadOnly Ctxt Defs} ->
               HasNames a => a -> Core a
 toFullNames t
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          full (gamma defs) t
 
 export
-toResolvedNames : {auto c : Ref Ctxt Defs} ->
+toResolvedNames : {auto c : ReadOnly Ctxt Defs} ->
                   HasNames a => a -> Core a
 toResolvedNames t
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          resolved (gamma defs) t
 
 -- Make the name look nicer for user display
@@ -2113,10 +2113,10 @@ resetFirstEntry
          put Ctxt ({ gamma->firstEntry := nextEntry (gamma defs) } defs)
 
 export
-getFullName : {auto c : Ref Ctxt Defs} ->
+getFullName : {auto c : ReadOnly Ctxt Defs} ->
               Name -> Core Name
 getFullName (Resolved i)
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          Just gdef <- lookupCtxtExact (Resolved i) (gamma defs)
               | Nothing => pure (Resolved i)
          pure (fullname gdef)
@@ -2125,10 +2125,10 @@ getFullName n = pure n
 -- Getting and setting various options
 
 export
-getPPrint : {auto c : Ref Ctxt Defs} ->
+getPPrint : {auto c : ReadOnly Ctxt Defs} ->
             Core PPrinter
 getPPrint
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure (printing (options defs))
 
 export
@@ -2392,95 +2392,95 @@ addNameDirective fc n ns
 -- Checking special names from Options
 
 export
-isPairType : {auto c : Ref Ctxt Defs} ->
+isPairType : {auto c : ReadOnly Ctxt Defs} ->
              Name -> Core Bool
 isPairType n
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          case pairnames (options defs) of
               Nothing => pure False
               Just l => pure $ !(getFullName n) == !(getFullName (pairType l))
 
 export
-fstName : {auto c : Ref Ctxt Defs} ->
+fstName : {auto c : ReadOnly Ctxt Defs} ->
           Core (Maybe Name)
 fstName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ maybe Nothing (Just . fstName) (pairnames (options defs))
 
 export
-sndName : {auto c : Ref Ctxt Defs} ->
+sndName : {auto c : ReadOnly Ctxt Defs} ->
           Core (Maybe Name)
 sndName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ maybe Nothing (Just . sndName) (pairnames (options defs))
 
 export
-getRewrite :{auto c : Ref Ctxt Defs} ->
+getRewrite :{auto c : ReadOnly Ctxt Defs} ->
             Core (Maybe Name)
 getRewrite
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ maybe Nothing (Just . rewriteName) (rewritenames (options defs))
 
 export
-isEqualTy : {auto c : Ref Ctxt Defs} ->
+isEqualTy : {auto c : ReadOnly Ctxt Defs} ->
             Name -> Core Bool
 isEqualTy n
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          case rewritenames (options defs) of
               Nothing => pure False
               Just r => pure $ !(getFullName n) == !(getFullName (equalType r))
 
 export
-fromIntegerName : {auto c : Ref Ctxt Defs} ->
+fromIntegerName : {auto c : ReadOnly Ctxt Defs} ->
                   Core (Maybe Name)
 fromIntegerName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ fromIntegerName (primnames (options defs))
 
 export
-fromStringName : {auto c : Ref Ctxt Defs} ->
+fromStringName : {auto c : ReadOnly Ctxt Defs} ->
                  Core (Maybe Name)
 fromStringName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ fromStringName (primnames (options defs))
 
 export
-fromCharName : {auto c : Ref Ctxt Defs} ->
+fromCharName : {auto c : ReadOnly Ctxt Defs} ->
                Core (Maybe Name)
 fromCharName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ fromCharName (primnames (options defs))
 
 export
-fromDoubleName : {auto c : Ref Ctxt Defs} ->
+fromDoubleName : {auto c : ReadOnly Ctxt Defs} ->
                Core (Maybe Name)
 fromDoubleName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ fromDoubleName (primnames (options defs))
 
 export
-fromTTImpName : {auto c : Ref Ctxt Defs} ->
+fromTTImpName : {auto c : ReadOnly Ctxt Defs} ->
                 Core (Maybe Name)
 fromTTImpName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ fromTTImpName (primnames (options defs))
 
 export
-fromNameName : {auto c : Ref Ctxt Defs} ->
+fromNameName : {auto c : ReadOnly Ctxt Defs} ->
                Core (Maybe Name)
 fromNameName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ fromNameName (primnames (options defs))
 
 export
-fromDeclsName : {auto c : Ref Ctxt Defs} ->
+fromDeclsName : {auto c : ReadOnly Ctxt Defs} ->
                 Core (Maybe Name)
 fromDeclsName
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure $ fromDeclsName (primnames (options defs))
 
 export
-getPrimNames : {auto c : Ref Ctxt Defs} -> Core PrimNames
+getPrimNames : {auto c : ReadOnly Ctxt Defs} -> Core PrimNames
 getPrimNames = [| MkPrimNs fromIntegerName
                            fromStringName
                            fromCharName
@@ -2490,7 +2490,7 @@ getPrimNames = [| MkPrimNs fromIntegerName
                            fromDeclsName |]
 
 export
-getPrimitiveNames : {auto c : Ref Ctxt Defs} -> Core (List Name)
+getPrimitiveNames : {auto c : ReadOnly Ctxt Defs} -> Core (List Name)
 getPrimitiveNames = primNamesToList <$> getPrimNames
 
 export
@@ -2540,10 +2540,10 @@ setDebugElabCheck : {auto c : Ref Ctxt Defs} -> Bool -> Core ()
 setDebugElabCheck b = update Ctxt { options->session->debugElabCheck := b }
 
 export
-getSession : {auto c : Ref Ctxt Defs} ->
+getSession : {auto c : ReadOnly Ctxt Defs} ->
              Core Session
 getSession
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure (session (options defs))
 
 export
@@ -2591,10 +2591,10 @@ clearTimer = update Ctxt { timer := Nothing }
 
 ||| If the timer was started more than t milliseconds ago, throw an exception
 export
-checkTimer : {auto c : Ref Ctxt Defs} ->
+checkTimer : {auto c : ReadOnly Ctxt Defs} ->
              Core ()
 checkTimer
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          let Just (max, action) = timer defs
                 | Nothing => pure ()
          t <- getTime

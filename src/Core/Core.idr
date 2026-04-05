@@ -960,6 +960,16 @@ newRef x val
     = do ref <- coreLift (newIORef val)
          pure (MkRef ref)
 
+export
+newReadOnlyRef : (0 x : label) -> t -> Core (ReadOnly x t)
+newReadOnlyRef x val
+    = do ref <- coreLift (newIORef val)
+         pure (MkReadRef ref)
+
+export %inline
+read : (0 x : label) -> {auto ref : ReadOnly x a} -> Core a
+read x {ref = MkReadRef io} = coreLift (readIORef io)
+
 export %inline
 get : (0 x : label) -> {auto ref : Ref x a} -> Core a
 get x {ref = MkRef io} = coreLift (readIORef io)
