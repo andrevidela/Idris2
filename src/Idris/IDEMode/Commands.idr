@@ -35,7 +35,7 @@ sendStr f st =
   map (const ()) (fPutStr f st)
 
 export
-send : {auto c : Ref Ctxt Defs} -> File -> Reply -> Core ()
+send : {auto c : ReadOnly Ctxt Defs} -> File -> Reply -> Core ()
 send f resp
     = do let r = show (toSExp resp) ++ "\n"
          log "ide-mode.send" 20 r

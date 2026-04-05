@@ -2144,9 +2144,9 @@ setCG : {auto c : Ref Ctxt Defs} -> CG -> Core ()
 setCG cg = update Ctxt { options->session->codegen := cg }
 
 export
-getDirs : {auto c : Ref Ctxt Defs} -> Core Dirs
+getDirs : {auto c : ReadOnly Ctxt Defs} -> Core Dirs
 getDirs
-    = do defs <- get Ctxt
+    = do defs <- read Ctxt
          pure (dirs (options defs))
 
 export

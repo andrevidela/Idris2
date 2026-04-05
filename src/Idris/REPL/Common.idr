@@ -30,7 +30,7 @@ import System.File
 ||| messages, an unhandled error is an example of what should
 ||| *not* end up here.
 export
-iputStrLn : {auto c : Ref Ctxt Defs} ->
+iputStrLn : {auto c : ReadOnly Ctxt Defs} ->
             {auto o : Ref ROpts REPLOpts} ->
             Doc IdrisAnn -> Core ()
 iputStrLn msg
@@ -97,7 +97,7 @@ DocCreator : Type -> Type
 DocCreator a = a -> Core (Doc IdrisAnn)
 
 export
-emitProblem : {auto c : Ref Ctxt Defs} ->
+emitProblem : {auto c : ReadOnly Ctxt Defs} ->
             {auto o : Ref ROpts REPLOpts} ->
             {auto s : Ref Syn SyntaxInfo} ->
             a -> (DocCreator a) -> (DocCreator a) -> (a -> Maybe FC) -> MsgStatus -> Core ()
