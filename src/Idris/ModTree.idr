@@ -350,7 +350,10 @@ buildModsConcurrent loc opts timings taskCount dag
                   (pure . Left . singleton)
                   (\case [] => pure (Right ()); n => pure (Left n))
     in do
-      (_, []) <- coreLift $ execConcurrently dag builder 1 -- 8 threads
+      let assumedCompiled = fromList $ map (,()) $ Prelude.toList $ difference (keySet dag.tree) (keySet dag.items)
+      let True = isConsistent dag.reverseTree
+        | False => throw (InternalError "lmao wrong tree")
+      (_, []) <- coreLift $ execConcurrently {alreadyDone = assumedCompiled} dag builder 1 -- 8 threads
         | errs => pure (join (snd errs))
       pure []
 
@@ -410,16 +413,21 @@ buildAll : {auto c : Ref Ctxt Defs} ->
            (allFiles : List String) ->
            Core (List Error)
 buildAll allFiles
---     = do mods <- getAllModDAG EmptyFC empty allFiles
---          coreLift $ printLn mods
---          (opts, timings) <- readPresistentOpts
---          buildModsConcurrent EmptyFC opts timings
---            (length $ Prelude.toList mods.items) mods
-    = do mods <- getAllBuildMods EmptyFC [] allFiles
-         -- There'll be duplicates, so if something is already built, drop it
-         let mods' = dropLater mods
+    = do mods <- getAllModDAG EmptyFC empty allFiles
+         -- list of modules we assume are already compiled
+         coreLift $ putStrLn "--- starting compilation of modules ---------------------------"
+         coreLift $ putStrLn """
+           modules in the tree that are not in the item list:
+           \{unlines $ map show $ Prelude.toList $ difference (keySet mods.tree) (keySet mods.items)}
+           """
          (opts, timings) <- readPresistentOpts
-         buildMods EmptyFC opts timings 1 (length mods') mods'
+         buildModsConcurrent EmptyFC opts timings
+           (length $ Prelude.toList mods.items) mods
+--     = do mods <- getAllBuildMods EmptyFC [] allFiles
+--          -- There'll be duplicates, so if something is already built, drop it
+--          let mods' = dropLater mods
+--          (opts, timings) <- readPresistentOpts
+--          buildMods EmptyFC opts timings 1 (length mods') mods'
   where
     dropLater : List BuildMod -> List BuildMod
     dropLater [] = []

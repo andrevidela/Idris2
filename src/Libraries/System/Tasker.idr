@@ -21,6 +21,18 @@ record DAG (key: Type) (value : Type) where
   -- For each node, there is a list of its parents
   reverseTree : SortedMap key (SortedSet key)
 
+keyInTree : key -> SortedMap key a -> Bool
+keyInTree key tree = contains key (keySet tree)
+
+(.allParents) : Ord key => DAG key value -> SortedSet key
+dag.allParents = foldr union empty (values dag.reverseTree)
+-- check that for all node they have a parent in the tree
+export
+isConsistent : Ord key => Show key => SortedMap key (SortedSet key) -> Bool
+isConsistent parentTree =
+  let allParents = foldr union empty (values parentTree)
+  in all (\x => trace "is key \{show x} in tree" $ keyInTree x parentTree) allParents
+
 export
 Show key => Show (DAG key value) where
   show dag = unlines $ map show (kvList dag.reverseTree)
@@ -221,13 +233,14 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type} {0 result : Type}
 
   coordinator : Show key => Ord key =>
                 Show error =>
+                (allWorkers : Nat) ->
                 CoordinatorState key error result ->
                 (availableWorkers : Nat) ->
                 (remainingTasks : Nat) ->
                 IO ()
-  coordinator state Z Z
+  coordinator all state Z Z
     = putStrLn "Coord: all jobs done, notifying main thread" >> state.done.send (values state.finishedTasks, state.collectedErrors)
-  coordinator state Z (S remain)
+  coordinator all state Z (S remain)
     = do -- no workers available, wait for the next result to keep going
          putStrLn "Coord: no worker available, waiting for next result, \{show $ S remain} tasks remain}"
          outcome <- workNotif.wait
@@ -235,35 +248,54 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type} {0 result : Type}
          -- update the list of available jobs given the ones we already have
          -- coordinator runs again with 1 more worker available
          let (newState, count) = updateStateFromOutcome outcome dag state
-         coordinator newState 1 (remain `minus` count)
-  coordinator state (S w) Z
+         coordinator all newState 1 (remain `minus` count)
+  coordinator all state (S w) Z
     = do putStrLn "Coord: No more tasks, killing workers \{show w} left"
          task.send Nothing
-         coordinator state w Z
-  coordinator state (S availableWorkers) (S remain) with (state.availableTasks)
+         coordinator all state w Z
+  coordinator all state (S availableWorkers) (S remain) with (state.availableTasks)
     _ | []
-      = do putStrLn "Coord: We have \{show (S remain)} tasks in flight, waiting"
-           outcome  <- workNotif.wait
-           putStrLn "Coord: task \{show outcome.wid} is finished"
-           let (newState, count) = updateStateFromOutcome outcome dag state
-           coordinator newState (S availableWorkers) (remain `minus` count)
+     = if all == S availableWorkers
+          then putStrLn """
+                 Deadlock detected: All workers are available but we don't have any available task
+                 This is often due to a misconfigured initial state where some dependencies are impossible to fulfill.
+                 Here is the execution graph you gave me : \{show dag}
+                 Here are the dependencies that blocking:
+                 \{unlines $ map show $ Prelude.toList $ difference dag.allParents (keySet state.finishedTasks)}
+                 Here are the nodes that are unfulfillable:
+                 \{unlines $ map show $ filter (\(k, _) => not $ contains k (keySet state.finishedTasks)) (kvList dag.reverseTree)}
+                 Shutting down.
+                 """
+             >> coordinator all state Z Z
+          else do
+                 putStrLn "Coord: We have \{show (S remain)} tasks in flight, waiting"
+                 outcome  <- workNotif.wait
+                 putStrLn "Coord: task \{show outcome.wid} is finished"
+                 let (newState, count) = updateStateFromOutcome outcome dag state
+                 coordinator all newState (S availableWorkers) (remain `minus` count)
     _ | (next :: jobs)
       = putStrLn "Coord: \{show (S availableWorkers)} workers available, sending task \{show next}, \{show $ S remain} tasks remain"
         >> if (state.hasFailedDependency `contains'` next)
               then do
                 putStrLn "skipping task \{show next}, one of its dependencies failed"
-                coordinator ({availableTasks := jobs} state) availableWorkers remain
+                coordinator all ({availableTasks := jobs} state) availableWorkers remain
               else do
                 let Just value = lookup next dag.items
-                  | Nothing => ?big_oops
+                  | Nothing => putStrLn """
+                      Attempted to read key \{show next} but there is no such key in tree \{show $ keys dag.items}
+                      All keys in dag: \{show $ keys dag.tree}
+                      Shutting down.
+                      """
+                      >> coordinator all state (S availableWorkers) Z
                 task.send (Just (next, value))
-                coordinator ({availableTasks := jobs} state) availableWorkers (S remain)
+                coordinator all ({availableTasks := jobs} state) availableWorkers (S remain)
 
 parameters {0 key : Type} {0 value : Type} {0 error : Type}
   {auto ord : Ord key} (dag : DAG key value)
 
   export
   execConcurrently : (perform : value -> IO (Either error result)) ->
+                     {default empty alreadyDone : SortedMap key result} ->
                      Show key => Show error => (threads : Nat) -> IO (List result, List error)
   execConcurrently perform threads = do
     putStrLn "Starting concurrent execution on \{show threads} threads"
@@ -274,8 +306,8 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type}
     -- spawn the coordinator
     let roots = dag.getRoots
     putStrLn "Starting coordinator with roots \{show roots}"
-    let coordinatorInit = MkSt done roots empty [] empty
-    ignore $ fork (coordinator tasks workNotif dag coordinatorInit threads dag.nodeCount)
+    let coordinatorInit = MkSt done roots alreadyDone [] empty
+    ignore $ fork (coordinator tasks workNotif dag threads coordinatorInit threads dag.nodeCount)
     -- spawn the workers
     ignore $ for [1 .. threads] $ \n => do
       putStrLn "Spawning worker \{show n}"
