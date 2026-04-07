@@ -210,7 +210,7 @@ updateStateFromOutcome (MkOut doneTask (Left error)) dag state =
   ({ availableTasks := totalAvailable,
      collectedErrors $= (error ::),
      hasFailedDependency $= union toRemove}
-  (trace "removing children of \{show doneTask}:  \{show toRemove}\n" state), S $ length (Prelude.toList toRemove))
+  state, S $ length (Prelude.toList toRemove))
 
 parameters {0 key : Type} {0 value : Type} {0 error : Type} {0 result : Type}
     (task : Channel (Maybe (key, value))) (workNotif : Channel (TaskOutcome key error result)) (dag : DAG key value)

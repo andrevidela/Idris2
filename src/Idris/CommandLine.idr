@@ -173,7 +173,9 @@ data CLOpt
    ||| Turn on %default total globally
   Total |
    ||| Disable common subexpression elimination
-  NoCSE
+  NoCSE |
+   ||| How many threads to use when compiling modules
+  Threads Nat
 
 ||| Extract the host and port to bind the IDE socket to
 export
@@ -258,6 +260,8 @@ options = [MkOpt ["--check", "-c"] [] [CheckOnly]
               (Just "Generate profile data when compiling, if supported"),
            MkOpt ["--no-cse"] [] [NoCSE]
               (Just "Disable common subexpression elimination"),
+           MkOpt ["--threads"] [RequiredNat "n"] (\n => pure $ Threads n)
+              (Just "Use multicore compilation for modules"),
 
            optSeparator,
            MkOpt ["--total"] [] [Total]

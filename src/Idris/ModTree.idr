@@ -353,7 +353,8 @@ buildModsConcurrent loc opts timings taskCount dag
       let assumedCompiled = fromList $ map (,()) $ Prelude.toList $ difference (keySet dag.tree) (keySet dag.items)
       let True = isConsistent dag.reverseTree
         | False => throw (InternalError "lmao wrong tree")
-      (_, []) <- coreLift $ execConcurrently {alreadyDone = assumedCompiled} dag builder 1 -- 8 threads
+      (_, []) <- coreLift
+               $ execConcurrently {alreadyDone = assumedCompiled} dag builder opts.session.threads -- 8 threads
         | errs => pure (join (snd errs))
       pure []
 
