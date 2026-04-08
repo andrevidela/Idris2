@@ -112,31 +112,38 @@ data BuildOrder : Type where
 
 modTreeToDAG : ModTree -> DAG ModuleIdent BuildMod
 modTreeToDAG modTree =
-    MkDAG' (moduleItems modTree empty)
-           (moduleTree modTree empty)
+  let (items, tree, _) = go modTree (empty, empty, empty)
+  in MkDAG' items tree
   where
-    -- we don't keep track of dependencies in the map of items
-    moduleItems : ModTree -> SortedMap ModuleIdent BuildMod -> SortedMap ModuleIdent BuildMod
-    moduleItems (MkModTree nspace Nothing deps) acc
-      = -- trace "module \{show nspace} does not have a file associated" $
-        foldr moduleItems acc deps
-    moduleItems (MkModTree nspace (Just filename) deps) acc
-      = let dependencies = map (.nspace) deps
-        in foldr moduleItems
-          (insert nspace
-              (MkBuildMod filename nspace dependencies)
-              acc)
-          deps
-
-    moduleTree : ModTree ->
-      SortedMap ModuleIdent (SortedSet ModuleIdent) ->
-      SortedMap ModuleIdent (SortedSet ModuleIdent)
-    moduleTree (MkModTree _      Nothing  _   ) acc = acc
-    moduleTree (MkModTree nspace (Just _) deps) acc
-      = let realDeps = filter (isJust . sourceFile) deps
-            dependencies = map (.nspace) realDeps
-            newAcc = insert nspace (fromList dependencies) acc
-        in foldr moduleTree newAcc realDeps
+    -- Single pass that builds both the item map and the (reverse) edge map
+    -- with a shared `seen` set, so each ModTree node is visited at most once.
+    -- Without memoisation, shared subtrees (diamond imports) cause exponential
+    -- re-traversal because `mkModTree` returns the same cached subtree at
+    -- every import site.
+    go : ModTree ->
+         ( SortedMap ModuleIdent BuildMod
+         , SortedMap ModuleIdent (SortedSet ModuleIdent)
+         , SortedSet ModuleIdent
+         ) ->
+         ( SortedMap ModuleIdent BuildMod
+         , SortedMap ModuleIdent (SortedSet ModuleIdent)
+         , SortedSet ModuleIdent
+         )
+    go (MkModTree nspace Nothing deps) acc@(items, tree, seen) =
+      if contains nspace seen
+        then acc
+        else foldr go (items, tree, insert nspace seen) deps
+    go (MkModTree nspace (Just filename) deps) acc@(items, tree, seen) =
+      if contains nspace seen
+        then acc
+        else
+          let allDepNS  = map (.nspace) deps
+              realDeps  = filter (isJust . sourceFile) deps
+              realDepNS = map (.nspace) realDeps
+              items' = insert nspace (MkBuildMod filename nspace allDepNS) items
+              tree'  = insert nspace (fromList realDepNS) tree
+              seen'  = insert nspace seen
+          in foldr go (items', tree', seen') deps
 
 -- Given a module tree, returns the modules in the reverse order they need to
 -- be built, including their dependencies
@@ -197,12 +204,12 @@ getModDAG loc done fname
 export
 getBuildMods : {auto c : Ref Ctxt Defs} ->
                {auto o : Ref ROpts REPLOpts} ->
+               {auto a : Ref AllMods (List (ModuleIdent, ModTree))} ->
                FC -> (done : List BuildMod) ->
                (mainFile : String) ->
                Core (List BuildMod)
 getBuildMods loc done fname
-    = do a <- newRef AllMods []
-         Just t <- getModTree loc done fname
+    = do Just t <- getModTree loc done fname
            | Nothing => pure []
          dm <- newRef DoneMod empty
          o <- newRef BuildOrder []
@@ -389,7 +396,8 @@ buildDeps : {auto c : Ref Ctxt Defs} ->
             (mainFile : String) ->
             Core (List Error)
 buildDeps fname
-    = do mods <- getBuildMods EmptyFC [] fname
+    = do _ <- newRef AllMods []
+         mods <- getBuildMods EmptyFC [] fname
          log "import" 20 $ "Needs to rebuild: " ++ show mods
          (opts, timings) <- readPresistentOpts
          ok <- buildMods EmptyFC opts timings 1 (length mods) mods
@@ -411,13 +419,32 @@ buildDeps fname
 
 getAllBuildMods : {auto c : Ref Ctxt Defs} ->
                   {auto o : Ref ROpts REPLOpts} ->
+                  {auto a : Ref AllMods (List (ModuleIdent, ModTree))} ->
+                  Time =>
                   FC -> (done : List BuildMod) ->
                   (allFiles : List String) ->
                   Core (List BuildMod)
 getAllBuildMods fc done [] = pure done
 getAllBuildMods fc done (f :: fs)
-    = do ms <- getBuildMods fc done f
+    = do ms <- withTiming "getBuildMods" $ getBuildMods fc done f
          getAllBuildMods fc (ms ++ done) fs
+
+-- Build a DAG directly from a topologically-sorted `[BuildMod]`. Each BuildMod
+-- already lists its imports; we keep only those whose namespace appears in
+-- the build set (the rest are package modules that won't be built here).
+-- This avoids re-walking the ModTree (which can be exponential on diamond
+-- imports) and avoids the per-file `merge`/`invertTree` of `getAllModDAG`.
+buildModsToDAG : List BuildMod -> DAG ModuleIdent BuildMod
+buildModsToDAG mods =
+  let allNS : SortedSet ModuleIdent
+      allNS = fromList (map buildNS mods)
+      items : SortedMap ModuleIdent BuildMod
+      items = fromList (map (\m => (buildNS m, m)) mods)
+      tree  : SortedMap ModuleIdent (SortedSet ModuleIdent)
+      tree  = fromList $ map
+                (\m => (buildNS m, fromList (filter (contains' allNS) m.imports)))
+                mods
+  in MkDAG items tree
 
 getAllModDAG : {auto c : Ref Ctxt Defs} ->
                   {auto o : Ref ROpts REPLOpts} ->
@@ -442,26 +469,19 @@ buildAll allFiles
          coreLift $ putStrLn "--- starting compilation of modules ---------------------------"
          _ <- newRef TimeRef empty
          _ <- newRef AllMods []
-         mods <- withTiming "getAllModDAG" $ getAllModDAG EmptyFC empty allFiles
+         -- Get the topologically-sorted list of modules to build, then turn
+         -- it into a DAG in a single O(n log n) pass. This skips the
+         -- expensive ModTree → DAG conversion + per-file merge.
+         mods <- withTiming "getAllBuildMods" $ getAllBuildMods EmptyFC [] allFiles
+         let mods' = dropLater mods
+         let dag = buildModsToDAG mods'
          buildTime <- get TimeRef
          coreLift $ putStrLn """
            build timings:
            \{unlines $ map show $ kvList buildTime}
            """
-         -- coreLift $ putStrLn """
-         --   compiling files: \{show allFiles}
-         --   modules in the tree that are not in the item list:
-         --   \{unlines $ map show $ Prelude.toList $ difference (keySet mods.tree) (keySet mods.items)}
-         --   final tree before building \{show mods}
-         --   """
          (opts, timings) <- readPresistentOpts
-         buildModsConcurrent EmptyFC opts timings
-           (length $ Prelude.toList mods.items) mods
---     = do mods <- getAllBuildMods EmptyFC [] allFiles
---          -- There'll be duplicates, so if something is already built, drop it
---          let mods' = dropLater mods
---          (opts, timings) <- readPresistentOpts
---          buildMods EmptyFC opts timings 1 (length mods') mods'
+         buildModsConcurrent EmptyFC opts timings (length mods') dag
   where
     dropLater : List BuildMod -> List BuildMod
     dropLater [] = []
