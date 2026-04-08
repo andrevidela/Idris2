@@ -31,7 +31,7 @@ export
 isConsistent : Ord key => Show key => SortedMap key (SortedSet key) -> Bool
 isConsistent parentTree =
   let allParents = foldr union empty (values parentTree)
-  in all (\x => trace "is key \{show x} in tree" $ keyInTree x parentTree) allParents
+  in all (\x => keyInTree x parentTree) allParents
 
 export
 Show key => Show (DAG key value) where
@@ -78,8 +78,8 @@ MkDAG' : Ord key => (items : SortedMap key value) -> (tree : SortedMap key (Sort
 MkDAG' items tree = MkDAGFull items (invertTree tree) tree
 
 export
-merge : Ord key => (l, r : DAG key value) -> DAG key value
-merge l r = MkDAG' (mergeLeft l.items r.items)
+merge : Ord key => (combine : value -> value -> value) -> (l, r : DAG key value) -> DAG key value
+merge f l r = MkDAG' (mergeWith f l.items r.items)
     (mergeWith union l.reverseTree r.reverseTree)
 
 maybeLeft : Maybe a -> Either a ()
@@ -219,15 +219,15 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type} {0 result : Type}
               (perform : value -> IO (Either error result)) ->
               IO ()
   runWorker wid perform = do
-    putStrLn "Worker \{show wid}: available"
+    -- putStrLn "Worker \{show wid}: available"
     Just (taskKey, taskData) <- task.wait
-      | Nothing => putStrLn "terminating worker \{show wid}" >>
+      | Nothing => -- putStrLn "terminating worker \{show wid}" >>
                    pure ()
-    putStrLn "Worker \{show wid}: Recieve & perform task \{show taskKey}"
+    -- putStrLn "Worker \{show wid}: Recieve & perform task \{show taskKey}"
     errs <- perform taskData
-    case errs of
-         Left e => putStrLn "Worker \{show wid}: sending notification that task \{show taskKey} has failed with error \{show e}"
-         Right _ => putStrLn "Worker \{show wid}: sending notification that task \{show taskKey} is finished successfully"
+    -- case errs of
+    --      Left e => putStrLn "Worker \{show wid}: sending notification that task \{show taskKey} has failed with error \{show e}"
+    --      Right _ => putStrLn "Worker \{show wid}: sending notification that task \{show taskKey} is finished successfully"
     workNotif.send (MkOut taskKey errs)
     runWorker wid perform
 
@@ -239,18 +239,19 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type} {0 result : Type}
                 (remainingTasks : Nat) ->
                 IO ()
   coordinator all state Z Z
-    = putStrLn "Coord: all jobs done, notifying main thread" >> state.done.send (values state.finishedTasks, state.collectedErrors)
+    = -- putStrLn "Coord: all jobs done, notifying main thread" >>
+      state.done.send (values state.finishedTasks, state.collectedErrors)
   coordinator all state Z (S remain)
     = do -- no workers available, wait for the next result to keep going
-         putStrLn "Coord: no worker available, waiting for next result, \{show $ S remain} tasks remain}"
+         -- putStrLn "Coord: no worker available, waiting for next result, \{show $ S remain} tasks remain}"
          outcome <- workNotif.wait
-         putStrLn "Coord: task \{show outcome.wid} is finished"
+         -- putStrLn "Coord: task \{show outcome.wid} is finished"
          -- update the list of available jobs given the ones we already have
          -- coordinator runs again with 1 more worker available
          let (newState, count) = updateStateFromOutcome outcome dag state
          coordinator all newState 1 (remain `minus` count)
   coordinator all state (S w) Z
-    = do putStrLn "Coord: No more tasks, killing workers \{show w} left"
+    = do -- putStrLn "Coord: No more tasks, killing workers \{show w} left"
          task.send Nothing
          coordinator all state w Z
   coordinator all state (S availableWorkers) (S remain) with (state.availableTasks)
@@ -268,14 +269,16 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type} {0 result : Type}
                  """
              >> coordinator all state Z Z
           else do
-                 putStrLn "Coord: We have \{show (S remain)} tasks in flight, waiting"
+                 -- putStrLn "Coord: We have \{show (S remain)} tasks in flight, waiting"
                  outcome  <- workNotif.wait
-                 putStrLn "Coord: task \{show outcome.wid} is finished"
+                 -- putStrLn "Coord: task \{show outcome.wid} is finished"
+                 -- A worker just freed up, so bump the available-worker count.
                  let (newState, count) = updateStateFromOutcome outcome dag state
-                 coordinator all newState (S availableWorkers) (remain `minus` count)
+                 coordinator all newState (S (S availableWorkers)) (remain `minus` count)
     _ | (next :: jobs)
-      = putStrLn "Coord: \{show (S availableWorkers)} workers available, sending task \{show next}, \{show $ S remain} tasks remain"
-        >> if (state.hasFailedDependency `contains'` next)
+      = -- putStrLn "Coord: \{show (S availableWorkers)} workers available, sending task \{show next}, \{show $ S remain} tasks remain"
+        -- >>
+        if (state.hasFailedDependency `contains'` next)
               then do
                 putStrLn "skipping task \{show next}, one of its dependencies failed"
                 coordinator all ({availableTasks := jobs} state) availableWorkers remain
@@ -298,29 +301,27 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type}
                      {default empty alreadyDone : SortedMap key result} ->
                      Show key => Show error => (threads : Nat) -> IO (List result, List error)
   execConcurrently perform threads = do
-    putStrLn "Starting concurrent execution on \{show threads} threads"
+    -- putStrLn "Starting concurrent execution on \{show threads} threads"
     startTime <- clockTime Monotonic
     tasks <- makeChannel
     workNotif <- makeChannel
     done <- makeChannel
     -- spawn the coordinator
     let roots = dag.getRoots
-    putStrLn "Starting coordinator with roots \{show roots}"
+    -- putStrLn "Starting coordinator with roots \{show roots}"
     let coordinatorInit = MkSt done roots alreadyDone [] empty
     ignore $ fork (coordinator tasks workNotif dag threads coordinatorInit threads dag.nodeCount)
     -- spawn the workers
     ignore $ for [1 .. threads] $ \n => do
-      putStrLn "Spawning worker \{show n}"
+      -- putStrLn "Spawning worker \{show n}"
       fork (runWorker tasks workNotif dag n perform)
 
     -- wait until the coordinator runs out of tasks
+    -- (the coordinator already shuts each worker down with a Nothing in its
+    -- termination loop, so no extra Nothings are needed here)
     errors <- done.wait
     endTime <- clockTime Monotonic
     let duration = endTime `timeDifference` startTime
-
-    -- stop workers
-    ignore $ for (replicate threads ()) $ \_ =>
-      tasks.send Nothing
 
     putStrLn "done with time \{show duration}"
     pure errors

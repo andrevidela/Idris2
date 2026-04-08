@@ -103,7 +103,8 @@ modTreeToDAG modTree = MkDAG'
     -- we don't keep track of dependencies in the map of items
     moduleItems : ModTree -> SortedMap ModuleIdent BuildMod -> SortedMap ModuleIdent BuildMod
     moduleItems (MkModTree nspace Nothing deps) acc
-      = foldr moduleItems acc deps
+      = -- trace "module \{show nspace} does not have a file associated" $
+        foldr moduleItems acc deps
     moduleItems (MkModTree nspace (Just filename) deps) acc
       = let dependencies = map (.nspace) deps
         in foldr moduleItems
@@ -115,10 +116,12 @@ modTreeToDAG modTree = MkDAG'
     moduleTree : ModTree ->
       SortedMap ModuleIdent (SortedSet ModuleIdent) ->
       SortedMap ModuleIdent (SortedSet ModuleIdent)
-    moduleTree (MkModTree nspace sourceFile deps) acc
-      = let dependencies = map (.nspace) deps
+    moduleTree (MkModTree _      Nothing  _   ) acc = acc
+    moduleTree (MkModTree nspace (Just _) deps) acc
+      = let realDeps = filter (isJust . sourceFile) deps
+            dependencies = map (.nspace) realDeps
             newAcc = insert nspace (fromList dependencies) acc
-        in foldr moduleTree newAcc deps
+        in foldr moduleTree newAcc realDeps
 
 -- Given a module tree, returns the modules in the reverse order they need to
 -- be built, including their dependencies
@@ -161,10 +164,13 @@ getModDAG : {auto c : Ref Ctxt Defs} ->
             (mainFile : String) ->
             Core (DAG ModuleIdent BuildMod)
 getModDAG loc done fname
-  = do Just tree <- getModTree loc done fname
+  = do -- coreLift $ putStrLn "computing mod dag for module file \{fname}"
+       Just tree <- getModTree loc done fname
          | Nothing  => pure empty
        let dag = modTreeToDAG tree
-       -- coreLift $ printLn dag
+       -- coreLift $ putStrLn """
+       --     dependency tree: \{show dag}
+       --     """
        pure dag
 
 -- Given a main file name, return the list of modules that need to be
@@ -350,11 +356,8 @@ buildModsConcurrent loc opts timings taskCount dag
                   (pure . Left . singleton)
                   (\case [] => pure (Right ()); n => pure (Left n))
     in do
-      let assumedCompiled = fromList $ map (,()) $ Prelude.toList $ difference (keySet dag.tree) (keySet dag.items)
-      let True = isConsistent dag.reverseTree
-        | False => throw (InternalError "lmao wrong tree")
       (_, []) <- coreLift
-               $ execConcurrently {alreadyDone = assumedCompiled} dag builder opts.session.threads -- 8 threads
+               $ execConcurrently dag builder opts.session.threads
         | errs => pure (join (snd errs))
       pure []
 
@@ -405,7 +408,7 @@ getAllModDAG : {auto c : Ref Ctxt Defs} ->
 getAllModDAG fc done [] = pure done
 getAllModDAG fc done (f :: fs)
     = do ms <- getModDAG fc (values done.items) f
-         getAllModDAG fc (ms `merge` done) fs
+         getAllModDAG fc (merge const ms done) fs
 
 export
 buildAll : {auto c : Ref Ctxt Defs} ->
@@ -414,13 +417,15 @@ buildAll : {auto c : Ref Ctxt Defs} ->
            (allFiles : List String) ->
            Core (List Error)
 buildAll allFiles
-    = do mods <- getAllModDAG EmptyFC empty allFiles
-         -- list of modules we assume are already compiled
-         coreLift $ putStrLn "--- starting compilation of modules ---------------------------"
-         coreLift $ putStrLn """
-           modules in the tree that are not in the item list:
-           \{unlines $ map show $ Prelude.toList $ difference (keySet mods.tree) (keySet mods.items)}
-           """
+    = do
+         -- coreLift $ putStrLn "--- starting compilation of modules ---------------------------"
+         mods <- getAllModDAG EmptyFC empty allFiles
+         -- coreLift $ putStrLn """
+         --   compiling files: \{show allFiles}
+         --   modules in the tree that are not in the item list:
+         --   \{unlines $ map show $ Prelude.toList $ difference (keySet mods.tree) (keySet mods.items)}
+         --   final tree before building \{show mods}
+         --   """
          (opts, timings) <- readPresistentOpts
          buildModsConcurrent EmptyFC opts timings
            (length $ Prelude.toList mods.items) mods
