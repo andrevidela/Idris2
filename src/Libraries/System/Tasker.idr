@@ -225,9 +225,9 @@ parameters {0 key : Type} {0 value : Type} {0 error : Type} {0 result : Type}
                    pure ()
     -- putStrLn "Worker \{show wid}: Recieve & perform task \{show taskKey}"
     errs <- perform taskData
-    -- case errs of
-    --      Left e => putStrLn "Worker \{show wid}: sending notification that task \{show taskKey} has failed with error \{show e}"
-    --      Right _ => putStrLn "Worker \{show wid}: sending notification that task \{show taskKey} is finished successfully"
+    case errs of
+         Left e => putStrLn "Worker \{show wid}: sending notification that task \{show taskKey} has failed with error \{show e}"
+         Right _ => putStrLn "Worker \{show wid}: sending notification that task \{show taskKey} is finished successfully"
     workNotif.send (MkOut taskKey errs)
     runWorker wid perform
 
