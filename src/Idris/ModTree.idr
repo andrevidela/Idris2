@@ -16,6 +16,7 @@ import Data.Either
 import Data.String
 
 import System.Directory
+import System.Clock
 
 import Libraries.Data.StringMap
 import Libraries.System.Tasker
@@ -418,8 +419,12 @@ buildAll : {auto c : Ref Ctxt Defs} ->
            Core (List Error)
 buildAll allFiles
     = do
-         -- coreLift $ putStrLn "--- starting compilation of modules ---------------------------"
+         coreLift $ putStrLn "--- starting compilation of modules ---------------------------"
+         start <- coreLift $ clockTime Monotonic
          mods <- getAllModDAG EmptyFC empty allFiles
+         end <- coreLift $ clockTime Monotonic
+         let delta = timeDifference end start
+         coreLift $ putStrLn "time to setup the dependency graph: \{show delta}"
          -- coreLift $ putStrLn """
          --   compiling files: \{show allFiles}
          --   modules in the tree that are not in the item list:
