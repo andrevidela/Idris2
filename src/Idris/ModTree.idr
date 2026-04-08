@@ -33,6 +33,20 @@ covering
 Show ModTree where
   show t = show (sourceFile t) ++ " " ++ show (nspace t) ++ "<-" ++ show (deps t)
 
+data TimeRef : Type where
+
+Time : Type
+Time = Ref TimeRef (SortedMap String (Clock Duration))
+
+withTiming : Time => String -> Core a -> Core a
+withTiming fnName f = do
+  start <- coreLift $ clockTime Monotonic
+  result <- f
+  end <- coreLift $ clockTime Monotonic
+  let delta = timeDifference end start
+  update TimeRef (update (Just . maybe delta (addDuration delta)) fnName)
+  pure result
+
 -- A module file to build, and its list of dependencies
 -- From this we can work out if the source file needs rebuilding, assuming
 -- things are build in dependency order. A source file needs rebuilding
@@ -97,9 +111,9 @@ data DoneMod : Type where
 data BuildOrder : Type where
 
 modTreeToDAG : ModTree -> DAG ModuleIdent BuildMod
-modTreeToDAG modTree = MkDAG'
-  (moduleItems modTree empty)
-  (moduleTree modTree empty)
+modTreeToDAG modTree =
+    MkDAG' (moduleItems modTree empty)
+           (moduleTree modTree empty)
   where
     -- we don't keep track of dependencies in the map of items
     moduleItems : ModTree -> SortedMap ModuleIdent BuildMod -> SortedMap ModuleIdent BuildMod
@@ -161,14 +175,16 @@ getModTree loc done fname
 
 getModDAG : {auto c : Ref Ctxt Defs} ->
             {auto o : Ref ROpts REPLOpts} ->
+            Time =>
             FC -> (done : List BuildMod) ->
             (mainFile : String) ->
             Core (DAG ModuleIdent BuildMod)
 getModDAG loc done fname
   = do -- coreLift $ putStrLn "computing mod dag for module file \{fname}"
-       Just tree <- getModTree loc done fname
+
+       Just tree <- withTiming "getModTree" $ getModTree loc done fname
          | Nothing  => pure empty
-       let dag = modTreeToDAG tree
+       dag <- withTiming "modTreeToDAG" $ pure $ modTreeToDAG tree
        -- coreLift $ putStrLn """
        --     dependency tree: \{show dag}
        --     """
@@ -403,12 +419,13 @@ getAllBuildMods fc done (f :: fs)
 
 getAllModDAG : {auto c : Ref Ctxt Defs} ->
                   {auto o : Ref ROpts REPLOpts} ->
+                  Time =>
                   FC -> (done : DAG ModuleIdent BuildMod) ->
                   (allFiles : List String) ->
                   Core (DAG ModuleIdent BuildMod)
 getAllModDAG fc done [] = pure done
 getAllModDAG fc done (f :: fs)
-    = do ms <- getModDAG fc (values done.items) f
+    = do ms <- withTiming "getModDAG" $ getModDAG fc (values done.items) f
          getAllModDAG fc (merge const ms done) fs
 
 export
@@ -420,11 +437,13 @@ buildAll : {auto c : Ref Ctxt Defs} ->
 buildAll allFiles
     = do
          coreLift $ putStrLn "--- starting compilation of modules ---------------------------"
-         start <- coreLift $ clockTime Monotonic
-         mods <- getAllModDAG EmptyFC empty allFiles
-         end <- coreLift $ clockTime Monotonic
-         let delta = timeDifference end start
-         coreLift $ putStrLn "time to setup the dependency graph: \{show delta}"
+         _ <- newRef TimeRef empty
+         mods <- withTiming "getAllModDAG" $ getAllModDAG EmptyFC empty allFiles
+         buildTime <- get TimeRef
+         coreLift $ putStrLn """
+           build timings:
+           \{unlines $ map show $ kvList buildTime}
+           """
          -- coreLift $ putStrLn """
          --   compiling files: \{show allFiles}
          --   modules in the tree that are not in the item list:
