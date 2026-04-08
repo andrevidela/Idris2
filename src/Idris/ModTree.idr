@@ -163,18 +163,19 @@ mkBuildMods mod
 export
 getModTree : {auto c : Ref Ctxt Defs} ->
                {auto o : Ref ROpts REPLOpts} ->
+               {auto a : Ref AllMods (List (ModuleIdent, ModTree))} ->
                FC -> (done : List BuildMod) ->
                (mainFile : String) ->
                Core (Maybe ModTree)
 getModTree loc done fname
-    = do a <- newRef AllMods []
-         fname_ns <- ctxtPathToNS fname
+    = do fname_ns <- ctxtPathToNS fname
          if fname_ns `elem` map buildNS done
             then pure Nothing
-            else map Just (mkModTree {a} loc [] (Just fname) fname_ns)
+            else map Just (mkModTree loc [] (Just fname) fname_ns)
 
 getModDAG : {auto c : Ref Ctxt Defs} ->
             {auto o : Ref ROpts REPLOpts} ->
+            {auto a : Ref AllMods (List (ModuleIdent, ModTree))} ->
             Time =>
             FC -> (done : List BuildMod) ->
             (mainFile : String) ->
@@ -200,7 +201,8 @@ getBuildMods : {auto c : Ref Ctxt Defs} ->
                (mainFile : String) ->
                Core (List BuildMod)
 getBuildMods loc done fname
-    = do Just t <- getModTree loc done fname
+    = do a <- newRef AllMods []
+         Just t <- getModTree loc done fname
            | Nothing => pure []
          dm <- newRef DoneMod empty
          o <- newRef BuildOrder []
@@ -419,6 +421,7 @@ getAllBuildMods fc done (f :: fs)
 
 getAllModDAG : {auto c : Ref Ctxt Defs} ->
                   {auto o : Ref ROpts REPLOpts} ->
+                  {auto a : Ref AllMods (List (ModuleIdent, ModTree))} ->
                   Time =>
                   FC -> (done : DAG ModuleIdent BuildMod) ->
                   (allFiles : List String) ->
@@ -438,6 +441,7 @@ buildAll allFiles
     = do
          coreLift $ putStrLn "--- starting compilation of modules ---------------------------"
          _ <- newRef TimeRef empty
+         _ <- newRef AllMods []
          mods <- withTiming "getAllModDAG" $ getAllModDAG EmptyFC empty allFiles
          buildTime <- get TimeRef
          coreLift $ putStrLn """
