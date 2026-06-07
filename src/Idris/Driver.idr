@@ -23,11 +23,13 @@ import Idris.Error
 import IdrisPaths
 
 import Data.String
+import Data.Either
 import System
 import System.Directory
 import System.File.Meta
 import System.File.Virtual
 import Libraries.Utils.Path
+import Libraries.API
 import System.Term
 
 import Yaffle.Main
@@ -263,16 +265,85 @@ quitOpts (Help (Just HelpPragma) :: _)
          pure False
 quitOpts (_ :: opts) = quitOpts opts
 
+public export 0
+CMD_OPTS : API
+CMD_OPTS = Send (List CLOpt)
+
+public export 0
+IS_QUIT : API
+IS_QUIT = List CLOpt :- Bool
+
+0 SETUP_TERM  : API
+SETUP_TERM = End
+
+0 MAIN : API
+MAIN = Recv (List (String, Codegen), List CLOpt)
+
+handleCore : IO $$ a =&> Core $$ a
+handleCore =
+  transform {m = IO, n = Core} $ \p =>
+    coreRun p
+      (\err => do
+        ignore $ fPutStrLn stderr $ "Uncaught error: " ++ show err
+        exitWith (ExitFailure 1)
+      )
+      pure
+
+handleStrErr : IO $$ a =&> IO . Either String $$ a
+handleStrErr =
+    transform
+      {m = IO, n = IO . Either String} $ \p =>
+      case !p of
+           Right ok => pure ok
+           Left err => do
+             ignore $ fPutStrLn stderr $ "Error: " ++ err
+             exitWith (ExitFailure 1)
+
+setupTerminalHandler : Handler (IO $$ SETUP_TERM)
+setupTerminalHandler = sendHandler setupTerm
+
+mainHandler : Handler (Core $$ MAIN)
+mainHandler = mkHandler (uncurry stMain)
+
+isQuitHandler : Handler (IO $$ IS_QUIT)
+isQuitHandler = mkHandler quitOpts
+
+cmdOptsHandler : Handler (IO . Either String $$ CMD_OPTS)
+cmdOptsHandler = sendHandler getCmdOpts
+
+0
+MainFn : API
+MainFn = CMD_OPTS &> IS_QUIT &> (End + (SETUP_TERM &> MAIN))
+
+exec : Recv (List (String, Codegen)) =&> MainFn
+exec = !! \backends =>
+  Value $
+    (opts <- ()) @>
+    (continue <- opts) @>
+    if continue
+       then Right ((zz <- ()) @> (backends, opts))
+       else Left ()
+
+handleMainIO : Handler (IO $$ MainFn)
+handleMainIO =
+  IO $$ (CMD_OPTS &> IS_QUIT &> (End + (SETUP_TERM &> MAIN))
+  ~> (distrib IO)
+  IO $$ CMD_OPTS &> IO $$ IS_QUIT &> IO $$ (End + (SETUP_TERM &> MAIN))
+  ~> cmdOptsHandler &> isQuitHandler &> _
+  IO $$ (End + (SETUP_TERM &> MAIN))
+  ~> distrib+
+  IO $$ End + IO $$ (SETUP_TERM &> MAIN)
+  ~> _ + distrib IO
+  IO $$ End + (IO $$ SETUP_TERM &> IO $$ MAIN)
+  ~> _ + (setupTerminalHadler &> mainHandler)
+  IO $$ End + (End &> End)
+  ~> counit + identityLeft
+  End + End
+  ~> (dia)
+  End
+
+
+
 export
 mainWithCodegens : List (String, Codegen) -> IO ()
-mainWithCodegens cgs = do
-  Right opts <- getCmdOpts
-    | Left err => do ignore $ fPutStrLn stderr $ "Error: " ++ err
-                     exitWith (ExitFailure 1)
-  continue <- quitOpts opts
-  when continue $ do
-    setupTerm
-    coreRun (stMain cgs opts)
-      (\err : Error => do ignore $ fPutStrLn stderr $ "Uncaught error: " ++ show err
-                          exitWith (ExitFailure 1))
-      (\res => pure ())
+mainWithCodegens = runHandler $ map IO exec |&> handleMainIO
