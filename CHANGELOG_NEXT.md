@@ -38,6 +38,11 @@ should target this file (`CHANGELOG_NEXT`).
 
 ### Compiler changes
 
+* Displaying a hole no longer loops when its type mentions a function with no
+  normal form (a `covering` but not `total` definition). Normalisation for
+  display is now bounded; if the bound is reached the type is shown as it was
+  stored, followed by a warning that it is unreduced. The same bound stops
+  `--check` looping when it normalises the types of holes.
 * Fixed missing handling of dotted patterns See
   [#3669](https://github.com/idris-lang/Idris2/issues/3669),
   [comment](https://github.com/idris-lang/Idris2/issues/3644#issuecomment-3286320272).

@@ -71,13 +71,42 @@ normaliseLHS defs env (Bind fc n b sc)
 normaliseLHS defs env tm
     = quote defs env !(nfOpts onLHS defs env tm)
 
+||| How deep a chain of nested definition unfoldings we are prepared to follow
+||| before deciding that normalisation is not going to terminate. This is a
+||| backstop for types which mention non-total functions: those have no normal
+||| form at all, so without a limit the evaluator loops forever.
+public export
+divergenceFuel : Nat
+divergenceFuel = 1000
+
+||| Normalise, giving up rather than looping on terms with no normal form.
+||| Returns Nothing if either limit is reached, so that callers can report the
+||| original term instead. Two limits, because they catch different shapes of
+||| runaway: 'fuelLimit' bounds the depth of nested definition unfoldings and
+||| so guarantees termination on its own, but a term can pile up an enormous
+||| amount of work before reaching it, whereas 'appDepth' (the depth of nested
+||| stuck applications, as in 'tryNormaliseSizeLimit') tends to be reached
+||| early and cheaply by exactly those terms.
+export
+tryNormaliseLimited : {auto c : Ref Ctxt Defs} ->
+                      {free : _} ->
+                      Defs -> (fuelLimit : Nat) -> (appDepth : Nat) ->
+                      Env Term free -> Term free -> Core (Maybe (Term free))
+tryNormaliseLimited defs fuelLimit appDepth env tm
+    = catch (do tm' <- nfOpts ({ fuel := Just fuelLimit,
+                                 strictFuel := True } defaultOpts) defs env tm
+                Just <$> quoteOpts (MkQuoteOpts False False (Just appDepth))
+                                   defs env tm')
+            (\_ => pure Nothing)
+
 export
 tryNormaliseSizeLimit : {auto c : Ref Ctxt Defs} ->
                      {free : _} ->
                      Defs -> Nat ->
                      Env Term free -> Term free -> Core (Term free)
 tryNormaliseSizeLimit defs limit env tm
-    = do tm' <- nf defs env tm
+    = do tm' <- nfOpts ({ fuel := Just divergenceFuel,
+                          strictFuel := True } defaultOpts) defs env tm
          quoteOpts (MkQuoteOpts False False (Just limit)) defs env tm'
 
 -- The size limit here is the depth of stuck applications. If it gets past
@@ -88,7 +117,8 @@ normaliseSizeLimit : {auto c : Ref Ctxt Defs} ->
                      Defs -> Nat ->
                      Env Term free -> Term free -> Core (Term free)
 normaliseSizeLimit defs limit env tm
-    = catch (do tm' <- nf defs env tm
+    = catch (do tm' <- nfOpts ({ fuel := Just divergenceFuel,
+                                 strictFuel := True } defaultOpts) defs env tm
                 quoteOpts (MkQuoteOpts False False (Just limit)) defs env tm')
             (\err => pure tm)
 

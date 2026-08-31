@@ -1,0 +1,5 @@
+1/1: Building Diverge (Diverge.idr)
+Diverge> Diverge.diverging_rhs : loopy 0 = 0
+-- warning: normalisation stopped early, type shown unreduced
+Diverge> Diverge.converging_rhs : 4 = 4
+Diverge> Bye for now!

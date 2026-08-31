@@ -19,6 +19,8 @@ record EvalOpts where
   evalAll : Bool -- evaluate everything, including private names
   tcInline : Bool -- inline for totality checking
   fuel : Maybe Nat -- Limit for recursion depth
+  strictFuel : Bool -- if set, running out of 'fuel' is an error rather than
+                    -- silently returning the unreduced definition
   reduceLimit : List (Name, Nat) -- reduction limits for given names. If not
                      -- present, no limit
   strategy : EvalOrder
@@ -32,6 +34,7 @@ defaultOpts = MkEvalOpts
     , evalAll = False
     , tcInline = False
     , fuel = Nothing
+    , strictFuel = False
     , reduceLimit = []
     , strategy = CBN
     }
@@ -45,6 +48,7 @@ withHoles = MkEvalOpts
     , evalAll = False
     , tcInline = False
     , fuel = Nothing
+    , strictFuel = False
     , reduceLimit = []
     , strategy = CBN
     }
@@ -58,6 +62,7 @@ withAll = MkEvalOpts
     , evalAll = True
     , tcInline = False
     , fuel = Nothing
+    , strictFuel = False
     , reduceLimit = []
     , strategy = CBN
     }
@@ -71,6 +76,7 @@ withArgHoles = MkEvalOpts
     , evalAll = False
     , tcInline = False
     , fuel = Nothing
+    , strictFuel = False
     , reduceLimit = []
     , strategy = CBN
     }

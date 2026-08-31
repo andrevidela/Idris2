@@ -1,0 +1,5 @@
+. ../../../testutils.sh
+
+# Showing the hole must not loop, and checking the file must not either
+check Diverge.idr
+idris2 Diverge.idr < input

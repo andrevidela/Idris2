@@ -1,6 +1,7 @@
 module Idris.IDEMode.Holes
 
 import Core.Env
+import Core.Normalise
 
 import Data.String
 
@@ -52,6 +53,9 @@ record Data where
   name : Name
   type : IPTerm
   context : List Holes.Premise
+  ||| Set if we gave up normalising the hole's type or one of its premises,
+  ||| in which case the types above are shown as they were stored.
+  limitReached : Bool
 
 export
 prettyHoles : List Holes.Data -> Doc IdrisSyntax
@@ -88,6 +92,36 @@ showName (UN Underscore) = False
 showName (MN {}) = False
 showName _ = True
 
+||| How far we normalise a type before showing it in a hole. A type which
+||| mentions a non-total function has no normal form at all, so without a
+||| limit the evaluator loops forever instead of answering.
+|||
+||| The fuel is what guarantees termination and is set high enough not to
+||| interfere with real type level computation (it is a depth, and costs about
+||| 2.5 per step of e.g. Nat addition). The application depth is what makes
+||| the answer arrive quickly when a type really is diverging: reaching the
+||| fuel limit on such a type takes tens of seconds, reaching this one takes
+||| a fraction of a second.
+holeNormaliseFuel : Nat
+holeNormaliseFuel = 5000
+
+holeNormaliseAppDepth : Nat
+holeNormaliseAppDepth = 1000
+
+||| Normalise a type for display, giving up and returning it unchanged (with
+||| the flag set) if it looks like normalisation is not going to terminate.
+normaliseForDisplay : {vars : _} ->
+                      {auto c : Ref Ctxt Defs} ->
+                      Defs -> Env Term vars -> Term vars ->
+                      Core (Term vars, Bool)
+normaliseForDisplay defs env tm
+  = do Just tm' <- tryNormaliseLimited defs holeNormaliseFuel
+                                       holeNormaliseAppDepth env tm
+         | Nothing => do log "ide-mode.hole" 10 $
+                            "Normalisation limit reached on: " ++ show !(toFullNames tm)
+                         pure (tm, True)
+       pure (tm', False)
+
 export
 extractHoleData : {vars : _} ->
                   {auto c : Ref Ctxt Defs} ->
@@ -102,17 +136,19 @@ extractHoleData defs env fn (S args) (Bind fc x b sc)
          | False => do log "ide-mode.hole" 10 $ "Not showing name: " ++ show x
                        pure rest
        log "ide-mode.hole" 10 $ "Showing name: " ++ show x
-       ity <- resugar env !(normalise defs env (binderType b))
+       (bty, limited) <- normaliseForDisplay defs env (binderType b)
+       ity <- resugar env bty
        let premise = MkHolePremise x ity (multiplicity b) (isImplicit b)
-       pure $ { context $= (premise ::)  } rest
+       pure $ { context $= (premise ::)
+              , limitReached $= (limited ||) } rest
 extractHoleData defs env fn args ty
-  = do nty <- normalise defs env ty
+  = do (nty, limited) <- normaliseForDisplay defs env ty
        ity <- resugar env nty
        log "ide-mode.hole" 20 $
           "Return type: " ++ show !(toFullNames ty)
           ++ "\n  Evaluated to: " ++ show !(toFullNames nty)
           ++ "\n  Resugared to: " ++ show ity
-       pure $ MkHoleData fn ity []
+       pure $ MkHoleData fn ity [] limited
 
 
 export
@@ -155,6 +191,12 @@ getUserHolesData
                      holeData defs Env.empty n args (type gdef))
                   holesWithArgs
 
+||| Shown when we stopped normalising a hole's type early: the type above is
+||| the one we started from, not its normal form.
+export
+limitWarning : String
+limitWarning = "-- warning: normalisation stopped early, type shown unreduced"
+
 export
 showHole : {vars : _} ->
           {auto c : Ref Ctxt Defs} ->
@@ -164,12 +206,15 @@ showHole : {vars : _} ->
 
 showHole defs env fn args ty
     = do hdata <- holeData defs env fn args ty
+         let warning = if hdata.limitReached
+                          then "\n" ++ limitWarning
+                          else ""
          case hdata.context of
-           [] => pure $ show (hdata.name) ++ " : " ++ show hdata.type
+           [] => pure $ show (hdata.name) ++ " : " ++ show hdata.type ++ warning
            _  => pure $
               unlines (map show hdata.context)
               ++ "-------------------------------------\n"
-              ++ nameRoot (hdata.name) ++ " : " ++ show hdata.type
+              ++ nameRoot (hdata.name) ++ " : " ++ show hdata.type ++ warning
 
 export
 prettyHole : {vars : _} ->
@@ -179,11 +224,15 @@ prettyHole : {vars : _} ->
              Core (Doc IdrisSyntax)
 prettyHole defs env fn args ty
   = do hdata <- holeData defs env fn args ty
+       let warning = if hdata.limitReached
+                        then hardline <+> pretty0 limitWarning
+                        else neutral
        case hdata.context of
-         [] => pure $ pretty0 hdata.name <++> colon <++> pretty hdata.type
+         [] => pure $ pretty0 hdata.name <++> colon <++> pretty hdata.type <+> warning
          _  => pure $ indent 1 (vsep $ map pretty hdata.context) <+> hardline
                   <+> (pretty0 $ replicate 30 '-') <+> hardline
                   <+> pretty0 (nameRoot $ hdata.name) <++> colon <++> pretty hdata.type
+                  <+> warning
 
 
 premiseIDE : Holes.Premise -> HolePremise

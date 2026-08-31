@@ -515,8 +515,11 @@ parameters (defs : Defs) (topopts : EvalOpts)
                                               pure def
                                case fuel opts of
                                     Nothing => evalWithOpts defs opts env newLoc res stk'
-                                    Just Z => log "eval.def.stuck" 50 "Recursion depth limit exceeded"
-                                              >> pure def
+                                    Just Z =>
+                                       if strictFuel opts
+                                          then throw (InternalError "Recursion depth limit exceeded")
+                                          else log "eval.def.stuck" 50 "Recursion depth limit exceeded"
+                                               >> pure def
                                     Just (S k) =>
                                         do let opts' = { fuel := Just k } opts
                                            evalWithOpts defs opts' env newLoc res stk'
